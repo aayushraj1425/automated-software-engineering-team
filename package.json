@@ -1,0 +1,26 @@
+{
+  "name": "asep",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "e2e": "pnpm --filter web e2e",
+    "generate": "pnpm --filter @asep/shared generate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose -f infra/docker/docker-compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f infra/docker/docker-compose.dev.yml down",
+    "db:migrate": "pnpm --filter engine db:migrate && pnpm --filter web auth:migrate"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3"
+  }
+}

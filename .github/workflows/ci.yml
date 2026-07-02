@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web lint
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web test
+      - run: pnpm --filter web build
+        env:
+          BETTER_AUTH_SECRET: ci-dummy-secret-0000000000000000
+          BETTER_AUTH_URL: http://localhost:3000
+          DATABASE_URL: postgresql://asep:asep@localhost:5432/asep
+          ENGINE_URL: http://localhost:8000
+          ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
+
+  engine:
+    name: Engine (ruff, pyright, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/engine
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: asep
+          POSTGRES_PASSWORD: asep
+          POSTGRES_DB: asep
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U asep -d asep"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://asep:asep@localhost:5432/asep
+      LLM_FAKE: "1"
+      ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - run: uv run alembic upgrade head
+      - run: uv run pytest
+
+  compose:
+    name: Compose config check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f infra/docker/docker-compose.dev.yml config -q
