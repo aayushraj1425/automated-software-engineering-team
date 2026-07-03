@@ -1,3 +1,11 @@
 packages:
   - "apps/*"
   - "packages/*"
+# Native/postinstall build scripts: allow only what we actually use.
+# prisma/better-sqlite3 are unused better-auth adapter fallbacks (we use pg).
+allowBuilds:
+  "@prisma/client": false
+  better-sqlite3: false
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
