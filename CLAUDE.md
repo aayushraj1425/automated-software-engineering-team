@@ -46,4 +46,5 @@ Engine-only (run inside `apps/engine`): `uv sync`, `uv run pytest`,
 - Windows + OneDrive checkout: `.npmrc` pins `node-linker=hoisted` (no junctions) and
   the repo sets `core.longpaths=true`. Don't switch pnpm back to symlink linking.
 - `uv` is at `~/.local/bin` — new shells may need `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"`.
+- Dev Postgres maps to host port **5433** (a local Windows PostgreSQL service owns 5432).
 - Engine tests need Postgres running (`pnpm db:up`); they create/drop an `asep_test` db.

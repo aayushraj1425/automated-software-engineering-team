@@ -1,0 +1,13 @@
+{
+  "name": "engine",
+  "private": true,
+  "scripts": {
+    "dev": "uv run watchfiles --filter python \"python -m engine.serve\" src",
+    "start": "uv run python -m engine.serve",
+    "lint": "uv run ruff check . && uv run ruff format --check .",
+    "typecheck": "uv run pyright",
+    "test": "uv run pytest",
+    "db:migrate": "uv run alembic upgrade head",
+    "openapi": "uv run python -m engine.openapi_export"
+  }
+}

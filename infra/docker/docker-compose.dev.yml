@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: asep
       POSTGRES_DB: asep
     ports:
-      - "5432:5432"
+      # Host port 5433: many dev machines run a local PostgreSQL on 5432
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
