@@ -27,6 +27,6 @@ through a thin `ObjectStore` wrapper so signing/retry policy lives in one place.
 ## Consequences
 
 - One more dev service (MinIO) — negligible.
-- Bucket lifecycle rules (artifact retention) become part of M7 ops work.
+- Bucket lifecycle rules (artifact retention) become part of Phase 7 ops work.
 - Workspaces under `.workspaces/` remain local scratch space; anything worth keeping
   gets promoted to object storage.

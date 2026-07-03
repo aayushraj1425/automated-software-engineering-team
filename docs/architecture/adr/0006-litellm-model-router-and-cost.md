@@ -17,9 +17,9 @@ unboundedly if uncontrolled.
   env maps tiers to concrete models (`MODEL_PLANNER`, `MODEL_CODER`, `MODEL_CHEAP`),
   defaulting to Anthropic models with provider prefixes (e.g. `anthropic/claude-sonnet-4-6`).
 - **Keys:** provider API keys via env in dev; per-user encrypted BYO keys (AES-GCM)
-  arrive with M1's schema.
+  arrive with Phase 1's schema.
 - **Cost controls:** ModelRouter records tokens/cost per call (litellm usage data);
-  M1 adds per-run budget caps that abort runs exceeding their allowance.
+  Phase 1 adds per-run budget caps that abort runs exceeding their allowance.
 - **`LLM_FAKE=1`** returns deterministic canned streams — tests, CI, and offline dev
   never need real keys.
 

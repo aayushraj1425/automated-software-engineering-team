@@ -33,7 +33,7 @@ flowchart TB
         API[/v1 API\nchat · conversations · runs/]
         MR[ModelRouter\nLiteLLM · tiers · budgets]
         LG[LangGraph runtime\ngraphs · checkpoints · interrupts]
-        W[arq workers M1+\nagent runs]
+        W[arq workers Phase 1+\nagent runs]
     end
     PG[(Postgres 16\n+ pgvector)]
     RD[(Redis 7)]
@@ -46,13 +46,13 @@ flowchart TB
     API -->|SQLAlchemy async| PG
     BFF -->|better-auth tables| PG
     W --> RD
-    API -->|pub/sub events M1| RD
-    W -->|artifacts M1| S3
+    API -->|pub/sub events Phase 1| RD
+    W -->|artifacts Phase 1| S3
 ```
 
 ## Key flows
 
-### Chat (M0 walking skeleton)
+### Chat (Phase 0 walking skeleton)
 
 1. Browser POSTs `{conversationId?, message}` to the BFF route `/api/chat`.
 2. BFF validates the better-auth session, signs a short-lived HS256 **service JWT**
@@ -62,7 +62,7 @@ flowchart TB
 4. Tokens flow back as SSE (`event: token`), finishing with `event: done`. The BFF pipes
    the stream through untouched; the engine persists the assistant message.
 
-### Agent run (M1 target shape)
+### Agent run (Phase 1 target shape)
 
 Feature request → PM agent drafts spec + task DAG → **LangGraph interrupt** for human
 approval → Supervisor dispatches Backend/Frontend/DevOps agents against a per-run git
@@ -94,12 +94,12 @@ private network behind the BFF (ADR-0002).
 
 - **Token streaming:** engine SSE → BFF pass-through → browser `fetch` + ReadableStream
   parser. SSE over WebSockets because flows are strictly server→client (ADR-0004).
-- **Agent events (M1):** workers publish to Redis pub/sub; an engine SSE endpoint fans
+- **Agent events (Phase 1):** workers publish to Redis pub/sub; an engine SSE endpoint fans
   out per-run event streams to mission control.
 
 ## Environments
 
-| | Dev (now) | Production (M7) |
+| | Dev (now) | Production (Phase 7) |
 |---|---|---|
 | Services | Docker Compose (`infra/docker`) | Kubernetes + Helm |
 | Web/Engine | `pnpm dev` on host | Container images |
@@ -113,7 +113,7 @@ apps/web/src/app            # routes (App Router) + BFF endpoints under app/api
 apps/web/src/lib            # auth config, service-token signing, env
 apps/engine/src/engine/api  # FastAPI routers (health, chat, conversations)
 apps/engine/src/engine/llm  # ModelRouter over LiteLLM
-apps/engine/src/engine/agents  # LangGraph graphs (chat now, team in M1)
+apps/engine/src/engine/agents  # LangGraph graphs (chat now, team in Phase 1)
 apps/engine/src/engine/db   # SQLAlchemy models + session
 apps/engine/src/engine/migrations  # Alembic
 packages/shared             # generated OpenAPI types for the engine API

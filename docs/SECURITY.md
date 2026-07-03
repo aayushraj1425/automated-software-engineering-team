@@ -24,23 +24,23 @@ Browser ──(1)── web BFF ──(2)── engine ──(3)── LLM provi
    browsers; secret never in client bundles.
 3. Keys server-side only; requests carry code snippets — users consent by connecting a repo.
 4. **Repo content is untrusted input** (prompt injection lives here). Mitigations:
-   closed tool allowlist, path jail, no shell (M1), no-egress sandbox (M3), human PR gate.
-5. Minimal GitHub scopes; tokens encrypted at rest (M1).
+   closed tool allowlist, path jail, no shell (Phase 1), no-egress sandbox (Phase 3), human PR gate.
+5. Minimal GitHub scopes; tokens encrypted at rest (Phase 1).
 
 ## Top threats & mitigations
 
 | Threat | Mitigation (phase) |
 |---|---|
-| Prompt injection in repo files steers agents | Human plan approval + PR gate (M1); tool allowlist + path jail (M1); no-egress sandbox (M3); injection eval suite (M3) |
-| Path traversal / symlink escape from workspace | Jail resolves symlinks, rejects escapes; dedicated traversal/UNC tests (M1) |
-| Secret exfiltration into prompts/PRs | Tools refuse `.env*`/credential paths (M1); secrets scanner on diffs (M3); keys never enter prompt context |
-| Stolen provider keys | AES-GCM at rest, master key from env (M1); per-user keys never logged |
-| Runaway spend | Per-run token/cost caps (M1); tier defaults favor cheap models |
+| Prompt injection in repo files steers agents | Human plan approval + PR gate (Phase 1); tool allowlist + path jail (Phase 1); no-egress sandbox (Phase 3); injection eval suite (Phase 3) |
+| Path traversal / symlink escape from workspace | Jail resolves symlinks, rejects escapes; dedicated traversal/UNC tests (Phase 1) |
+| Secret exfiltration into prompts/PRs | Tools refuse `.env*`/credential paths (Phase 1); secrets scanner on diffs (Phase 3); keys never enter prompt context |
+| Stolen provider keys | AES-GCM at rest, master key from env (Phase 1); per-user keys never logged |
+| Runaway spend | Per-run token/cost caps (Phase 1); tier defaults favor cheap models |
 | Service JWT forgery | 256-bit secret, 60s expiry, `iat/exp` verified; rotate via env |
 | SSRF via user-supplied repo URLs | Allowlist git hosts; no arbitrary URL fetch tools until sanitized fetcher ships |
-| Dependency supply chain | Lockfiles committed; Dependabot/audit in CI (M3); pinned Docker base images |
+| Dependency supply chain | Lockfiles committed; Dependabot/audit in CI (Phase 3); pinned Docker base images |
 
-## Current controls (M0)
+## Current controls (Phase 0)
 
 - Auth: better-auth, DB sessions, password hashing handled by the library.
 - Engine `/v1/*` requires the service JWT; `/healthz` is the only public route.
@@ -49,11 +49,11 @@ Browser ──(1)── web BFF ──(2)── engine ──(3)── LLM provi
 - Audit skeleton: `audit_logs` table written from the first chat endpoint onward.
 - CI runs lint/type/test on every PR; no direct pushes to `main` once the repo is on GitHub.
 
-## Security work by milestone
+## Security work by phase
 
-- **M1:** path jail + tests, encrypted BYO keys, budget caps, tool audit trail, rate limiting.
-- **M3:** sandbox (no egress), secrets detection, dependency scanning, injection evals.
-- **M7:** row-level security, mTLS/service mesh option, SSO/SAML, pen test, backup/DR drills.
+- **Phase 1:** path jail + tests, encrypted BYO keys, budget caps, tool audit trail, rate limiting.
+- **Phase 3:** sandbox (no egress), secrets detection, dependency scanning, injection evals.
+- **Phase 7:** row-level security, mTLS/service mesh option, SSO/SAML, pen test, backup/DR drills.
 
 ## Reporting
 

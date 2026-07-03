@@ -30,7 +30,7 @@ role-based access control with organizations/teams — self-hosted, in our Postg
 ## Consequences
 
 - RBAC vocabulary (owner/admin/member) comes from the organization plugin; engine-side
-  authorization checks use role claims carried in the service JWT (hardened in M7).
+  authorization checks use role claims carried in the service JWT (hardened in Phase 7).
 - Identity schema evolution is coupled to better-auth releases; pin versions and run
   `auth:migrate` as part of `pnpm db:migrate`.
 - If better-auth stalls as a project, the migration path is Auth.js + a hand-built org

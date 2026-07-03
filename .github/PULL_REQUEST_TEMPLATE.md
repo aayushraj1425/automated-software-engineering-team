@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- What does this PR do, and why? Link the backlog item (e.g. M1-E2-T3). -->
+<!-- What does this PR do, and why? Link the backlog item (e.g. Task 1.2.3). -->
 
 ## Definition of Done
 

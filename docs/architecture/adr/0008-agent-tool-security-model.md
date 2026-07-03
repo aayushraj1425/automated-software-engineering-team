@@ -13,12 +13,12 @@ jail"* (PRD §7).
 
 Defense in depth, phased:
 
-1. **Path jail (M1):** every run gets a workspace `.workspaces/<run-id>/` (repo clone +
+1. **Path jail (Phase 1):** every run gets a workspace `.workspaces/<run-id>/` (repo clone +
    branch). All fs tools (`list_dir`, `read_file`, `search`, `apply_patch`) resolve
    paths and reject anything outside the workspace root (symlink-resolved).
-2. **No arbitrary shell before the sandbox (M1):** tools are a closed allowlist; there
-   is no `run_command` tool until M3.
-3. **Sandboxed execution (M3):** builds/tests run in disposable Docker containers with
+2. **No arbitrary shell before the sandbox (Phase 1):** tools are a closed allowlist; there
+   is no `run_command` tool until Phase 3.
+3. **Sandboxed execution (Phase 3):** builds/tests run in disposable Docker containers with
    CPU/memory/time limits and **no network egress** by default.
 4. **Human gates:** plan approval before any edit; PR (never direct push to default
    branches) as the only merge path.
@@ -32,13 +32,13 @@ Defense in depth, phased:
 ## Alternatives considered
 
 - **Full VM/microVM isolation (Firecracker/gVisor) from day 1** — strongest isolation,
-  heavy infra; planned as the M7+ hardening path for hosted multi-tenancy.
+  heavy infra; planned as the Phase 7+ hardening path for hosted multi-tenancy.
 - **Unrestricted shell with LLM self-policing** — how several agent products started;
   rejected outright, prompt injection makes it untenable.
 
 ## Consequences
 
-- Some tasks (installing deps to verify builds) are impossible until M3 — accepted;
-  the Reviewer agent compensates partially in M1.
+- Some tasks (installing deps to verify builds) are impossible until Phase 3 — accepted;
+  the Reviewer agent compensates partially in Phase 1.
 - Path jail code becomes security-critical and gets dedicated tests (traversal,
   symlink escape, UNC paths on Windows).

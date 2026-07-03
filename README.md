@@ -5,7 +5,8 @@ development lifecycle: a multi-agent engineering team (PM, Backend, Frontend, De
 Reviewer), repository intelligence, planning, implementation, code review, testing,
 documentation, and deployment.
 
-> Working codename: **asep**. Status: **Milestone 0 — Foundation** (walking skeleton).
+> Working codename: **asep**. Status: **Foundation phase complete** — next up:
+> Phase 1, the Multi-Agent Engineering Team (see [docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Architecture at a glance
 
@@ -16,7 +17,7 @@ Browser ──► apps/web   Next.js 15 (UI + BFF: better-auth sessions, SSE pro
             apps/engine FastAPI (Python 3.12)
               ├─ ModelRouter over LiteLLM (multi-provider, tiering, BYO keys)
               ├─ LangGraph runtime (agents, Postgres checkpoints)
-              └─ arq workers (Redis) — agent runs (M1+)
+              └─ arq workers (Redis) — agent runs (Phase 1+)
         Postgres 16 + pgvector ─── Redis 7 ─── MinIO (S3-compatible)
 ```
 

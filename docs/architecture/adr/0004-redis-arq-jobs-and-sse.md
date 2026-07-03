@@ -4,7 +4,7 @@
 
 ## Context
 
-Agent runs (M1) and repo indexing (M2) are long-running jobs that outlive HTTP requests
+Agent runs (Phase 1) and repo indexing (Phase 2) are long-running jobs that outlive HTTP requests
 and must stream progress to the UI. The engine is asyncio end-to-end.
 
 ## Decision

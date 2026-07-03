@@ -45,42 +45,42 @@ implementation → review → deployment → maintenance → continuous improvem
 9. **AI Memory** (G9) — style, decisions, conversations, evolution, preferences.
 10. **Production Deployment** (G10) — Docker/K8s, authn/z, logging, metrics, backups, DR.
 
-## 5. v1 scope (Milestones 0–3)
+## 5. v1 scope (Phases 0–3)
 
 **In scope**
-- M0: monorepo foundation, auth skeleton, streaming chat spine (LiteLLM), dev infra, CI.
-- M1: the multi-agent team v1 — feature request → PM spec + task breakdown → human
+- Phase 0: monorepo foundation, auth skeleton, streaming chat spine (LiteLLM), dev infra, CI.
+- Phase 1: the multi-agent team v1 — feature request → PM spec + task breakdown → human
   approval → Backend/Frontend/DevOps agents implement in a git worktree → Reviewer
   critique loop → GitHub PR. Mission-control UI with live agent timeline.
-- M2: repository intelligence — tree-sitter indexing (TS/JS, Python, Java/Kotlin),
+- Phase 2: repository intelligence — tree-sitter indexing (TS/JS, Python, Java/Kotlin),
   hybrid semantic + keyword search, dependency graphs, grounded chat with citations.
-- M3: sandboxed execution (build/test in Docker), QA agent self-correction, PR-review
+- Phase 3: sandboxed execution (build/test in Docker), QA agent self-correction, PR-review
   agent via webhooks, secrets/dependency scanning.
 
-**Explicit cutlines (not before M4+)**
+**Explicit cutlines (not before Phase 4+)**
 - In-browser IDE (editor/terminal/debugger), Jira/Linear/Slack/Figma integrations,
   GitLab/Bitbucket, knowledge graph & long-term memory, K8s/production hardening,
   SSO/SAML, usage-based billing.
 
 ## 6. Core user journeys (v1)
 
-1. **Chat about anything** (M0): sign in → chat with a model through the multi-provider
+1. **Chat about anything** (Phase 0): sign in → chat with a model through the multi-provider
    gateway; conversations persist.
-2. **Ship a feature with the agent team** (M1): connect GitHub repo → describe feature →
+2. **Ship a feature with the agent team** (Phase 1): connect GitHub repo → describe feature →
    review/approve the PM's plan → watch the team execute live → receive a PR → merge or
    request changes.
-3. **Understand a codebase** (M2): connect repo → indexed automatically → ask "how does
+3. **Understand a codebase** (Phase 2): connect repo → indexed automatically → ask "how does
    auth work here?" → grounded answer with file/line citations.
-4. **Trust but verify** (M3): agent-run tests in a sandbox before the PR; automated
+4. **Trust but verify** (Phase 3): agent-run tests in a sandbox before the PR; automated
    review comments on every PR.
 
 ## 7. Success metrics
 
 - **Activation:** first agent-team PR created within 30 minutes of signup.
-- **Quality:** ≥ 60% of agent PRs merged without human code changes (target, measured from M1 eval set onward).
+- **Quality:** ≥ 60% of agent PRs merged without human code changes (target, measured from Phase 1 eval set onward).
 - **Trust:** 100% of code changes flow through human-approved plans and PRs; zero writes outside the workspace jail.
 - **Retention:** weekly active runs per connected repo.
-- **Cost:** per-run token budget respected; cost surfaced per run in the UI (M1).
+- **Cost:** per-run token budget respected; cost surfaced per run in the UI (Phase 1).
 
 ## 8. Competitive positioning
 
@@ -88,20 +88,20 @@ implementation → review → deployment → maintenance → continuous improvem
 |---|---|---|---|
 | Center of gravity | Editor keystrokes | Single autonomous agent | SDLC team with human gates |
 | Planning & PM artifacts | ✗ | Weak | First-class (specs, tasks, roadmaps) |
-| Repo intelligence | Context window tricks | Ad-hoc | Persistent index + graphs (M2) |
+| Repo intelligence | Context window tricks | Ad-hoc | Persistent index + graphs (Phase 2) |
 | Review & QA | Basic | Self-review | Dedicated Reviewer/QA agents |
 | Deployment | SaaS only | SaaS only | Self-host first, BYO LLM keys |
 
 ## 9. Non-functional requirements
 
-- Self-hostable via Docker Compose (dev) and Kubernetes (M7).
+- Self-hostable via Docker Compose (dev) and Kubernetes (Phase 7).
 - BYO LLM keys, multi-provider via LiteLLM; per-run cost caps.
-- All agent file access jailed to per-run workspaces; no arbitrary shell before the M3 sandbox.
-- Auditability: every agent action recorded (who/what/when) from M0's audit_logs onward.
-- p95 chat first-token < 2s (excluding provider latency); index a 100k-LOC repo < 10 min (M2 target).
+- All agent file access jailed to per-run workspaces; no arbitrary shell before the Phase 3 sandbox.
+- Auditability: every agent action recorded (who/what/when) from Phase 0's audit_logs onward.
+- p95 chat first-token < 2s (excluding provider latency); index a 100k-LOC repo < 10 min (Phase 2 target).
 
 ## 10. Open questions
 
-- Pricing/packaging (self-host OSS core + paid cloud?) — decide before M6.
-- Which agent roles get dedicated models vs shared tiers — revisit with M1 eval data.
+- Pricing/packaging (self-host OSS core + paid cloud?) — decide before Phase 6.
+- Which agent roles get dedicated models vs shared tiers — revisit with Phase 1 eval data.
 - Multi-tenancy hardening timeline (row-level security) — before any hosted beta.

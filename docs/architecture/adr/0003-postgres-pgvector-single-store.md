@@ -5,7 +5,7 @@
 ## Context
 
 We need relational data (users, orgs, repos, conversations, runs, tasks), vector search
-for repository intelligence (M2), full-text search, and LangGraph checkpoint storage.
+for repository intelligence (Phase 2), full-text search, and LangGraph checkpoint storage.
 Operating many datastores early adds cost with no user value.
 
 ## Decision
@@ -13,7 +13,7 @@ Operating many datastores early adds cost with no user value.
 **One PostgreSQL 16 database** with the **pgvector** extension (enabled from migration
 0001) serves as system of record, vector store, and checkpoint store. Access from the
 engine via SQLAlchemy 2 async on psycopg3; schema migrations via Alembic. Vector access
-will hide behind a small retriever interface (M2) so the store can be swapped.
+will hide behind a small retriever interface (Phase 2) so the store can be swapped.
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ will hide behind a small retriever interface (M2) so the store can be swapped.
 - **SQLite (dev) + Postgres (prod)** — divergent behavior (extensions, concurrency)
   undermines the walking-skeleton goal of prod-like dev.
 - **Elasticsearch for text search** — powerful BM25, heavy operationally; Postgres FTS
-  is adequate for M2's hybrid retrieval and can be fused with vectors in one query.
+  is adequate for Phase 2's hybrid retrieval and can be fused with vectors in one query.
 
 ## Consequences
 

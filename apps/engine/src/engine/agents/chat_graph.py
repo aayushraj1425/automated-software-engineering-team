@@ -1,6 +1,6 @@
-"""Minimal LangGraph chat graph — the M0 walking skeleton.
+"""Minimal LangGraph chat graph — the Phase 0 walking skeleton.
 
-M1 replaces this with the supervisor + specialist-team graphs (ADR-0005);
+Phase 1 replaces this with the supervisor + specialist-team graphs (ADR-0005);
 the streaming contract (custom writer events consumed as SSE) stays the same.
 """
 
