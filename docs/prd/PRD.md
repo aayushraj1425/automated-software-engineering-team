@@ -25,25 +25,25 @@ implementation → review → deployment → maintenance → continuous improvem
 
 ## 3. Personas
 
-- **P1 — Solo builder / indie hacker.** Wants a whole "team" on demand: spec help,
+- **Solo builder / indie hacker.** Wants a whole "team" on demand: spec help,
   implementation, review, docs. Cost-sensitive; brings their own LLM keys.
-- **P2 — Tech lead of a small team (2–10 devs).** Wants throughput without chaos:
+- **Tech lead of a small team (2–10 devs).** Wants throughput without chaos:
   agent-generated PRs that respect conventions, automated review, planning support.
-- **P3 — Engineering manager / platform owner.** Wants visibility (progress, blockers),
+- **Engineering manager / platform owner.** Wants visibility (progress, blockers),
   governance (RBAC, audit, budgets), and safe rollout (self-host, SSO later).
 
 ## 4. Product pillars → brief goals
 
-1. **AI Software Engineer** (G1) — plan, implement, refactor, fix, test, document.
-2. **Repository Intelligence** (G2) — index, dependency/architecture graphs, debt & security detection.
-3. **Multi-Agent Team** (G3) — PM, Architect, Backend, Frontend, DevOps, Security, QA, Writer, Reviewer, Research under structured task planning.
-4. **Project Planning** (G4) — roadmaps, task breakdown, estimates, progress, blockers.
-5. **Intelligent Coding** (G5) — features, bugs, refactors, APIs, schemas, migrations.
-6. **Workflow Integrations** (G6) — Git(Hub/Lab/Bucket), Jira/Linear, Slack/Discord, Docker/K8s, CI/CD.
-7. **Code Review** (G7) — PR review: bugs, breaking changes, perf, security, smells.
-8. **Knowledge System** (G8) — persistent graph of repos, docs, decisions, PRs, tasks.
-9. **AI Memory** (G9) — style, decisions, conversations, evolution, preferences.
-10. **Production Deployment** (G10) — Docker/K8s, authn/z, logging, metrics, backups, DR.
+1. **AI Software Engineer** — plan, implement, refactor, fix, test, document.
+2. **Repository Intelligence** — index, dependency/architecture graphs, debt & security detection.
+3. **Multi-Agent Team** — PM, Architect, Backend, Frontend, DevOps, Security, QA, Writer, Reviewer, Research under structured task planning.
+4. **Project Planning** — roadmaps, task breakdown, estimates, progress, blockers.
+5. **Intelligent Coding** — features, bugs, refactors, APIs, schemas, migrations.
+6. **Workflow Integrations** — Git(Hub/Lab/Bucket), Jira/Linear, Slack/Discord, Docker/K8s, CI/CD.
+7. **Code Review** — PR review: bugs, breaking changes, perf, security, smells.
+8. **Knowledge System** — persistent graph of repos, docs, decisions, PRs, tasks.
+9. **AI Memory** — style, decisions, conversations, evolution, preferences.
+10. **Production Deployment** — Docker/K8s, authn/z, logging, metrics, backups, DR.
 
 ## 5. v1 scope (Phases 0–3)
 

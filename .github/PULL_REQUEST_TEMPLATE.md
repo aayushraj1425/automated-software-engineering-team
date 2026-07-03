@@ -1,6 +1,7 @@
 ## Summary
 
-<!-- What does this PR do, and why? Link the backlog item (e.g. Task 1.2.3). -->
+<!-- What does this PR do, and why? Name the backlog item it delivers,
+     e.g. "Backlog: Agent Runtime — Postgres checkpointing per run". -->
 
 ## Definition of Done
 

@@ -4,8 +4,10 @@ ASEP — AI Software Engineering Platform. pnpm + Turborepo monorepo: Next.js we
 FastAPI AI engine, shared OpenAPI types. Program plan and phase status live in
 `docs/ROADMAP.md`; the living backlog is `docs/BACKLOG.md`. Decisions are recorded as
 ADRs in `docs/architecture/adr/` — read the relevant ADR before changing architecture.
-Naming convention: use descriptive phase names ("Phase 1 — Multi-Agent Engineering
-Team"), never shorthand codes like "M1" — the user considers those unprofessional.
+Naming convention: descriptive names only — never shorthand codes. Phases are
+"Phase 1 — Multi-Agent Engineering Team" (not "M1"); backlog work is referenced by
+workstream and item name, e.g. "Agent Runtime — Postgres checkpointing per run"
+(not "Task 1.1.4" or "M1-E1-T4"). The user considers coded identifiers unprofessional.
 
 ## Commands
 
