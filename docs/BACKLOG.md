@@ -77,3 +77,8 @@ Tracked in the working session; exit criteria in [ROADMAP.md](ROADMAP.md).
 ## Done
 
 - 2026-07-02 · M0 docs pack: PRD, OVERVIEW, ADR-0001…0010, ROADMAP, BACKLOG, SECURITY.
+- 2026-07-02 · M0 walking skeleton verified end-to-end: compose services healthy
+  (postgres on host port 5433), alembic up/down/up cycle + better-auth migration,
+  engine 14/14 pytest + ruff + pyright, web 5/5 vitest + eslint + tsc + next build,
+  shared OpenAPI types generated, Playwright smoke (sign-up → streamed chat →
+  persistence across reload) green with LLM_FAKE.

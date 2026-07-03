@@ -2,7 +2,7 @@
   "name": "engine",
   "private": true,
   "scripts": {
-    "dev": "uv run watchfiles --filter python \"python -m engine.serve\" src",
+    "dev": "uv run watchfiles --filter python engine.serve.main src",
     "start": "uv run python -m engine.serve",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "typecheck": "uv run pyright",
