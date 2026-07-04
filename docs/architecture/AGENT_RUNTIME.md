@@ -1,140 +1,58 @@
-# Agent Runtime — Design Note
+# Agent Runtime
 
-**Status:** Living document · **Phase:** 1 — Multi-Agent Engineering Team · **Last updated:** 2026-07-03
-Companion decisions: [ADR-0005 LangGraph](adr/0005-langgraph-agent-runtime.md),
-[ADR-0006 LiteLLM & cost controls](adr/0006-litellm-model-tiering.md),
-[ADR-0008 agent tool security](adr/0008-agent-tool-security.md).
+One sentence: you describe a feature, AI agents plan it, you approve, they
+write the code in an isolated copy of your repo, and you get a GitHub pull
+request. This doc explains how a "run" moves through that pipeline and what
+gets stored.
 
-## What this is
+New here? Read [HOW_IT_WORKS.md](../HOW_IT_WORKS.md) first.
 
-The runtime that executes an agent-team run: a user's feature request flows through
-a Product Manager agent (spec + task breakdown), a human approval gate, specialist
-engineer agents (Backend / Frontend / DevOps) working in a per-run git worktree, and
-a Reviewer critique loop — ending in a GitHub pull request. Everything observable
-about a run is persisted so the mission-control UI can replay it live or after the fact.
-
-## Run lifecycle
+## A run's life
 
 ```mermaid
-stateDiagram-v2
-    [*] --> queued: user submits feature request
-    queued --> planning: worker picks up the run
-    planning --> awaiting_approval: Product Manager produced spec + tasks
-    awaiting_approval --> executing: human approves the plan
-    awaiting_approval --> cancelled: human rejects
-    executing --> reviewing: all tasks done
-    reviewing --> executing: Reviewer requests changes (one revision loop)
-    reviewing --> completed: Reviewer approves → PR opened
-    planning --> failed: error / budget exceeded
-    executing --> failed: error / budget exceeded
-    reviewing --> failed: error / budget exceeded
-    completed --> [*]
-    failed --> [*]
-    cancelled --> [*]
+flowchart TD
+    A[queued: you submitted a request] --> B[planning: Product Manager<br/>writes spec + task list]
+    B --> C{awaiting_approval:<br/>you review the plan}
+    C -->|reject| X[cancelled]
+    C -->|approve| D[executing: Supervisor gives each task<br/>to a Backend / Frontend / DevOps agent]
+    D --> E[reviewing: Reviewer agent<br/>checks the combined changes]
+    E -->|problems found - one retry| D
+    E -->|approved| F[completed: pull request opened]
+    B -->|error or cost cap hit| Y[failed - with the reason saved]
+    D -->|error or cost cap hit| Y
 ```
 
-Task lifecycle: `pending → in_progress → done | failed | skipped`, with `blocked`
-for tasks whose dependencies have not finished. The Supervisor retries a failed
-task at most twice before failing the run.
+The words in bold-ish (`queued`, `planning`, …) are the exact `status` values
+stored on the run, defined in `engine/db/enums.py`.
 
-## Domain model
+## Task rules (the Supervisor)
 
-Four tables carry the runtime state (Alembic revision `0002_agent_runtime`).
-Identity stays with better-auth: `user_id` / `org_id` are plain text ids, no FKs
-(ADR-0007). Status vocabularies live in `engine/db/enums.py` as `StrEnum`s and are
-stored as plain strings — adding a status never needs a migration.
+`engine/agents/supervisor.py` decides who works when. Three rules:
 
-```mermaid
-erDiagram
-    repositories ||--o{ agent_runs : "runs against"
-    agent_runs ||--o{ agent_tasks : "breaks into"
-    agent_runs ||--o{ agent_events : "emits"
-    agent_runs ||--o{ artifacts : "produces"
-    agent_tasks |o--o{ agent_events : "scoped to"
-    agent_tasks |o--o{ artifacts : "scoped to"
+1. A task can start only after every task it depends on is done.
+2. A failed task is retried, at most twice. Third failure fails the whole run.
+3. If the run fails, tasks that never started are marked `skipped`.
 
-    agent_runs {
-        uuid id PK
-        text user_id "better-auth id, no FK"
-        text org_id "nullable"
-        uuid repository_id FK
-        text request "the feature request"
-        text status "RunStatus"
-        jsonb plan "PM spec + task breakdown"
-        text base_branch
-        text branch_name "one branch per run"
-        text pr_url
-        text error "surfaced failure reason"
-        numeric max_cost_usd "budget cap, null = unlimited"
-        numeric total_cost_usd
-        bigint total_input_tokens
-        bigint total_output_tokens
-        timestamptz started_at
-        timestamptz finished_at
-    }
+## What gets stored (4 tables)
 
-    agent_tasks {
-        uuid id PK
-        uuid run_id FK
-        int sequence "unique per run"
-        text role "AgentRole"
-        text title
-        text description
-        text status "TaskStatus"
-        jsonb depends_on "list of task ids"
-        text result "agent's task summary"
-        int attempts "retries, max 2"
-        timestamptz started_at
-        timestamptz finished_at
-    }
+| Table | One row means | Read it as |
+|---|---|---|
+| `agent_runs` | one feature request | "the folder for everything below" |
+| `agent_tasks` | one item on the plan's checklist | the task board in the UI |
+| `agent_events` | one thing that happened | the live timeline in the UI |
+| `artifacts` | one thing produced (spec, diff, PR link) | the run's outputs |
 
-    agent_events {
-        bigint id PK "identity — total order for stream cursors"
-        uuid run_id FK
-        uuid task_id FK "nullable"
-        text agent "AgentRole or null for system"
-        text type "dotted, e.g. task.status_changed"
-        jsonb payload
-        timestamptz created_at
-    }
+Details worth knowing:
 
-    artifacts {
-        uuid id PK
-        uuid run_id FK
-        uuid task_id FK "nullable"
-        text kind "ArtifactKind"
-        text name
-        text content "inline for small artifacts"
-        text s3_key "MinIO for large ones"
-        jsonb meta
-        timestamptz created_at
-    }
-```
+- A run also stores the money spent (`total_cost_usd`) and its cap
+  (`max_cost_usd`). Hitting the cap stops the run and the reason is saved
+  in its `error` column.
+- Events are numbered 1, 2, 3… so the UI can say "I've seen up to event 40,
+  give me what's new" after a refresh.
+- Deleting a run deletes its tasks, events, and artifacts with it.
+- Who each agent is — its instructions, which model it uses, which tools it
+  may touch — lives in `engine/agents/registry.py`. Agents that only need to
+  read (Product Manager, Reviewer) get no editing tools.
 
-Design choices worth recording:
-
-- **`agent_events.id` is a bigint identity, not a UUID.** The event stream endpoint
-  (`/v1/runs/{id}/events`) needs a total order and a resume cursor (`Last-Event-ID`);
-  a monotonically increasing integer gives both for free. A composite index
-  `(run_id, id)` serves the "events for run X after cursor Y" query.
-- **`plan` and `depends_on` are JSONB, not join tables.** The plan is a document the
-  PM agent produces and the human approves as a unit; task dependencies are small
-  lists read whole by the Supervisor. Neither is queried relationally yet — promote
-  to tables only if that changes.
-- **Budget columns live on the run.** `max_cost_usd` (cap) and the running totals are
-  updated by the ModelRouter accounting hook (ADR-0006); the budget guard aborts the
-  run and writes the reason into `error` with status `failed`.
-- **Cascade deletes.** Deleting a run removes its tasks, events, and artifacts;
-  deleting a repository removes its runs (development-phase policy — revisit for
-  retention/audit before any hosted deployment; noted in the backlog debt register).
-
-## How the pieces will consume this model
-
-| Component (backlog item) | Reads / writes |
-|---|---|
-| Supervisor graph | routes on `agent_tasks.depends_on` + `status`; writes task transitions |
-| Run event bus | inserts `agent_events`, publishes to Redis; SSE replays from Postgres by cursor |
-| Budget guard | updates run totals per LLM call; flips run to `failed` when the cap is hit |
-| Background worker (arq) | claims `queued` runs; LangGraph checkpoints make crash-resume safe |
-| Mission-control UI | timeline = `agent_events`; task board = `agent_tasks`; cost widget = run totals |
-| Reviewer loop | writes `artifacts` (`diff`, review verdict in `agent_events`), `pr_url` on the run |
+Tables are created by migration `0002_agent_runtime`; models are in
+`engine/db/models.py`.

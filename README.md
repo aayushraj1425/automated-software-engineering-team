@@ -21,6 +21,10 @@ Browser ──► apps/web   Next.js 15 (UI + BFF: better-auth sessions, SSE pro
         Postgres 16 + pgvector ─── Redis 7 ─── MinIO (S3-compatible)
 ```
 
+**New to the codebase? Start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)** —
+a plain-language walkthrough of what happens when you use the app, with the
+actual file names.
+
 Full design docs live in [`docs/`](docs/): [PRD](docs/prd/PRD.md) ·
 [Architecture](docs/architecture/OVERVIEW.md) · [ADRs](docs/architecture/adr/) ·
 [Roadmap](docs/ROADMAP.md) · [Backlog](docs/BACKLOG.md) · [Security](docs/SECURITY.md)

@@ -13,9 +13,30 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
 
 ## Phase 1 — Multi-Agent Engineering Team
 
+### The 3-day plan (deadline 2026-07-07)
+
+Goal: describe a feature → approve the plan → agents write the code → GitHub
+pull request. Only what's needed for that demo; everything else waits.
+
+- **Day 1 (2026-07-05):** runs API + worker that executes the Supervisor with
+  stub agents; events saved to Postgres; a runs page that shows the timeline
+  (simple polling — no Redis streaming yet).
+- **Day 2 (2026-07-06):** connect a GitHub repo; Product Manager agent plans →
+  approval gate → engineer agents edit files through the jailed tools in a
+  cloned workspace.
+- **Day 3 (2026-07-07):** Reviewer agent + open the pull request; run the whole
+  flow end to end on a small fixture repo; fix what breaks.
+
+**Cut to make the deadline** (revisit after): Postgres checkpointing/resume,
+Redis event streaming (polling instead), encrypted BYO keys + settings screen,
+GitHub OAuth sign-in, organization switcher, the scripted evaluation harness.
+
+The workstreams below remain the full Phase 1 map; the 3-day plan is the
+subset being built now.
+
 ### Workstream: Agent Runtime (blocking)
 - [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/AGENT_RUNTIME.md](architecture/AGENT_RUNTIME.md)
-- [ ] Supervisor graph: route work by task dependencies, retries (max 2), failure states
+- [x] Supervisor graph: route work by task dependencies, retries (max 2), failure states
 - [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
 - [ ] Postgres checkpointing per run, with a resume-after-restart test
 - [ ] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events`
@@ -100,3 +121,6 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
   role to a model tier, a declarative tool policy (deny-by-default per ADR-0008;
   reviewer and product manager are read-only), and a versioned prompt file under
   `engine/agents/prompts/`; six tests enforce the contract (engine suite 25/25).
+- 2026-07-04 · Agent Runtime — supervisor graph: `engine/agents/supervisor.py` routes
+  tasks by dependency and sequence, retries a failed task at most twice, fails the run
+  with a saved reason and skips unstarted tasks; five routing tests (engine suite 30/30).
