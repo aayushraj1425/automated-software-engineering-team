@@ -1,10 +1,25 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from engine.db.enums import RunStatus, TaskStatus
 
 
 class Base(DeclarativeBase):
@@ -69,6 +84,107 @@ class Message(Base):
     )
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+# ── Agent runtime (docs/architecture/AGENT_RUNTIME.md) ──────────────────────
+
+
+class AgentRun(Base, TimestampMixin):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    org_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    request: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default=RunStatus.QUEUED, index=True)
+    plan: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    base_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    branch_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pr_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    max_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    total_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(12, 6), default=Decimal(0), server_default="0"
+    )
+    total_input_tokens: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    total_output_tokens: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    tasks: Mapped[list["AgentTask"]] = relationship(
+        back_populates="run",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AgentTask.sequence",
+    )
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="Artifact.created_at"
+    )
+
+
+class AgentTask(Base, TimestampMixin):
+    __tablename__ = "agent_tasks"
+    __table_args__ = (UniqueConstraint("run_id", "sequence", name="uq_agent_tasks_run_sequence"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    sequence: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default=TaskStatus.PENDING, index=True)
+    depends_on: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    result: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    run: Mapped[AgentRun] = relationship(back_populates="tasks")
+
+
+class AgentEvent(Base):
+    """Append-only run timeline. The bigint identity pk gives the SSE stream a
+    total order and a resume cursor (Last-Event-ID) — see AGENT_RUNTIME.md."""
+
+    __tablename__ = "agent_events"
+    __table_args__ = (Index("ix_agent_events_run_id_id", "run_id", "id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agent_runs.id", ondelete="CASCADE"))
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_tasks.id", ondelete="SET NULL"), nullable=True
+    )
+    agent: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    type: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Artifact(Base):
+    __tablename__ = "artifacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_tasks.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(256))
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    s3_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class AuditLog(Base):

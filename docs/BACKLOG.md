@@ -14,7 +14,7 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
 ## Phase 1 — Multi-Agent Engineering Team
 
 ### Workstream: Agent Runtime (blocking)
-- [ ] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`)
+- [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/AGENT_RUNTIME.md](architecture/AGENT_RUNTIME.md)
 - [ ] Supervisor graph: route work by task dependencies, retries (max 2), failure states
 - [ ] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
 - [ ] Postgres checkpointing per run, with a resume-after-restart test
@@ -80,6 +80,7 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
 | No rate limiting on the BFF or engine | single-user development phase | Identity & Keys workstream / Phase 7 |
 | Playwright smoke not in CI (needs the compose stack) | CI time budget | Phase 1 |
+| Deleting a repository cascades away its run history (`agent_runs` FK) | development-phase simplicity | retention/audit policy before any hosted deployment |
 
 ## Done
 
@@ -91,3 +92,7 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
   persistence across reload) green in fake-model mode.
 - 2026-07-03 · Phase 0 shipped to GitHub: seven task-scoped commits pushed, CI green on
   main and pull request #1 (foundation PR with the Definition-of-Done checklist).
+- 2026-07-03 · Agent Runtime — run/task/event domain model: design note
+  (architecture/AGENT_RUNTIME.md with lifecycle + ER diagrams), `engine/db/enums.py`
+  StrEnums, four new models, Alembic revision `0002_agent_runtime` (up/down/up verified
+  on the dev database), five round-trip/cascade/constraint tests (engine suite 19/19).
