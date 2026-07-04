@@ -16,7 +16,7 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
 ### Workstream: Agent Runtime (blocking)
 - [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/AGENT_RUNTIME.md](architecture/AGENT_RUNTIME.md)
 - [ ] Supervisor graph: route work by task dependencies, retries (max 2), failure states
-- [ ] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
+- [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
 - [ ] Postgres checkpointing per run, with a resume-after-restart test
 - [ ] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events`
 - [ ] Per-run budget guard (token and cost caps per ADR-0006 accounting); abort with a surfaced reason
@@ -96,3 +96,7 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
   (architecture/AGENT_RUNTIME.md with lifecycle + ER diagrams), `engine/db/enums.py`
   StrEnums, four new models, Alembic revision `0002_agent_runtime` (up/down/up verified
   on the dev database), five round-trip/cascade/constraint tests (engine suite 19/19).
+- 2026-07-03 · Agent Runtime — agent registry: `engine/agents/registry.py` maps each
+  role to a model tier, a declarative tool policy (deny-by-default per ADR-0008;
+  reviewer and product manager are read-only), and a versioned prompt file under
+  `engine/agents/prompts/`; six tests enforce the contract (engine suite 25/25).
