@@ -19,7 +19,8 @@ pnpm e2e                                # Playwright smoke (db must be up)
 ```
 
 Engine-only (run inside `apps/engine`): `uv sync`, `uv run pytest`,
-`uv run ruff check .`, `uv run pyright`, `uv run alembic upgrade head`.
+`uv run ruff check .`, `uv run ruff format --check .` (CI enforces formatting —
+run before every push), `uv run pyright`, `uv run alembic upgrade head`.
 
 ## Layout
 

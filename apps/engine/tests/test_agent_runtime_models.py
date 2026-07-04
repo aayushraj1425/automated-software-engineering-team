@@ -85,9 +85,7 @@ async def test_tasks_events_artifacts_attach_to_run(prepared_db):
         tasks = (
             (
                 await session.execute(
-                    select(AgentTask)
-                    .where(AgentTask.run_id == run.id)
-                    .order_by(AgentTask.sequence)
+                    select(AgentTask).where(AgentTask.run_id == run.id).order_by(AgentTask.sequence)
                 )
             )
             .scalars()
@@ -154,8 +152,6 @@ async def test_task_sequence_unique_per_run(prepared_db):
 
 async def test_run_rejects_unknown_repository(prepared_db):
     async with session_scope() as session:
-        session.add(
-            AgentRun(user_id="user_test", repository_id=uuid.uuid4(), request="orphan run")
-        )
+        session.add(AgentRun(user_id="user_test", repository_id=uuid.uuid4(), request="orphan run"))
         with pytest.raises(IntegrityError):
             await session.commit()
