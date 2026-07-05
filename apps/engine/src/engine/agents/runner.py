@@ -19,19 +19,22 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from engine.agents.engineer import execute_task
+from engine.agents.engineer import execute_revision, execute_task
 from engine.agents.loop import LlmUsage
 from engine.agents.product_manager import create_plan
+from engine.agents.reviewer import APPROVE, REQUEST_CHANGES, review_run
 from engine.agents.supervisor import TaskState, build_supervisor_graph
 from engine.config import get_settings
 from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
+from engine.github import open_pull_request, parse_github_repo
 from engine.workspace.manager import (
     Workspace,
     create_scratch_workspace,
     create_workspace,
     load_workspace,
+    push_branch,
 )
 
 log = structlog.get_logger()
@@ -155,7 +158,12 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.EXECUTING:
             return
+        repo = await session.get(Repository, run.repository_id)
+        assert repo is not None
+        repo_url = repo.url
+        default_branch = repo.default_branch
         request = run.request
+        plan_summary = str((run.plan or {}).get("summary", ""))
         branch = run.branch_name or ""
         base_sha = run.base_sha or ""
         rows = (
@@ -176,7 +184,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         {"recursion_limit": 100},
     )
 
-    # Record how the run ended.
+    # Sync the task board; a failed run ends here, a clean one goes to review.
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         assert run is not None
@@ -198,14 +206,116 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
                 )
                 row.status = state["status"]
                 row.attempts = state["attempts"]
-        if final["failure"] is None:
-            _set_run_status(session, run, RunStatus.COMPLETED)
-        else:
+        if final["failure"] is not None:
             run.error = final["failure"]
             _set_run_status(session, run, RunStatus.FAILED)
+            run.finished_at = _now()
+            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+            await session.commit()
+            return
+        _set_run_status(session, run, RunStatus.REVIEWING)
+        await session.commit()
+
+    verdict = await _review(run_id, request, plan_summary, ws)
+    if verdict["verdict"] == REQUEST_CHANGES:
+        # One revision round: each role fixes its own findings, then re-review.
+        findings_by_role: dict[str, list[str]] = {}
+        for finding in verdict["findings"]:
+            findings_by_role.setdefault(finding["role"], []).append(finding["issue"])
+        for role, issues in findings_by_role.items():
+            usage = LlmUsage()
+            summary = await execute_revision(role, issues, request, ws, usage)
+            async with session_scope() as session:
+                run = await session.get(AgentRun, run_id)
+                assert run is not None
+                _apply_usage(run, usage)
+                _emit(
+                    session,
+                    run_id,
+                    "review.revision",
+                    {"role": role, "findings": len(issues), "summary": summary[:500]},
+                    agent=role,
+                )
+                await session.commit()
+        verdict = await _review(run_id, request, plan_summary, ws)
+
+    if verdict["verdict"] != APPROVE:
+        async with session_scope() as session:
+            run = await session.get(AgentRun, run_id)
+            assert run is not None
+            run.error = "the reviewer did not approve the changes after one revision"
+            _set_run_status(session, run, RunStatus.FAILED)
+            run.finished_at = _now()
+            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+            await session.commit()
+        return
+
+    pr_url = await _publish(run_id, repo_url, default_branch, request, plan_summary, ws)
+
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        run.pr_url = pr_url
+        _set_run_status(session, run, RunStatus.COMPLETED)
         run.finished_at = _now()
         _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
         await session.commit()
+
+
+async def _review(run_id: uuid.UUID, request: str, plan_summary: str, ws: Workspace) -> dict:
+    usage = LlmUsage()
+    verdict = await review_run(request, plan_summary, ws, usage)
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        _apply_usage(run, usage)
+        _emit(
+            session,
+            run_id,
+            "review.verdict",
+            {
+                "verdict": verdict["verdict"],
+                "findings": [f["issue"][:300] for f in verdict["findings"]],
+            },
+            agent=AgentRole.REVIEWER,
+        )
+        await session.commit()
+    return verdict
+
+
+async def _publish(
+    run_id: uuid.UUID,
+    repo_url: str,
+    default_branch: str,
+    request: str,
+    plan_summary: str,
+    ws: Workspace,
+) -> str | None:
+    """Push the run branch; open the pull request when the repo is on GitHub
+    and a token is configured. Scratch workspaces have nothing to push to."""
+    pushed = await push_branch(ws)
+    if not pushed:
+        return None
+
+    pr_url: str | None = None
+    if parse_github_repo(repo_url) is not None and get_settings().github_token:
+        title = request.strip().splitlines()[0][:72]
+        body = (
+            f"{plan_summary}\n\n"
+            f"Opened by the ASEP agent team (run {run_id}).\n"
+            "Review checklist: correctness, scope, security, consistency."
+        )
+        pr_url = await open_pull_request(repo_url, ws.branch, default_branch, title, body)
+
+    async with session_scope() as session:
+        _emit(
+            session,
+            run_id,
+            "branch.published",
+            {"branch": ws.branch, "pr_url": pr_url},
+        )
+        await session.commit()
+    return pr_url
 
 
 def _to_task_state(task: AgentTask) -> TaskState:

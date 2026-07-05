@@ -49,6 +49,7 @@ class RunOut(BaseModel):
     request: str
     repository_url: str
     error: str | None
+    pr_url: str | None
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -75,6 +76,7 @@ def _run_out(run: AgentRun, repository_url: str) -> RunOut:
         request=run.request,
         repository_url=repository_url,
         error=run.error,
+        pr_url=run.pr_url,
         created_at=run.created_at,
         started_at=run.started_at,
         finished_at=run.finished_at,

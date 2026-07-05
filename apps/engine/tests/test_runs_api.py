@@ -75,6 +75,7 @@ async def test_approved_run_executes_to_completed(client):
     assert types[0] == "run.started"
     assert "plan.created" in types
     assert "plan.approved" in types
+    assert "review.verdict" in types  # the Reviewer ran before completion
     assert types[-1] == "run.finished"
     ids = [e["id"] for e in events]
     assert ids == sorted(ids)
@@ -95,6 +96,46 @@ async def test_rejected_run_is_cancelled_and_tasks_skipped(client):
     assert "plan.rejected" in [e["type"] for e in events]
     # a rejected run's workspace is deleted
     assert not (workspaces_root() / created["id"]).exists()
+
+
+async def test_run_on_a_local_repository_pushes_the_branch(client, tmp_path):
+    """Full pipeline against a real (local) repository: clone, plan, approve,
+    engineer commits, review, and the run branch pushed back to the origin."""
+    import subprocess
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    for args in (
+        ["init", "--initial-branch=main"],
+        ["config", "user.name", "Fixture"],
+        ["config", "user.email", "fixture@test.local"],
+    ):
+        subprocess.run(["git", *args], cwd=origin, check=True, capture_output=True)
+    (origin / "README.md").write_text("# Demo\n")
+    subprocess.run(["git", "add", "."], cwd=origin, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=origin, check=True, capture_output=True)
+
+    headers = _headers()
+    resp = await client.post(
+        "/v1/runs",
+        json={"request": "Add a /status endpoint", "repository_url": str(origin)},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    run_id = resp.json()["id"]
+    await _decide(client, headers, run_id, approved=True)
+
+    detail = (await client.get(f"/v1/runs/{run_id}", headers=headers)).json()
+    assert detail["status"] == "completed"
+    assert detail["pr_url"] is None  # local origin — nothing to open a PR on
+
+    branches = subprocess.run(
+        ["git", "branch", "--list", "asep/*"], cwd=origin, capture_output=True, text=True
+    ).stdout
+    assert f"asep/run-{uuid.UUID(run_id).hex[:8]}" in branches
+
+    events = (await client.get(f"/v1/runs/{run_id}/events", headers=headers)).json()
+    assert "branch.published" in [e["type"] for e in events]
 
 
 async def test_decision_only_allowed_while_awaiting_approval(client):

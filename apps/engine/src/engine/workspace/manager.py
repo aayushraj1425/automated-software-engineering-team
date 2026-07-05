@@ -96,6 +96,26 @@ async def create_scratch_workspace(run_id: uuid.UUID) -> Workspace:
     return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
 
 
+async def push_branch(ws: Workspace) -> bool:
+    """Push the run branch to origin; False when there is no origin (scratch
+    workspaces). GitHub pushes authenticate with GITHUB_TOKEN."""
+    remotes = await run_git(ws.path, "remote")
+    if "origin" not in remotes.split():
+        return False
+    target = "origin"
+    url = await run_git(ws.path, "remote", "get-url", "origin")
+    token = get_settings().github_token
+    if token and url.startswith("https://github.com/"):
+        target = url.replace("https://", f"https://x-access-token:{token}@", 1)
+    try:
+        await run_git(ws.path, "push", target, ws.branch)
+    except WorkspaceError as exc:
+        # git may echo the push URL; never let the token reach logs or the UI
+        raise WorkspaceError(str(exc).replace(token, "***") if token else str(exc)) from None
+    log.info("workspace.branch_pushed", run_id=str(ws.run_id), branch=ws.branch)
+    return True
+
+
 def load_workspace(run_id: uuid.UUID, branch: str, base_sha: str) -> Workspace:
     """Reopen the workspace created during planning (execution runs later,
     after the human approves the plan)."""
