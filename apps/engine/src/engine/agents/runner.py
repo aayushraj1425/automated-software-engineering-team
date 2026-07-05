@@ -59,10 +59,20 @@ def _set_run_status(session: AsyncSession, run: AgentRun, status: RunStatus) -> 
     _emit(session, run.id, "run.status_changed", {"from": old, "to": status})
 
 
-async def execute_run(run_id: uuid.UUID) -> None:
-    """Background entrypoint: everything a run does happens in here."""
+async def plan_run(run_id: uuid.UUID) -> None:
+    """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
+    await _guarded(_plan_run, run_id)
+
+
+async def execute_tasks(run_id: uuid.UUID) -> None:
+    """Background entrypoint after the human approves the plan."""
+    await _guarded(_execute_tasks, run_id)
+
+
+async def _guarded(work, run_id: uuid.UUID) -> None:
+    """Whatever breaks inside a run must end as a failed run, never a crash."""
     try:
-        await _execute_run(run_id)
+        await work(run_id)
     except Exception:
         log.exception("run.crashed", run_id=str(run_id))
         async with session_scope() as session:
@@ -75,8 +85,8 @@ async def execute_run(run_id: uuid.UUID) -> None:
                 await session.commit()
 
 
-async def _execute_run(run_id: uuid.UUID) -> None:
-    # Phase 1 of the run: plan it (stub Product Manager).
+async def _plan_run(run_id: uuid.UUID) -> None:
+    # Plan the run (stub Product Manager), then stop and wait for the human.
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.QUEUED:
@@ -110,12 +120,28 @@ async def _execute_run(run_id: uuid.UUID) -> None:
         }
         run.plan = plan
         _emit(session, run_id, "plan.created", plan, agent=AgentRole.PRODUCT_MANAGER)
-        # Day 1 has no approval gate yet — go straight to work (Day 2 adds it).
-        _set_run_status(session, run, RunStatus.EXECUTING)
+        # Stop here: nothing executes until the human approves the plan.
+        _set_run_status(session, run, RunStatus.AWAITING_APPROVAL)
         await session.commit()
-        board = [_to_task_state(t) for t in tasks]
 
-    # Phase 2 of the run: the Supervisor hands tasks to the (stub) agents.
+
+async def _execute_tasks(run_id: uuid.UUID) -> None:
+    # The human approved — load the task board and let the Supervisor work.
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        if run is None or run.status != RunStatus.EXECUTING:
+            return
+        rows = (
+            (
+                await session.execute(
+                    select(AgentTask).where(AgentTask.run_id == run_id).order_by(AgentTask.sequence)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        board = [_to_task_state(t) for t in rows]
+
     graph = build_supervisor_graph(_stub_agent)
     final = await graph.ainvoke(
         {"tasks": board, "current_task_id": None, "failure": None},

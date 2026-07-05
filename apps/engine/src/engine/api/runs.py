@@ -5,7 +5,7 @@ GET /v1/runs/{id}/events?after=<last event id> for new timeline entries.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -14,9 +14,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from engine.agents.runner import execute_run
+from engine.agents.runner import execute_tasks, plan_run
 from engine.auth import Principal, require_service_auth
-from engine.db.enums import RunStatus
+from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session
 
@@ -117,8 +117,59 @@ async def create_run(
     db.add(run)
     await db.commit()
 
-    background.add_task(execute_run, run.id)
+    background.add_task(plan_run, run.id)
     return _run_out(run, url)
+
+
+class DecisionIn(BaseModel):
+    approved: bool
+
+
+@router.post("/v1/runs/{run_id}/decision")
+async def decide_run(
+    run_id: uuid.UUID,
+    body: DecisionIn,
+    background: BackgroundTasks,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunOut:
+    """The human approval gate: approve starts the work, reject ends the run."""
+    run = await _owned_run(db, run_id, principal)
+    if run.status != RunStatus.AWAITING_APPROVAL:
+        raise HTTPException(status_code=409, detail="This run is not waiting for approval")
+
+    if body.approved:
+        run.status = RunStatus.EXECUTING
+        db.add(AgentEvent(run_id=run.id, type="plan.approved", payload={"by": principal.user_id}))
+        db.add(
+            AgentEvent(
+                run_id=run.id,
+                type="run.status_changed",
+                payload={"from": RunStatus.AWAITING_APPROVAL, "to": RunStatus.EXECUTING},
+            )
+        )
+    else:
+        run.status = RunStatus.CANCELLED
+        run.finished_at = datetime.now(UTC)
+        tasks = (
+            (await db.execute(select(AgentTask).where(AgentTask.run_id == run.id))).scalars().all()
+        )
+        for task in tasks:
+            task.status = TaskStatus.SKIPPED
+        db.add(AgentEvent(run_id=run.id, type="plan.rejected", payload={"by": principal.user_id}))
+        db.add(
+            AgentEvent(
+                run_id=run.id,
+                type="run.finished",
+                payload={"status": RunStatus.CANCELLED, "error": None},
+            )
+        )
+    await db.commit()
+
+    if body.approved:
+        background.add_task(execute_tasks, run.id)
+    repo = await db.get(Repository, run.repository_id)
+    return _run_out(run, repo.url if repo else "")
 
 
 @router.get("/v1/runs")
