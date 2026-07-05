@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASEP — Inside each box</title>
+<style>
+  body { background:#101014; color:#e4e4e7; font:15px/1.65 system-ui, sans-serif;
+         max-width:1100px; margin:0 auto; padding:2rem; }
+  h1 { font-size:1.5rem; } h2 { font-size:1.2rem; margin-top:3.5rem; color:#fafafa; }
+  p.caption { color:#a1a1aa; max-width:75ch; }
+  .mermaid { background:#18181b; border:1px solid #27272a; border-radius:10px;
+             padding:1.25rem; margin:1.25rem 0; }
+  code { background:#27272a; padding:0.1em 0.35em; border-radius:4px; font-size:0.9em; }
+  .hint { color:#71717a; font-size:0.9em; }
+</style>
+</head>
+<body>
+
+<h1>Inside each box</h1>
+<p class="caption">The five-box picture, one box at a time. Each box breaks into
+3–4 parts, never more. Under each diagram: which file to open first.</p>
+
+<h2>🧑 1. The browser — three screens</h2>
+<pre class="mermaid">
+flowchart LR
+    subgraph SCREENS["What you can open"]
+        S1["/chat<br/>talk to one AI model"]
+        S2["/runs<br/>start an agent run,<br/>see past runs"]
+        S3["/runs/{id}<br/>watch one run:<br/>task board + timeline"]
+    end
+    S2 -->|"click a run"| S3
+</pre>
+<p class="hint">Open first: <code>apps/web/src/components/runs/run-detail-panel.tsx</code>
+— the watch screen, ~100 lines, shows the whole polling idea.</p>
+
+<h2>🌐 2. The website — three layers</h2>
+<p class="caption">Think of it as: what you see, what forwards, what protects.</p>
+<pre class="mermaid">
+flowchart LR
+    P["Pages<br/><code>app/chat, app/runs</code><br/>the screens themselves"]
+    R["Relay routes<br/><code>app/api/chat, app/api/runs</code><br/>forward requests to the engine"]
+    H["Helpers<br/><code>lib/auth.ts</code> — the bouncer<br/><code>lib/service-token.ts</code> — the pass-maker"]
+    P --> R --> H
+</pre>
+<p class="hint">Open first: <code>apps/web/src/app/api/runs/route.ts</code> —
+one relay route, ~40 lines: check session → sign pass → forward.</p>
+
+<h2>⚙️ 3. The engine — four rooms</h2>
+<pre class="mermaid">
+flowchart LR
+    subgraph API["Front desk — api/"]
+        A1["<code>chat.py</code> · <code>runs.py</code><br/>receive requests,<br/>check the pass"]
+    end
+    subgraph AG["Agent room — agents/"]
+        A2["<code>runner.py</code> — foreman<br/><code>supervisor.py</code> — scheduler<br/><code>registry.py</code> — who's who"]
+    end
+    subgraph LLM["Phone line — llm/"]
+        A3["<code>router.py</code><br/>the only file that<br/>calls the AI"]
+    end
+    subgraph ST["Records — db/"]
+        A4["<code>models.py</code> — table shapes<br/><code>migrations/</code> — table history"]
+    end
+    A1 --> A2 --> A3
+    A1 --> A4
+    A2 --> A4
+</pre>
+<p class="hint">Open first: <code>apps/engine/src/engine/llm/router.py</code> —
+~60 lines, and every AI word in the whole product passes through it.</p>
+
+<h2>🗄️ 4. The database — two families of tables</h2>
+<pre class="mermaid">
+flowchart LR
+    subgraph F1["Identity (owned by better-auth)"]
+        T1["user · session<br/>account · organization"]
+    end
+    subgraph F2["App data (owned by the engine)"]
+        T2["Chat:<br/>conversations · messages"]
+        T3["Agent runs:<br/>agent_runs · agent_tasks<br/>agent_events · artifacts"]
+    end
+    T1 -.->|"linked by user id<br/>(plain text, on purpose)"| T2 & T3
+</pre>
+<p class="hint">Open first: <code>apps/engine/src/engine/db/models.py</code> —
+every table as a Python class, with comments.</p>
+
+<h2>🤖 5. The AI — one connection, three price tiers</h2>
+<pre class="mermaid">
+flowchart LR
+    RT["<code>llm/router.py</code>"]
+    RT -->|"planner — thinking jobs<br/>(plans, reviews)"| M1["gemini-2.5-pro"]
+    RT -->|"coder — writing code<br/>(and chat today)"| M2["gemini-2.5-flash"]
+    RT -->|"cheap — small jobs<br/>(summaries, routing)"| M3["gemini-2.5-flash-lite"]
+    RT -->|"LLM_FAKE=1 — tests,<br/>no key, no cost"| M4["canned replies"]
+</pre>
+<p class="hint">The tiers are just three lines in <code>.env</code>
+(<code>MODEL_PLANNER</code>, <code>MODEL_CODER</code>, <code>MODEL_CHEAP</code>).
+Swap any of them to Claude or GPT and nothing else changes — that's the point
+of the router.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>
