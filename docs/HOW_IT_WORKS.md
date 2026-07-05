@@ -57,10 +57,12 @@ flowchart TD
     F -->|approved| G[Pull request opened on GitHub]
 ```
 
-What exists so far: the database tables for runs, the role definitions
-(who each agent is, which model it uses, which tools it may touch), and the
-Supervisor's routing logic. Next: the agents themselves, then the UI to watch
-them work. Progress lives in [BACKLOG.md](BACKLOG.md).
+What exists so far: the whole pipeline runs end to end with **stub agents** —
+open `/runs` in the app, describe a feature, and watch the task board and
+timeline update live while fake agents "work". The machinery (statuses, task
+order, retries, the event diary) is real; the thinking is not. Next: replace
+the stubs with real AI agents that edit code. Progress lives in
+[BACKLOG.md](BACKLOG.md).
 
 ## Run it
 

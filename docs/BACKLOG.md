@@ -18,9 +18,9 @@ Complete; exit criteria in [ROADMAP.md](ROADMAP.md), evidence in §Done.
 Goal: describe a feature → approve the plan → agents write the code → GitHub
 pull request. Only what's needed for that demo; everything else waits.
 
-- **Day 1 (2026-07-05):** runs API + worker that executes the Supervisor with
-  stub agents; events saved to Postgres; a runs page that shows the timeline
-  (simple polling — no Redis streaming yet).
+- **Day 1 — done 2026-07-04:** runs API + in-process runner executing the
+  Supervisor with stub agents; events saved to Postgres; `/runs` pages with a
+  polling task board and timeline.
 - **Day 2 (2026-07-06):** connect a GitHub repo; Product Manager agent plans →
   approval gate → engineer agents edit files through the jailed tools in a
   cloned workspace.
@@ -65,8 +65,8 @@ subset being built now.
 - [ ] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested
 
 ### Workstream: Mission-Control Interface (planned)
-- [ ] Runs list and a "new run" form (repository picker, request text area)
-- [ ] Run detail: live agent timeline (streaming), task board, streamed agent output
+- [x] Runs list and a "new run" form (repository URL, request text area)
+- [x] Run detail: agent timeline and task board (polling; Redis streaming and per-agent output panes come later)
 - [ ] Plan approval gate (approve / edit / reject → LangGraph interrupt resume)
 - [ ] Diff viewer and pull-request link panel
 - [ ] Run cost widget (tokens and cost per agent)
@@ -124,3 +124,7 @@ subset being built now.
 - 2026-07-04 · Agent Runtime — supervisor graph: `engine/agents/supervisor.py` routes
   tasks by dependency and sequence, retries a failed task at most twice, fails the run
   with a saved reason and skips unstarted tasks; five routing tests (engine suite 30/30).
+- 2026-07-04 · Day 1 of the 3-day plan: runs API (`engine/api/runs.py`), in-process
+  runner with stub agents (`engine/agents/runner.py`), regenerated shared types, and
+  the `/runs` pages (start form, task board, polling timeline). Engine 35/35, web 9/9,
+  builds clean.
