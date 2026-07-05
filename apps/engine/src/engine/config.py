@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     llm_fake: bool = False
+    workspaces_dir: str = ".workspaces"
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"
