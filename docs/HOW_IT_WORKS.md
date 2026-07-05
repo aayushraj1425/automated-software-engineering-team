@@ -57,14 +57,17 @@ flowchart TD
     F -->|approved| G[Pull request opened on GitHub]
 ```
 
-What exists so far: everything above except the Reviewer and the pull
-request. Open `/runs`, describe a feature, and the Product Manager reads a
-clone of your repository and writes a plan; after you press Approve, the
-engineer agents edit files and make git commits inside that clone — never in
-your real repository. Every step lands in the timeline. With `LLM_FAKE=1`
-the same pipeline runs without an AI model (a fixed plan, real files, real
-commits) — that's how the tests work. Next: the Reviewer agent and opening
-the pull request. Progress lives in [BACKLOG.md](BACKLOG.md).
+The whole flow above exists now. Open `/runs`, describe a feature, and the
+Product Manager reads a clone of your repository and writes a plan; after you
+press Approve, the engineer agents edit files and make git commits inside
+that clone — never in your real repository. The Reviewer then checks the full
+diff: it can send findings back to the engineers once, and its second verdict
+is final. On approval the branch is pushed and — when the repository is on
+GitHub and `GITHUB_TOKEN` is set in `.env` — a pull request opens, linked
+from the run page. Every step lands in the timeline. With `LLM_FAKE=1` the
+same pipeline runs without an AI model (a fixed plan, real files, real
+commits) — that's how the tests work. Progress lives in
+[BACKLOG.md](BACKLOG.md).
 
 ## Run it
 

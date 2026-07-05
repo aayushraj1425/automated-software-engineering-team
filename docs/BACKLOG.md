@@ -21,11 +21,12 @@ pull request. Only what's needed for that demo; everything else waits.
 - **Day 1 — done 2026-07-04:** runs API + in-process runner executing the
   Supervisor with stub agents; events saved to Postgres; `/runs` pages with a
   polling task board and timeline.
-- **Day 2 (2026-07-06):** connect a GitHub repo; Product Manager agent plans →
-  approval gate → engineer agents edit files through the jailed tools in a
-  cloned workspace.
-- **Day 3 (2026-07-07):** Reviewer agent + open the pull request; run the whole
-  flow end to end on a small fixture repo; fix what breaks.
+- **Day 2 — done 2026-07-05:** repository cloned per run; Product Manager agent
+  plans → approval gate → engineer agents edit files through the jailed tools
+  in the cloned workspace.
+- **Day 3 — code done 2026-07-05:** Reviewer agent (one revision loop), branch
+  push, pull request via the GitHub API. Remaining: a real-model end-to-end run
+  against a GitHub repository (needs `GITHUB_TOKEN` in `.env`); fix what breaks.
 
 **Cut to make the deadline** (revisit after): Postgres checkpointing/resume,
 Redis event streaming (polling instead), encrypted BYO keys + settings screen,
@@ -53,7 +54,7 @@ subset being built now.
 - [x] Read-side tools: list directory, read file (size-capped), search (plain-text scan; ripgrep upgrade pending)
 - [x] Write-side tools: write file — jailed (apply-patch with unified diffs still pending)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
-- [ ] Open pull request via the GitHub API with a generated description and Definition-of-Done checklist
+- [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
 - [ ] Task-board tools: create tasks, update task status (writes `agent_tasks`)
 - [ ] Tool-call audit: every invocation recorded to `agent_events` and `audit_logs`
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
@@ -61,14 +62,15 @@ subset being built now.
 ### Workstream: Specialist Agents (blocking)
 - [x] Product Manager agent: feature request → mini-specification + task breakdown (structured JSON contract, strict validation with one corrective round)
 - [x] Backend, Frontend, and DevOps engineer agents: task → edits + task summary (shared tool loop; commit required before the summary)
-- [ ] Reviewer agent: diff → verdict (approve / request changes with findings); one revision loop
+- [x] Reviewer agent: diff → verdict (approve / request changes with role-tagged findings); one revision loop, second verdict is final
 - [ ] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested
 
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
 - [x] Run detail: agent timeline and task board (polling; Redis streaming and per-agent output panes come later)
 - [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page (in-place plan editing still pending)
-- [ ] Diff viewer and pull-request link panel
+- [x] Pull-request link on the run page
+- [ ] Diff viewer
 - [ ] Run cost widget (tokens and cost per agent)
 
 ### Workstream: Identity & Keys (planned)
@@ -141,3 +143,14 @@ subset being built now.
   Approve/Reject with matching timeline entries. Engine 62 passed, web 9/9.
 - 2026-07-05 · CI workflow actions bumped to current majors, ending the Node 20
   deprecation warnings.
+- 2026-07-05 · Specialist Agents — real agents replace the stubs: Product Manager
+  (strictly validated JSON plan, one corrective round), engineer agents on a shared
+  tool loop (`engine/agents/loop.py`), workspace cloned at planning and reopened
+  after approval (`agent_runs.base_sha`, migration 0003), token/cost totals per run.
+  Engine 72 passed.
+- 2026-07-05 · Reviewer + pull request: Reviewer agent verdict contract with one
+  revision loop (`engine/agents/reviewer.py`), branch pushed to origin with the
+  token kept out of logs, pull request opened via the GitHub API
+  (`engine/github.py`), PR link on the run page, review/publish timeline events.
+  End-to-end test proves a local repository gets the run branch pushed back.
+  Engine 80 passed, web 9/9.
