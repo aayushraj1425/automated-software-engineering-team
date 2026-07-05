@@ -57,12 +57,14 @@ flowchart TD
     F -->|approved| G[Pull request opened on GitHub]
 ```
 
-What exists so far: the whole pipeline runs end to end with **stub agents** —
-open `/runs` in the app, describe a feature, and watch the task board and
-timeline update live while fake agents "work". The machinery (statuses, task
-order, retries, the event diary) is real; the thinking is not. Next: replace
-the stubs with real AI agents that edit code. Progress lives in
-[BACKLOG.md](BACKLOG.md).
+What exists so far: everything above except the Reviewer and the pull
+request. Open `/runs`, describe a feature, and the Product Manager reads a
+clone of your repository and writes a plan; after you press Approve, the
+engineer agents edit files and make git commits inside that clone — never in
+your real repository. Every step lands in the timeline. With `LLM_FAKE=1`
+the same pipeline runs without an AI model (a fixed plan, real files, real
+commits) — that's how the tests work. Next: the Reviewer agent and opening
+the pull request. Progress lives in [BACKLOG.md](BACKLOG.md).
 
 ## Run it
 

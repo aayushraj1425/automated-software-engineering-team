@@ -59,8 +59,8 @@ subset being built now.
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
 
 ### Workstream: Specialist Agents (blocking)
-- [ ] Product Manager agent: feature request → mini-specification + task breakdown (structured JSON contract)
-- [ ] Backend, Frontend, and DevOps engineer agents: task → edits + task summary
+- [x] Product Manager agent: feature request → mini-specification + task breakdown (structured JSON contract, strict validation with one corrective round)
+- [x] Backend, Frontend, and DevOps engineer agents: task → edits + task summary (shared tool loop; commit required before the summary)
 - [ ] Reviewer agent: diff → verdict (approve / request changes with findings); one revision loop
 - [ ] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested
 
