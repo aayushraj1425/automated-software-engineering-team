@@ -1,23 +1,26 @@
-"""End-to-end tests for the runs API with stub agents and the approval gate.
+"""End-to-end tests for the runs API with offline agents and the approval gate.
 
+LLM_FAKE=1 (set in conftest) makes the whole pipeline deterministic: planning
+creates a scratch git workspace and a fixed three-task plan; after approval
+the engineer agents write and commit real files through the jailed tools.
 httpx's ASGI transport waits for FastAPI background tasks, so by the time a
-POST response arrives the background work (planning, or executing after an
-approval) has already finished — no polling loops needed here.
+POST response arrives the background work has already finished — no polling.
 """
 
 import uuid
 
 import pytest
 
-from engine.agents import runner
+from engine.config import get_settings
+from engine.workspace.manager import workspaces_root
 from tests.conftest import auth_headers
 
 REPO = "https://github.com/acme/demo"
 
 
 @pytest.fixture(autouse=True)
-def instant_stub_agents(monkeypatch):
-    monkeypatch.setattr(runner, "STUB_TASK_SECONDS", 0)
+def workspaces_in_tmp(tmp_path, monkeypatch):
+    monkeypatch.setattr(get_settings(), "workspaces_dir", str(tmp_path / "workspaces"))
 
 
 def _headers() -> dict[str, str]:
@@ -45,8 +48,10 @@ async def test_run_plans_then_waits_for_approval(client):
     detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
     assert detail["status"] == "awaiting_approval"
     assert detail["plan"]["tasks"]
-    assert len(detail["tasks"]) == 4
+    assert len(detail["tasks"]) == 3
     assert all(t["status"] == "pending" for t in detail["tasks"])
+    # planning created the run's workspace (scratch repository in offline mode)
+    assert (workspaces_root() / created["id"] / ".git").is_dir()
 
 
 async def test_approved_run_executes_to_completed(client):
@@ -59,8 +64,11 @@ async def test_approved_run_executes_to_completed(client):
     detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
     assert detail["status"] == "completed"
     assert all(t["status"] == "done" and t["result"] for t in detail["tasks"])
-    assert detail["tasks"][0]["role"] == "product_manager"
-    assert detail["tasks"][-1]["role"] == "devops"
+    assert [t["role"] for t in detail["tasks"]] == ["backend", "frontend", "devops"]
+    # each offline engineer committed one file into the run's workspace
+    ws = workspaces_root() / created["id"]
+    assert (ws / ".asep" / "task-1.md").is_file()
+    assert (ws / ".asep" / "task-3.md").is_file()
 
     events = (await client.get(f"/v1/runs/{created['id']}/events", headers=headers)).json()
     types = [e["type"] for e in events]
@@ -85,6 +93,8 @@ async def test_rejected_run_is_cancelled_and_tasks_skipped(client):
     assert all(t["status"] == "skipped" for t in detail["tasks"])
     events = (await client.get(f"/v1/runs/{created['id']}/events", headers=headers)).json()
     assert "plan.rejected" in [e["type"] for e in events]
+    # a rejected run's workspace is deleted
+    assert not (workspaces_root() / created["id"]).exists()
 
 
 async def test_decision_only_allowed_while_awaiting_approval(client):

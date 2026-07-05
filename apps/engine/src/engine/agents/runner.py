@@ -1,39 +1,40 @@
 """Executes one agent run from start to finish.
 
-Day 1 version: the machinery is real (statuses, task board, event diary in
-Postgres) but the agents are stubs that pretend to work for a moment and
-report success. Real agents replace the stubs on Day 2; an arq worker
-replaces the in-process background task when runs get long (backlog).
+Planning: clone the repository into a jailed per-run workspace, let the
+Product Manager write the plan, save the task board, and stop at
+awaiting_approval. Execution (after the human approves): reopen the workspace
+and let the Supervisor route each task to the engineer agents. Every status
+change lands in Postgres as an event, so the UI timeline is a full audit of
+the run. An arq worker replaces the in-process background task when runs get
+long (backlog).
 """
 
-import asyncio
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from engine.agents.engineer import execute_task
+from engine.agents.loop import LlmUsage
+from engine.agents.product_manager import create_plan
 from engine.agents.supervisor import TaskState, build_supervisor_graph
+from engine.config import get_settings
 from engine.db.enums import AgentRole, RunStatus, TaskStatus
-from engine.db.models import AgentEvent, AgentRun, AgentTask
+from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
+from engine.workspace.manager import (
+    Workspace,
+    create_scratch_workspace,
+    create_workspace,
+    load_workspace,
+)
 
 log = structlog.get_logger()
-
-# How long a stub agent "works" on a task. Tests set this to 0.
-STUB_TASK_SECONDS = 0.4
-
-# The stub plan every Day 1 run gets: a small diamond of dependencies so the
-# timeline visibly shows ordering (spec first, backend+frontend in between,
-# devops last).
-_STUB_PLAN = [
-    (AgentRole.PRODUCT_MANAGER, "Write the mini-specification", []),
-    (AgentRole.BACKEND, "Implement the backend change", [0]),
-    (AgentRole.FRONTEND, "Implement the frontend change", [0]),
-    (AgentRole.DEVOPS, "Wire up configuration and checks", [1, 2]),
-]
 
 
 def _now() -> datetime:
@@ -59,6 +60,12 @@ def _set_run_status(session: AsyncSession, run: AgentRun, status: RunStatus) -> 
     _emit(session, run.id, "run.status_changed", {"from": old, "to": status})
 
 
+def _apply_usage(run: AgentRun, usage: LlmUsage) -> None:
+    run.total_input_tokens += usage.input_tokens
+    run.total_output_tokens += usage.output_tokens
+    run.total_cost_usd += Decimal(str(round(usage.cost_usd, 6)))
+
+
 async def plan_run(run_id: uuid.UUID) -> None:
     """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
     await _guarded(_plan_run, run_id)
@@ -73,64 +80,84 @@ async def _guarded(work, run_id: uuid.UUID) -> None:
     """Whatever breaks inside a run must end as a failed run, never a crash."""
     try:
         await work(run_id)
-    except Exception:
+    except Exception as exc:
         log.exception("run.crashed", run_id=str(run_id))
         async with session_scope() as session:
             run = await session.get(AgentRun, run_id)
             if run is not None:
                 run.status = RunStatus.FAILED
-                run.error = "internal error while executing the run"
+                run.error = str(exc)[:500] or "internal error while executing the run"
                 run.finished_at = _now()
-                _emit(session, run_id, "run.finished", {"status": RunStatus.FAILED})
+                _emit(
+                    session,
+                    run_id,
+                    "run.finished",
+                    {"status": RunStatus.FAILED, "error": run.error},
+                )
                 await session.commit()
 
 
+async def _open_workspace(run_id: uuid.UUID, repo_url: str) -> Workspace:
+    # Offline mode still clones local fixture repositories; with a remote URL
+    # it starts from an empty scratch repository instead of touching the network.
+    if get_settings().llm_fake and not Path(repo_url).exists():
+        return await create_scratch_workspace(run_id)
+    return await create_workspace(run_id, repo_url)
+
+
 async def _plan_run(run_id: uuid.UUID) -> None:
-    # Plan the run (stub Product Manager), then stop and wait for the human.
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.QUEUED:
             return
+        repo = await session.get(Repository, run.repository_id)
+        assert repo is not None
+        repo_url = repo.url
+        request = run.request
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
         await session.commit()
 
-    await asyncio.sleep(STUB_TASK_SECONDS)  # the stub PM "thinks"
+    ws = await _open_workspace(run_id, repo_url)
+    usage = LlmUsage()
+    plan = await create_plan(request, ws, usage)
 
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         assert run is not None
+        run.branch_name = ws.branch
+        run.base_sha = ws.base_sha
         tasks: list[AgentTask] = []
-        for sequence, (role, title, dep_indexes) in enumerate(_STUB_PLAN, start=1):
+        for sequence, item in enumerate(plan["tasks"], start=1):
             task = AgentTask(
                 run_id=run_id,
                 sequence=sequence,
-                role=role,
-                title=title,
-                description=f"Stub task for: {run.request[:120]}",
+                role=item["role"],
+                title=item["title"],
+                description=item["description"],
             )
             session.add(task)
             await session.flush()
-            task.depends_on = [str(tasks[i].id) for i in dep_indexes]
+            task.depends_on = [str(tasks[dep - 1].id) for dep in item["depends_on"]]
             tasks.append(task)
-        plan: dict[str, Any] = {
-            "summary": f"Stub plan for: {run.request[:200]}",
-            "tasks": [t.title for t in tasks],
-        }
-        run.plan = plan
-        _emit(session, run_id, "plan.created", plan, agent=AgentRole.PRODUCT_MANAGER)
+        run.plan = {"summary": plan["summary"], "tasks": [t.title for t in tasks]}
+        _apply_usage(run, usage)
+        _emit(session, run_id, "plan.created", run.plan, agent=AgentRole.PRODUCT_MANAGER)
         # Stop here: nothing executes until the human approves the plan.
         _set_run_status(session, run, RunStatus.AWAITING_APPROVAL)
         await session.commit()
 
 
 async def _execute_tasks(run_id: uuid.UUID) -> None:
-    # The human approved — load the task board and let the Supervisor work.
+    # The human approved — reopen the workspace and let the Supervisor work.
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.EXECUTING:
             return
+        request = run.request
+        branch = run.branch_name or ""
+        base_sha = run.base_sha or ""
         rows = (
             (
                 await session.execute(
@@ -142,13 +169,14 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         )
         board = [_to_task_state(t) for t in rows]
 
-    graph = build_supervisor_graph(_stub_agent)
+    ws = load_workspace(run_id, branch, base_sha)
+    graph = build_supervisor_graph(_make_task_executor(run_id, request, ws))
     final = await graph.ainvoke(
         {"tasks": board, "current_task_id": None, "failure": None},
         {"recursion_limit": 100},
     )
 
-    # Phase 3 of the run: record how it ended.
+    # Record how the run ended.
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         assert run is not None
@@ -194,43 +222,70 @@ def _to_task_state(task: AgentTask) -> TaskState:
     )
 
 
-async def _stub_agent(task: TaskState) -> str:
-    """Pretends to be the agent named in task['role']: marks the task started,
-    'works', marks it done. Replaced by real agents on Day 2."""
-    task_id = uuid.UUID(task["id"])
-    async with session_scope() as session:
-        row = await session.get(AgentTask, task_id)
-        assert row is not None
-        row.status = TaskStatus.IN_PROGRESS
-        row.attempts = task["attempts"]
-        row.started_at = _now()
-        _emit(
-            session,
-            row.run_id,
-            "task.status_changed",
-            {"from": TaskStatus.PENDING, "to": TaskStatus.IN_PROGRESS, "title": task["title"]},
-            agent=task["role"],
-            task_id=task_id,
-        )
-        await session.commit()
-        run_id = row.run_id
+def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
+    """Wraps the engineer agents with the task board's bookkeeping: statuses,
+    timestamps, events, and the run's token/cost totals."""
 
-    await asyncio.sleep(STUB_TASK_SECONDS)
-    result = f"[stub {task['role']}] finished: {task['title']}"
+    async def _execute(task: TaskState) -> str:
+        task_id = uuid.UUID(task["id"])
+        async with session_scope() as session:
+            row = await session.get(AgentTask, task_id)
+            assert row is not None
+            row.status = TaskStatus.IN_PROGRESS
+            row.attempts = task["attempts"]
+            row.started_at = _now()
+            _emit(
+                session,
+                run_id,
+                "task.status_changed",
+                {"from": TaskStatus.PENDING, "to": TaskStatus.IN_PROGRESS, "title": task["title"]},
+                agent=task["role"],
+                task_id=task_id,
+            )
+            await session.commit()
 
-    async with session_scope() as session:
-        row = await session.get(AgentTask, task_id)
-        assert row is not None
-        row.status = TaskStatus.DONE
-        row.result = result
-        row.finished_at = _now()
-        _emit(
-            session,
-            run_id,
-            "task.status_changed",
-            {"from": TaskStatus.IN_PROGRESS, "to": TaskStatus.DONE, "result": result},
-            agent=task["role"],
-            task_id=task_id,
-        )
-        await session.commit()
-    return result
+        usage = LlmUsage()
+        try:
+            result = await execute_task(task, request, ws, usage)
+        except Exception as exc:
+            async with session_scope() as session:
+                row = await session.get(AgentTask, task_id)
+                run = await session.get(AgentRun, run_id)
+                assert row is not None and run is not None
+                row.status = TaskStatus.PENDING  # the supervisor decides retry vs fail
+                _apply_usage(run, usage)
+                _emit(
+                    session,
+                    run_id,
+                    "task.attempt_failed",
+                    {
+                        "attempt": task["attempts"],
+                        "title": task["title"],
+                        "error": str(exc)[:500],
+                    },
+                    agent=task["role"],
+                    task_id=task_id,
+                )
+                await session.commit()
+            raise
+
+        async with session_scope() as session:
+            row = await session.get(AgentTask, task_id)
+            run = await session.get(AgentRun, run_id)
+            assert row is not None and run is not None
+            row.status = TaskStatus.DONE
+            row.result = result
+            row.finished_at = _now()
+            _apply_usage(run, usage)
+            _emit(
+                session,
+                run_id,
+                "task.status_changed",
+                {"from": TaskStatus.IN_PROGRESS, "to": TaskStatus.DONE, "result": result[:500]},
+                agent=task["role"],
+                task_id=task_id,
+            )
+            await session.commit()
+        return result
+
+    return _execute

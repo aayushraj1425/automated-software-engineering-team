@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from engine.db.enums import AgentRole
+from engine.llm.router import Tier
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -26,7 +27,7 @@ _GIT_TOOLS = ("git_branch", "git_commit", "git_diff")
 @dataclass(frozen=True)
 class AgentSpec:
     role: AgentRole
-    model_tier: str  # ModelRouter tier: planner | coder | cheap
+    model_tier: Tier
     tools: tuple[str, ...]
     prompt_file: str
 

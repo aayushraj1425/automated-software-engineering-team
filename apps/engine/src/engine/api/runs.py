@@ -4,6 +4,7 @@ The UI polls GET /v1/runs/{id} for the task board and
 GET /v1/runs/{id}/events?after=<last event id> for new timeline entries.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -19,6 +20,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session
+from engine.workspace.manager import remove_workspace
 
 router = APIRouter()
 
@@ -168,6 +170,9 @@ async def decide_run(
 
     if body.approved:
         background.add_task(execute_tasks, run.id)
+    else:
+        # The workspace was cloned during planning; a rejected run won't use it.
+        await asyncio.to_thread(remove_workspace, run.id)
     repo = await db.get(Repository, run.repository_id)
     return _run_out(run, repo.url if repo else "")
 
