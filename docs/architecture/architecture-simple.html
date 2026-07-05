@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASEP — Simple first, then explained</title>
+<style>
+  body { background:#101014; color:#e4e4e7; font:15px/1.65 system-ui, sans-serif;
+         max-width:1100px; margin:0 auto; padding:2rem; }
+  h1 { font-size:1.5rem; } h2 { font-size:1.2rem; margin-top:3.5rem; color:#fafafa; }
+  p.caption { color:#a1a1aa; max-width:75ch; }
+  .mermaid { background:#18181b; border:1px solid #27272a; border-radius:10px;
+             padding:1.25rem; margin:1.25rem 0; }
+  code { background:#27272a; padding:0.1em 0.35em; border-radius:4px; font-size:0.9em; }
+  ol.steps { max-width:80ch; } ol.steps li { margin-bottom:0.9rem; }
+  ol.steps b { color:#fafafa; }
+  .divider { border:none; border-top:1px solid #27272a; margin-top:3.5rem; }
+</style>
+</head>
+<body>
+
+<h1>ASEP architecture — simple first, then explained</h1>
+
+<h2>The simple picture (start here)</h2>
+<p class="caption">Five boxes. If you remember nothing else, remember this:
+requests only ever flow left to right, and answers flow back the same way.
+Nothing skips a box.</p>
+<pre class="mermaid">
+flowchart LR
+    A["🧑 You<br/>(browser)"] --> B["🌐 Website<br/>Next.js<br/>port 3000"]
+    B --> C["⚙️ Engine<br/>Python<br/>port 8000"]
+    C --> D["🤖 AI<br/>Gemini"]
+    C --> E[("🗄️ Database<br/>Postgres")]
+</pre>
+<p class="caption">
+<b>Website</b> = what you see, plus the bouncer (checks you're signed in).<br/>
+<b>Engine</b> = the brain room: talks to the AI, runs the agents, remembers everything.<br/>
+<b>Database</b> = the memory: accounts, chats, agent runs.<br/>
+<b>AI</b> = rented thinking, paid per word. The engine is the only box allowed to call it.
+</p>
+
+<hr class="divider"/>
+
+<h2>The same picture, fully explained</h2>
+<p class="caption">Same system, now with real file names and numbered arrows.
+Follow the numbers 1→9 — that is one agent run happening. The numbered list
+below the diagram explains each arrow.</p>
+<pre class="mermaid">
+flowchart LR
+    subgraph B1["🧑 Browser"]
+        UI["runs page<br/><code>runs-panel.tsx</code>"]
+        WATCH["watch page<br/><code>run-detail-panel.tsx</code>"]
+    end
+
+    subgraph B2["🌐 Website — apps/web (port 3000)"]
+        SESS["1. bouncer<br/><code>lib/auth.ts</code>"]
+        PASS["2. pass-maker<br/><code>lib/service-token.ts</code>"]
+        RELAY["3. relay<br/><code>app/api/runs/route.ts</code>"]
+    end
+
+    subgraph B3["⚙️ Engine — apps/engine (port 8000)"]
+        DOOR["4. door<br/><code>auth.py</code>"]
+        RAPI["5. runs desk<br/><code>api/runs.py</code>"]
+        RUN["6. foreman<br/><code>agents/runner.py</code>"]
+        SCHED["7. scheduler<br/><code>agents/supervisor.py</code>"]
+    end
+
+    DB[("🗄️ Postgres<br/>agent_runs · agent_tasks<br/>agent_events")]
+
+    UI -->|"① start run"| SESS
+    SESS -->|"② signed in? yes"| PASS
+    PASS -->|"③ 60-second pass"| RELAY
+    RELAY -->|"④ forward + pass"| DOOR
+    DOOR -->|"⑤ pass valid"| RAPI
+    RAPI -->|"⑥ save run, reply instantly"| DB
+    RAPI -->|"⑦ work continues in background"| RUN
+    RUN <-->|"⑧ which task next?"| SCHED
+    RUN -->|"⑨ every step written down"| DB
+    WATCH -.->|"⑩ every 1.5s: anything new?"| RELAY
+</pre>
+
+<ol class="steps">
+  <li><b>① Start run.</b> You type a feature request and click Start. The page
+      sends it to the website's own backend — never to the engine directly.</li>
+  <li><b>② The bouncer.</b> <code>lib/auth.ts</code> (better-auth) reads your
+      session cookie and confirms who you are. No cookie → sent to sign-in.</li>
+  <li><b>③ The pass-maker.</b> <code>lib/service-token.ts</code> signs a small
+      token that says “user X, valid for 60 seconds”. Both sides know the same
+      secret (<code>ENGINE_SERVICE_SECRET</code> in <code>.env</code>), so the
+      engine can verify it wasn't forged.</li>
+  <li><b>④ The relay.</b> <code>app/api/runs/route.ts</code> forwards your
+      request to the engine with that pass attached. It adds nothing else —
+      it's deliberately boring.</li>
+  <li><b>⑤ The door.</b> The engine's <code>auth.py</code> checks the pass on
+      every request. Expired or fake → 401, nothing happens.</li>
+  <li><b>⑥ The runs desk.</b> <code>api/runs.py</code> writes one row into
+      <code>agent_runs</code> (status: <i>queued</i>) and replies to you
+      <i>immediately</i> with the run's id. You're not kept waiting.</li>
+  <li><b>⑦ The foreman.</b> <code>agents/runner.py</code> picks the run up in
+      the background: writes the plan as rows in <code>agent_tasks</code>,
+      then works through them. Today its workers are stubs; Day 2 they become
+      real AI agents.</li>
+  <li><b>⑧ The scheduler.</b> <code>agents/supervisor.py</code> answers one
+      question, over and over: “which task is allowed to run next?” Rules:
+      dependencies first, two retries max, third failure stops the run.</li>
+  <li><b>⑨ The diary.</b> Every step becomes a numbered row in
+      <code>agent_events</code>. This is the single source of truth for what
+      happened — the UI is just a pretty view of this table.</li>
+  <li><b>⑩ Watching.</b> The watch page asks every 1.5 seconds: “give me
+      events newer than #N”. Because events are numbered, nothing is ever
+      missed or shown twice — even if you refresh the page.</li>
+</ol>
+
+<p class="caption">Chat works the same way through boxes 1–5, then goes to
+<code>api/chat.py</code> → <code>llm/router.py</code> → Gemini instead of the
+foreman — and the reply streams back word by word.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>
