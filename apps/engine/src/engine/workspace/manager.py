@@ -79,6 +79,32 @@ async def create_workspace(run_id: uuid.UUID, repo_url: str) -> Workspace:
     return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
 
 
+async def create_scratch_workspace(run_id: uuid.UUID) -> Workspace:
+    """A fresh local repository for offline runs (LLM_FAKE) — no clone, no network."""
+    path = workspaces_root() / str(run_id)
+    if path.exists():
+        remove_workspace(run_id)
+    path.mkdir(parents=True)
+
+    branch = f"asep/run-{run_id.hex[:8]}"
+    await run_git(path, "init", f"--initial-branch={branch}")
+    await run_git(path, "config", "user.name", "ASEP Agent Team")
+    await run_git(path, "config", "user.email", "agents@asep.local")
+    await run_git(path, "commit", "--allow-empty", "-m", "initialize run workspace")
+    base_sha = await run_git(path, "rev-parse", "HEAD")
+    log.info("workspace.scratch_created", run_id=str(run_id), path=str(path))
+    return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
+
+
+def load_workspace(run_id: uuid.UUID, branch: str, base_sha: str) -> Workspace:
+    """Reopen the workspace created during planning (execution runs later,
+    after the human approves the plan)."""
+    path = workspaces_root() / str(run_id)
+    if not path.is_dir():
+        raise WorkspaceError(f"workspace for run {run_id} is missing")
+    return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
+
+
 def remove_workspace(run_id: uuid.UUID) -> None:
     """Delete a run's workspace folder (git marks some files read-only on Windows)."""
     path = workspaces_root() / str(run_id)

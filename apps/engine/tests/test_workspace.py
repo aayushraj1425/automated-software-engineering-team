@@ -12,6 +12,7 @@ from engine.config import get_settings
 from engine.workspace.manager import (
     WorkspaceError,
     create_workspace,
+    load_workspace,
     remove_workspace,
     run_git,
 )
@@ -82,3 +83,15 @@ async def test_clone_failure_raises_a_readable_error(workspace_root, tmp_path):
 
 async def test_removing_a_missing_workspace_is_fine(workspace_root):
     remove_workspace(uuid.uuid4())  # must not raise
+
+
+async def test_reopening_a_workspace_after_the_approval_pause(origin, workspace_root):
+    run_id = uuid.uuid4()
+    created = await create_workspace(run_id, str(origin))
+
+    reopened = load_workspace(run_id, created.branch, created.base_sha)
+    assert reopened == created
+
+    remove_workspace(run_id)
+    with pytest.raises(WorkspaceError, match="missing"):
+        load_workspace(run_id, created.branch, created.base_sha)

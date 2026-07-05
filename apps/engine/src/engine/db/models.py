@@ -103,6 +103,7 @@ class AgentRun(Base, TimestampMixin):
     plan: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     base_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
     branch_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    base_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     pr_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     max_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
