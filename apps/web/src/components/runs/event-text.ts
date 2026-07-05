@@ -30,6 +30,8 @@ export function describeEvent(event: RunEvent): string {
       if (to === "skipped") return `Task skipped (the run stopped first)`;
       return `Task is now ${to.replace("_", " ")}`;
     }
+    case "task.attempt_failed":
+      return `${agentName(event.agent)} hit an error and will retry: ${String(p.error ?? "")}`;
     case "plan.approved":
       return "You approved the plan — work begins";
     case "plan.rejected":
