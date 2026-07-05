@@ -30,6 +30,7 @@ class Workspace:
     run_id: uuid.UUID
     path: Path
     branch: str
+    base_sha: str  # the commit the clone started from — diffs measure against this
 
 
 def workspaces_root() -> Path:
@@ -73,8 +74,9 @@ async def create_workspace(run_id: uuid.UUID, repo_url: str) -> Workspace:
     # Commits made by agents are attributed to the platform, not to the user.
     await run_git(path, "config", "user.name", "ASEP Agent Team")
     await run_git(path, "config", "user.email", "agents@asep.local")
+    base_sha = await run_git(path, "rev-parse", "HEAD")
     log.info("workspace.created", run_id=str(run_id), path=str(path), branch=branch)
-    return Workspace(run_id=run_id, path=path, branch=branch)
+    return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
 
 
 def remove_workspace(run_id: uuid.UUID) -> None:
