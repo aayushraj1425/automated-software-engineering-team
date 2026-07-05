@@ -30,6 +30,10 @@ export function describeEvent(event: RunEvent): string {
       if (to === "skipped") return `Task skipped (the run stopped first)`;
       return `Task is now ${to.replace("_", " ")}`;
     }
+    case "plan.approved":
+      return "You approved the plan — work begins";
+    case "plan.rejected":
+      return "You rejected the plan — run cancelled";
     case "run.finished":
       return p.error
         ? `Run failed: ${String(p.error)}`

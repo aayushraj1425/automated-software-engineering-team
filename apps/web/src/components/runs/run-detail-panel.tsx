@@ -13,7 +13,25 @@ const POLL_MS = 1500;
 export function RunDetailPanel({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
+  const [deciding, setDeciding] = useState(false);
   const cursorRef = useRef(0);
+
+  async function decide(approved: boolean) {
+    setDeciding(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}/decision`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ approved }),
+      });
+      if (res.ok) {
+        const updated: RunDetail = await res.json();
+        setRun((prev) => (prev ? { ...prev, status: updated.status } : prev));
+      }
+    } finally {
+      setDeciding(false);
+    }
+  }
 
   useEffect(() => {
     let stopped = false;
@@ -63,6 +81,30 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         {run.error && <p className="text-sm text-red-400">{run.error}</p>}
         {run.plan?.summary && <p className="text-sm text-zinc-400">{run.plan.summary}</p>}
       </header>
+
+      {run.status === "awaiting_approval" && (
+        <section className="space-y-3 rounded-md border border-violet-900 bg-violet-950/30 p-4">
+          <p className="text-sm text-zinc-200">
+            The plan is ready. Nothing runs until you decide.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => void decide(true)}
+              disabled={deciding}
+              className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Approve plan
+            </button>
+            <button
+              onClick={() => void decide(false)}
+              disabled={deciding}
+              className="rounded-md border border-red-800 px-4 py-2 text-sm font-medium text-red-300 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Task board</h2>
