@@ -14,9 +14,9 @@ jobs:
     name: Web (lint, typecheck, test, build)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -57,8 +57,8 @@ jobs:
       LLM_FAKE: "1"
       ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -72,5 +72,5 @@ jobs:
     name: Compose config check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose -f infra/docker/docker-compose.dev.yml config -q
