@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-03
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-05
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -46,13 +46,13 @@ subset being built now.
 ### Workstream: Repository Connection & Workspaces (blocking)
 - [ ] GitHub connection: personal access token first (encrypted at rest), OAuth app flow next
 - [ ] Repositories API (create/list/status) and the connect screen
-- [ ] Workspace manager: clone into `.workspaces/<run>`, one branch per run, cleanup policy
-- [ ] Path-jail module with symlink/UNC/traversal tests (security-critical, ADR-0008)
+- [x] Workspace manager: clone into `.workspaces/<run>`, one branch per run, cleanup policy
+- [x] Path-jail module with symlink/UNC/traversal tests (security-critical, ADR-0008); paths validated under both Windows and POSIX semantics
 
 ### Workstream: Agent Tools (blocking)
-- [ ] Read-side tools: list directory, read file (size-capped), search (ripgrep with fallback)
-- [ ] Write-side tools: apply patch (unified diff, reject fuzzy failures), write file — all jailed
-- [ ] Git tools: branch, commit, diff summary
+- [x] Read-side tools: list directory, read file (size-capped), search (plain-text scan; ripgrep upgrade pending)
+- [x] Write-side tools: write file — jailed (apply-patch with unified diffs still pending)
+- [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
 - [ ] Open pull request via the GitHub API with a generated description and Definition-of-Done checklist
 - [ ] Task-board tools: create tasks, update task status (writes `agent_tasks`)
 - [ ] Tool-call audit: every invocation recorded to `agent_events` and `audit_logs`
@@ -67,7 +67,7 @@ subset being built now.
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
 - [x] Run detail: agent timeline and task board (polling; Redis streaming and per-agent output panes come later)
-- [ ] Plan approval gate (approve / edit / reject → LangGraph interrupt resume)
+- [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page (in-place plan editing still pending)
 - [ ] Diff viewer and pull-request link panel
 - [ ] Run cost widget (tokens and cost per agent)
 
@@ -91,7 +91,6 @@ subset being built now.
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
 - LiteLLM proxy-server evaluation if callers beyond the engine appear (ADR-0006).
 - Langfuse in compose plus a ModelRouter trace exporter (ADR-0010).
-- Bump GitHub Actions to their next majors (current ones emit Node 20 deprecation notices).
 
 ## Debt register
 
@@ -128,3 +127,17 @@ subset being built now.
   runner with stub agents (`engine/agents/runner.py`), regenerated shared types, and
   the `/runs` pages (start form, task board, polling timeline). Engine 35/35, web 9/9,
   builds clean.
+- 2026-07-05 · Repository Connection & Workspaces — path jail and workspace manager:
+  `engine/workspace/jail.py` rejects escapes under both Windows and POSIX path rules
+  (hardened after CI exposed a Linux backslash bypass); `engine/workspace/manager.py`
+  shallow-clones per run, branches `asep/run-<id>`, records the base commit for diffs,
+  and cleans up read-only git files on Windows.
+- 2026-07-05 · Agent Tools — jailed toolbox: read/write/git tools behind an
+  allow-list dispatcher (`engine/agents/tools.py`); tool failures return error text
+  to the model instead of crashing the run.
+- 2026-07-05 · Mission-Control Interface + Agent Runtime — plan approval gate:
+  every run stops at `awaiting_approval`; `POST /v1/runs/{id}/decision` starts
+  execution or cancels the run (wrong-state decisions get 409); the run page shows
+  Approve/Reject with matching timeline entries. Engine 62 passed, web 9/9.
+- 2026-07-05 · CI workflow actions bumped to current majors, ending the Node 20
+  deprecation warnings.
