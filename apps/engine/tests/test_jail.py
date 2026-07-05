@@ -1,7 +1,6 @@
 """The path jail must reject every way of escaping the workspace (ADR-0008)."""
 
 import os
-import sys
 
 import pytest
 
@@ -68,8 +67,9 @@ def test_symlink_pointing_outside_is_rejected(root, tmp_path_factory):
         resolve_inside(root, "innocent/secret.txt")
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows path forms")
-def test_windows_backslash_traversal_is_rejected(root):
+def test_backslash_traversal_is_rejected_on_every_platform(root):
+    # Backslashes count as separators even on Linux — an agent must not be
+    # able to smuggle traversal past the jail by using Windows separators.
     with pytest.raises(JailViolation):
         resolve_inside(root, "..\\outside.txt")
     with pytest.raises(JailViolation):
