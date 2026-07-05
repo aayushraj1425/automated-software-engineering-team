@@ -7,10 +7,9 @@ executing garbage. With LLM_FAKE=1 a fixed plan is returned so the whole
 pipeline runs offline.
 """
 
-import json
 from typing import Any
 
-from engine.agents.loop import LlmUsage, run_tool_loop
+from engine.agents.loop import LlmUsage, parse_json_object, run_tool_loop
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
 from engine.db.enums import AgentRole
@@ -86,17 +85,10 @@ async def create_plan(request: str, ws: Workspace, usage: LlmUsage) -> dict[str,
 
 
 def parse_plan(reply: str) -> dict[str, Any]:
-    text = reply.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else ""
-        text = text.rsplit("```", 1)[0]
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise PlanError(f"plan is not valid JSON: {exc}") from exc
-    if not isinstance(data, dict):
-        raise PlanError("plan must be a JSON object")
-    return data
+        return parse_json_object(reply)
+    except ValueError as exc:
+        raise PlanError(f"plan {exc}") from exc
 
 
 def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:

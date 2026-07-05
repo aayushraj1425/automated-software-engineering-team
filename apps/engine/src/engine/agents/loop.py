@@ -5,6 +5,7 @@ allow-list differ (all three come from the registry). The loop ends when the
 model replies without tool calls — that text is the agent's final answer.
 """
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,6 +38,23 @@ class LlmUsage:
         self.input_tokens += turn.input_tokens
         self.output_tokens += turn.output_tokens
         self.cost_usd += turn.cost_usd
+
+
+def parse_json_object(reply: str) -> dict[str, Any]:
+    """An agent's final answer as a JSON object; tolerates a markdown fence.
+    Raises ValueError with a readable reason — callers wrap it in their
+    contract-specific error."""
+    text = reply.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"reply is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError("reply must be a JSON object")
+    return data
 
 
 async def run_tool_loop(

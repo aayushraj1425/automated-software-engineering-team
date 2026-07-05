@@ -39,6 +39,45 @@ async def execute_task(task: TaskState, request: str, ws: Workspace, usage: LlmU
     return await run_tool_loop(spec, ws, messages, usage)
 
 
+async def execute_revision(
+    role: str, findings: list[str], request: str, ws: Workspace, usage: LlmUsage
+) -> str:
+    """One revision round: the engineer addresses the Reviewer's findings."""
+    spec = get_agent_spec(role)
+    if get_settings().llm_fake:
+        issues = "\n".join(f"- {finding}" for finding in findings)
+        result = await call_tool(
+            ws,
+            spec.tools,
+            "write_file",
+            {"path": f".asep/revision-{role}.md", "content": f"# Review findings\n\n{issues}\n"},
+        )
+        if result.startswith("ERROR:"):
+            raise TaskExecutionError(result)
+        committed = await call_tool(
+            ws, spec.tools, "git_commit", {"message": f"address review findings ({role})"}
+        )
+        if committed.startswith("ERROR:"):
+            raise TaskExecutionError(committed)
+        return f"offline revision: addressed {len(findings)} finding(s)"
+
+    issues = "\n".join(f"- {finding}" for finding in findings)
+    messages = [
+        {"role": "system", "content": spec.system_prompt},
+        {
+            "role": "user",
+            "content": (
+                f"Overall feature request:\n{request}\n\n"
+                "The Reviewer requested changes to work already committed in this "
+                f"workspace. Address every finding below:\n{issues}\n\n"
+                "Work only through your tools. Commit your fixes with git_commit, "
+                "then reply with a short summary (no tool call) to finish."
+            ),
+        },
+    ]
+    return await run_tool_loop(spec, ws, messages, usage)
+
+
 async def _execute_offline(task: TaskState, spec: AgentSpec, ws: Workspace) -> str:
     """Deterministic offline path: same tools and allow-list, no model."""
     path = f".asep/task-{task['sequence']}.md"
