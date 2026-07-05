@@ -4,6 +4,7 @@ export type RunSummary = {
   request: string;
   repository_url: string;
   error: string | null;
+  pr_url: string | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

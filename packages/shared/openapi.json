@@ -188,6 +188,57 @@
         }
       }
     },
+    "/v1/runs/{run_id}/decision": {
+      "post": {
+        "summary": "Decide Run",
+        "description": "The human approval gate: approve starts the work, reject ends the run.",
+        "operationId": "decide_run_v1_runs__run_id__decision_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}": {
       "get": {
         "summary": "Get Run",
@@ -349,6 +400,19 @@
           "updated_at"
         ],
         "title": "ConversationOut"
+      },
+      "DecisionIn": {
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "title": "Approved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved"
+        ],
+        "title": "DecisionIn"
       },
       "EventOut": {
         "properties": {
@@ -528,6 +592,17 @@
             ],
             "title": "Error"
           },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -584,6 +659,7 @@
           "request",
           "repository_url",
           "error",
+          "pr_url",
           "created_at",
           "started_at",
           "finished_at",
@@ -622,6 +698,17 @@
             ],
             "title": "Error"
           },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -659,6 +746,7 @@
           "request",
           "repository_url",
           "error",
+          "pr_url",
           "created_at",
           "started_at",
           "finished_at"

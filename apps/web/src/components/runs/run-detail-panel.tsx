@@ -80,6 +80,16 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         <h1 className="text-lg font-semibold">{run.request}</h1>
         {run.error && <p className="text-sm text-red-400">{run.error}</p>}
         {run.plan?.summary && <p className="text-sm text-zinc-400">{run.plan.summary}</p>}
+        {run.pr_url && (
+          <a
+            href={run.pr_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded-md border border-emerald-800 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40"
+          >
+            View the pull request ↗
+          </a>
+        )}
       </header>
 
       {run.status === "awaiting_approval" && (

@@ -32,6 +32,16 @@ export function describeEvent(event: RunEvent): string {
     }
     case "task.attempt_failed":
       return `${agentName(event.agent)} hit an error and will retry: ${String(p.error ?? "")}`;
+    case "review.verdict":
+      return p.verdict === "approve"
+        ? "Reviewer approved the changes"
+        : `Reviewer requested changes (${Array.isArray(p.findings) ? p.findings.length : 0} findings)`;
+    case "review.revision":
+      return `${agentName(event.agent)} addressed the review findings`;
+    case "branch.published":
+      return p.pr_url
+        ? "Branch pushed and pull request opened"
+        : `Branch ${String(p.branch ?? "")} pushed`;
     case "plan.approved":
       return "You approved the plan — work begins";
     case "plan.rejected":

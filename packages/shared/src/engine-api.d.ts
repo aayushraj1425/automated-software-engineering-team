@@ -90,6 +90,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Run
+         * @description The human approval gate: approve starts the work, reject ends the run.
+         */
+        post: operations["decide_run_v1_runs__run_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -154,6 +174,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** DecisionIn */
+        DecisionIn: {
+            /** Approved */
+            approved: boolean;
         };
         /** EventOut */
         EventOut: {
@@ -223,6 +248,8 @@ export interface components {
             repository_url: string;
             /** Error */
             error: string | null;
+            /** Pr Url */
+            pr_url: string | null;
             /**
              * Created At
              * Format: date-time
@@ -254,6 +281,8 @@ export interface components {
             repository_url: string;
             /** Error */
             error: string | null;
+            /** Pr Url */
+            pr_url: string | null;
             /**
              * Created At
              * Format: date-time
@@ -451,6 +480,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_run_v1_runs__run_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
