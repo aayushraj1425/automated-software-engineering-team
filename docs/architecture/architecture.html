@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASEP — Architecture (as built)</title>
+<style>
+  body { background:#101014; color:#e4e4e7; font:15px/1.6 system-ui, sans-serif;
+         max-width:1200px; margin:0 auto; padding:2rem; }
+  h1 { font-size:1.5rem; } h2 { font-size:1.15rem; margin-top:3rem; color:#a1a1aa; }
+  p.caption { color:#a1a1aa; max-width:70ch; }
+  .mermaid { background:#18181b; border:1px solid #27272a; border-radius:10px;
+             padding:1rem; margin:1rem 0; }
+  code { background:#27272a; padding:0.1em 0.35em; border-radius:4px; font-size:0.9em; }
+</style>
+</head>
+<body>
+
+<h1>ASEP — the architecture as it exists right now</h1>
+<p class="caption">Every box is a real file or a real process on your machine.
+Nothing here is planned-but-not-built except where marked <b>“later”</b>.</p>
+
+<h2>1. The three processes and what's inside them</h2>
+<p class="caption">When you run <code>pnpm dev</code>, you start the web app and the
+engine. Docker runs the databases. The browser only ever talks to the web app;
+only the web app talks to the engine; only the engine talks to Gemini and Postgres.</p>
+<pre class="mermaid">
+flowchart LR
+    subgraph BROWSER["Your browser"]
+        CP["chat-panel.tsx<br/>(the chat screen)"]
+        RP["runs-panel.tsx<br/>(start a run)"]
+        RD["run-detail-panel.tsx<br/>(task board + timeline,<br/>polls every 1.5s)"]
+    end
+
+    subgraph WEB["Web app — Next.js, port 3000 (apps/web)"]
+        AUTH["lib/auth.ts<br/>better-auth: sign-up, sessions"]
+        TOK["lib/service-token.ts<br/>signs a 60-second pass (JWT)"]
+        BFF1["app/api/chat/route.ts"]
+        BFF2["app/api/runs/*/route.ts"]
+    end
+
+    subgraph ENGINE["Engine — FastAPI, port 8000 (apps/engine)"]
+        GUARD["auth.py<br/>checks the 60-second pass"]
+        CHAT["api/chat.py<br/>streams a chat reply"]
+        RUNS["api/runs.py<br/>create / list / watch runs"]
+        RUNNER["agents/runner.py<br/>executes one run"]
+        SUP["agents/supervisor.py<br/>decides which task runs next"]
+        REG["agents/registry.py<br/>each agent's model + tools + prompt"]
+        ROUTER["llm/router.py<br/>the only file that calls the AI"]
+    end
+
+    subgraph DATA["Docker containers"]
+        PG[("Postgres, port 5433<br/>all tables live here")]
+        REDIS[("Redis, port 6379<br/>later: live event streams")]
+        MINIO[("MinIO, port 9000<br/>later: big file storage")]
+    end
+
+    GEM["Gemini API<br/>(the actual AI)"]
+
+    CP -->|"POST /api/chat"| BFF1
+    RP & RD -->|"GET/POST /api/runs…"| BFF2
+    BFF1 & BFF2 --> AUTH --> TOK
+    BFF1 -->|"pass in header"| GUARD
+    BFF2 -->|"pass in header"| GUARD
+    GUARD --> CHAT & RUNS
+    RUNS -->|"starts in background"| RUNNER
+    RUNNER --> SUP
+    SUP -.->|"stub agents today,<br/>real agents Day 2"| REG
+    CHAT --> ROUTER
+    ROUTER -->|"MODEL_CODER from .env"| GEM
+    CHAT & RUNS & RUNNER --> PG
+</pre>
+
+<h2>2. What happens when you start an agent run (today, with stub agents)</h2>
+<p class="caption">This is the exact Day-1 flow. The “agents” pretend to work for
+0.4 seconds each — everything else is real and stored in Postgres.</p>
+<pre class="mermaid">
+sequenceDiagram
+    actor You
+    participant Page as /runs page
+    participant BFF as api/runs/route.ts<br/>(web app)
+    participant API as api/runs.py<br/>(engine)
+    participant Runner as agents/runner.py
+    participant Sup as agents/supervisor.py
+    participant DB as Postgres
+
+    You->>Page: type request, click Start run
+    Page->>BFF: POST /api/runs
+    BFF->>BFF: check session, sign 60s pass
+    BFF->>API: POST /v1/runs (with pass)
+    API->>DB: insert agent_runs row (status: queued)
+    API-->>Page: 201 — run id
+    Page->>You: jump to /runs/{id}
+
+    Note over Runner: continues in the background
+    Runner->>DB: status → planning, event "run.started"
+    Runner->>DB: insert 4 agent_tasks (the stub plan)
+    Runner->>Sup: here's the task board
+    loop until all tasks done
+        Sup->>Sup: pick next task whose<br/>dependencies are done
+        Sup->>Runner: run this task
+        Runner->>DB: task → in_progress (event)
+        Runner->>Runner: stub agent "works" 0.4s
+        Runner->>DB: task → done (event)
+    end
+    Runner->>DB: status → completed, event "run.finished"
+
+    loop every 1.5 seconds
+        Page->>BFF: GET /api/runs/{id} + /events?after=N
+        BFF->>API: forward with a fresh pass
+        API->>DB: read tasks + events newer than N
+        API-->>Page: task board + new timeline lines
+    end
+</pre>
+
+<h2>3. What happens when you send a chat message</h2>
+<pre class="mermaid">
+sequenceDiagram
+    actor You
+    participant Chat as chat-panel.tsx
+    participant BFF as api/chat/route.ts
+    participant API as api/chat.py (engine)
+    participant Router as llm/router.py
+    participant Gemini as Gemini API
+    participant DB as Postgres
+
+    You->>Chat: press Enter
+    Chat->>BFF: POST /api/chat
+    BFF->>BFF: check session, sign 60s pass
+    BFF->>API: POST /v1/chat (with pass)
+    API->>DB: load earlier messages
+    API->>Router: stream("coder", history)
+    Router->>Gemini: gemini-2.5-flash, stream=true
+    loop each word
+        Gemini-->>Router: word
+        Router-->>API: word
+        API-->>BFF: word (SSE)
+        BFF-->>Chat: word (passed through)
+        Chat-->>You: word appears
+    end
+    API->>DB: save both messages
+</pre>
+
+<h2>4. The database tables and how they connect</h2>
+<p class="caption">Two families: better-auth owns the identity tables (created by
+its own migration tool); the engine owns the rest (created by Alembic migrations
+0001 and 0002). They link by plain text user ids — no hard foreign keys across
+the families, so either tool can migrate without breaking the other.</p>
+<pre class="mermaid">
+erDiagram
+    user ||--o{ session : "signs in"
+    user ||--o{ conversations : "owns (by text id)"
+    user ||--o{ agent_runs : "owns (by text id)"
+    conversations ||--o{ messages : "has"
+    repositories ||--o{ agent_runs : "runs against"
+    agent_runs ||--o{ agent_tasks : "plan checklist"
+    agent_runs ||--o{ agent_events : "timeline diary"
+    agent_runs ||--o{ artifacts : "outputs"
+
+    user { text id PK "better-auth" }
+    session { text id PK "better-auth" }
+    conversations { uuid id PK  text user_id }
+    messages { uuid id PK  text role  text content }
+    repositories { uuid id PK  text url }
+    agent_runs { uuid id PK  text status  text request  jsonb plan }
+    agent_tasks { uuid id PK  int sequence  text role  text status  jsonb depends_on }
+    agent_events { bigint id PK "numbered 1,2,3… for polling"  text type  jsonb payload }
+    artifacts { uuid id PK  text kind  text content }
+</pre>
+
+<h2>5. Who the agents are (from engine/agents/registry.py)</h2>
+<pre class="mermaid">
+flowchart TD
+    SUP2["Supervisor<br/>model: cheap tier<br/>no editing tools — just routes tasks"]
+    PM["Product Manager<br/>model: planner tier (best model)<br/>tools: read files, search, create tasks"]
+    BE["Backend Engineer<br/>model: coder tier<br/>tools: read + edit files, git"]
+    FE["Frontend Engineer<br/>model: coder tier<br/>tools: read + edit files, git"]
+    OPS["DevOps Engineer<br/>model: coder tier<br/>tools: read + edit files, git"]
+    REV["Reviewer<br/>model: planner tier (best model)<br/>tools: read-only + diff — cannot edit, on purpose"]
+
+    SUP2 -->|"hands tasks to"| BE & FE & OPS
+    PM -->|"writes the plan first"| SUP2
+    BE & FE & OPS -->|"finished work goes to"| REV
+</pre>
+<p class="caption">The safety idea: agents that judge (Reviewer) or plan
+(Product Manager) physically have no tools that can change files. Model tiers
+map to <code>.env</code>: planner = gemini-2.5-pro, coder = gemini-2.5-flash,
+cheap = gemini-2.5-flash-lite.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>
