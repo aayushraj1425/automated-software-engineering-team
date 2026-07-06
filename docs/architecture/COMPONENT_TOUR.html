@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASEP — Component tour: frontend to backend to Docker to CI</title>
+<style>
+  body { background:#101014; color:#e4e4e7; font:15px/1.65 system-ui, sans-serif;
+         max-width:1100px; margin:0 auto; padding:2rem; }
+  h1 { font-size:1.6rem; } h2 { font-size:1.25rem; margin-top:3.5rem; color:#fafafa; }
+  h3 { font-size:1.05rem; margin-top:2rem; color:#d4d4d8; }
+  p.caption { color:#a1a1aa; max-width:78ch; }
+  .mermaid { background:#18181b; border:1px solid #27272a; border-radius:10px;
+             padding:1.25rem; margin:1.25rem 0; }
+  code { background:#27272a; padding:0.1em 0.35em; border-radius:4px; font-size:0.9em; }
+  .hint { color:#71717a; font-size:0.9em; }
+  .rule { border:0; border-top:1px solid #27272a; margin:3rem 0; }
+  table { border-collapse:collapse; margin:1rem 0; }
+  td, th { border:1px solid #27272a; padding:0.4rem 0.8rem; font-size:0.9em; text-align:left; }
+  th { background:#18181b; color:#fafafa; }
+</style>
+</head>
+<body>
+
+<h1>Component tour — the whole platform, one figure at a time</h1>
+<p class="caption">High level design first, then the low-level implementation of
+every component: frontend, backend, database, Docker, GitHub Actions. Companion
+page: <a href="architecture-components.html" style="color:#93c5fd">Inside each box</a>.</p>
+
+<!-- ══════════════════ PART 1 — HIGH LEVEL ══════════════════ -->
+
+<h2>Part 1 · High Level Design</h2>
+
+<h3>1.1 The whole system in one picture</h3>
+<p class="caption">The browser never talks to the AI engine directly. The website
+owns identity and forwards every request with a signed pass; the engine owns
+everything intelligent; Postgres remembers everything.</p>
+<pre class="mermaid">
+flowchart TB
+    B["🧑 Browser"] --> W["🌐 apps/web — Next.js 15<br/>screens + relay routes (BFF)"]
+    W -->|"REST + live streams,<br/>signed service pass (JWT)"| E["⚙️ apps/engine — FastAPI<br/>agents · chat · code index"]
+    E --> P[("🗄️ Postgres 16 + pgvector<br/>all data and code vectors")]
+    E --> LLM["🤖 AI providers via LiteLLM<br/>Gemini / Claude / GPT"]
+    E --> GH["🐙 GitHub API<br/>push branch, open pull request"]
+    subgraph DOCKER["🐳 Docker Compose (dev services)"]
+        P
+        R[("Redis 7 — reserved for<br/>live events + workers")]
+        M[("MinIO — reserved for<br/>artifacts")]
+    end
+    CI["✅ GitHub Actions<br/>checks every push"] -.->|"guards"| W & E & DOCKER
+</pre>
+
+<h3>1.2 The three product loops</h3>
+<p class="caption">Everything the platform does today is one of these three loops.</p>
+<pre class="mermaid">
+flowchart LR
+    subgraph L1["Loop 1 — Agent run"]
+        A1["Describe a feature"] --> A2["PM agent plans"] --> A3["You approve"]
+        A3 --> A4["Engineers code<br/>in an isolated clone"] --> A5["Reviewer judges"]
+        A5 --> A6["Branch pushed,<br/>pull request opened"]
+    end
+</pre>
+<pre class="mermaid">
+flowchart LR
+    subgraph L2["Loop 2 — Repository intelligence"]
+        B1["Connect a repository"] --> B2["Chunk + embed<br/>into the code index"] --> B3["Search it by meaning<br/>(you and the agents)"]
+    end
+    subgraph L3["Loop 3 — Grounded chat"]
+        C1["Pick a repository,<br/>ask a question"] --> C2["Closest code chunks<br/>go into the prompt"] --> C3["Answer cites<br/>file and lines"]
+    end
+    B2 -.->|"same index"| C2
+</pre>
+
+<h3>1.3 One rule that ties it together: everything runs offline</h3>
+<pre class="mermaid">
+flowchart LR
+    F["LLM_FAKE=1"] --> F1["canned model replies"]
+    F --> F2["deterministic fake embeddings<br/>(same text → same vector)"]
+    F --> F3["local fixture repository<br/>fixtures/demo-service"]
+    F1 & F2 & F3 --> G["CI and your laptop prove the whole
+    pipeline with zero API keys and zero cost"]
+</pre>
+<p class="hint">Real keys only change <em>what the models say</em>, never
+<em>how the system works</em>.</p>
+
+<hr class="rule" />
+
+<!-- ══════════════════ PART 2 — LOW LEVEL ══════════════════ -->
+
+<h2>Part 2 · Low Level Implementation</h2>
+
+<h3>2.1 Frontend — the screens (<code>apps/web</code>)</h3>
+<pre class="mermaid">
+flowchart LR
+    SI["/sign-in · /sign-up<br/>better-auth pages"] --> CH["/chat<br/>streaming chat ·<br/>repository picker ·<br/>Sources under answers"]
+    SI --> RU["/runs<br/>new-run form ·<br/>past runs list"]
+    RU --> RD["/runs/{id}<br/>timeline · task board ·<br/>approve/reject · diff viewer ·<br/>cost totals · PR link"]
+    SI --> RE["/repositories<br/>connect · index with<br/>live status · semantic search"]
+</pre>
+<p class="hint">Open first: <code>apps/web/src/components/chat/chat-panel.tsx</code> —
+one screen showing streaming, state, and the repository picker together.
+Stack: Next.js 15 App Router, TypeScript strict, Tailwind v4, Vitest.</p>
+
+<h3>2.2 Frontend — the relay layer (BFF)</h3>
+<p class="caption">Every <code>src/app/api/*</code> route does the same three
+steps. The browser never holds an engine credential.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant W as Relay route (app/api/chat)
+    participant E as Engine (/v1/chat)
+    B->>W: fetch with session cookie
+    W->>W: 1. validate the session (better-auth)
+    W->>W: 2. sign a 60s service JWT (HS256)
+    W->>E: 3. forward with Authorization: Bearer
+    E-->>W: SSE stream (tokens, citations, done)
+    W-->>B: same stream, piped through
+</pre>
+<p class="hint">Open first: <code>apps/web/src/app/api/chat/route.ts</code> — the
+whole pattern in ~45 lines. The shared secret is <code>ENGINE_SERVICE_SECRET</code>.</p>
+
+<h3>2.3 Backend — the engine's rooms (<code>apps/engine/src/engine</code>)</h3>
+<pre class="mermaid">
+flowchart TB
+    subgraph API["api/ — front desk (all /v1/* need the JWT)"]
+        api1["chat.py · conversations.py<br/>runs.py · repositories.py"]
+    end
+    subgraph AGENTS["agents/ — the team"]
+        ag1["runner.py — run pipeline<br/>supervisor.py — task routing<br/>registry.py — roles → tier + tools + prompt"]
+        ag2["product_manager.py · engineer.py<br/>reviewer.py — JSON contracts<br/>loop.py — shared tool loop (24 turns)"]
+        ag3["tools.py — jailed toolbox:<br/>list/read/write · search ·<br/>search_code · git commit/diff"]
+    end
+    subgraph IDX["indexing/ — code intelligence"]
+        ix1["chunker.py — 60-line windows<br/>indexer.py — clone→chunk→embed→store<br/>retrieval.py — one shared ranking"]
+    end
+    subgraph WS["workspace/ — isolation"]
+        ws1["manager.py — clone per run,<br/>branch asep/run-&lt;id&gt;, push<br/>jail.py — no path escapes"]
+    end
+    subgraph LLMR["llm/ — the only door to AI"]
+        lm1["router.py — tiers, streaming,<br/>tool turns, embeddings,<br/>rate-limit retries, LLM_FAKE"]
+    end
+    subgraph DB["db/ — records"]
+        db1["models.py — every table<br/>migrations/ 0001…0005"]
+    end
+    API --> AGENTS --> LLMR
+    AGENTS --> WS
+    API --> IDX --> LLMR
+    API --> DB
+    AGENTS --> DB
+    IDX --> DB
+</pre>
+<p class="hint">Open first: <code>apps/engine/src/engine/llm/router.py</code> —
+every AI word in the product passes through it (ADR-0006).</p>
+
+<h3>2.4 Backend — the life of an agent run</h3>
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> queued: POST /v1/runs
+    queued --> planning: clone workspace,<br/>PM explores + plans
+    planning --> awaiting_approval: plan saved
+    awaiting_approval --> executing: you approve
+    awaiting_approval --> [*]: you reject<br/>(workspace removed)
+    executing --> reviewing: engineers code + commit<br/>(budget checked before each task)
+    reviewing --> executing: request changes<br/>(one revision round)
+    reviewing --> completed: approve → push branch,<br/>open pull request
+    executing --> failed: budget exhausted /<br/>task failed 3×
+</pre>
+<p class="hint">Open first: <code>apps/engine/src/engine/agents/runner.py</code>.
+Every tool call lands in the timeline as a <code>tool.called</code> event —
+arguments summarized, file contents never stored.</p>
+
+<h3>2.5 Backend — repository intelligence, one index with three consumers</h3>
+<pre class="mermaid">
+flowchart LR
+    RP["Repository"] -->|"clone --depth 1"| CH["chunker.py<br/>60 lines, 10 overlap,<br/>17 languages"]
+    CH --> EM["router.embed()<br/>batches of 64"]
+    EM --> DB[("code_chunks<br/>pgvector vector(768)")]
+    DB --> RET["retrieval.py<br/>cosine distance, top N"]
+    RET --> C1["Repositories page search"]
+    RET --> C2["Grounded chat<br/>(citations event + column)"]
+    RET --> C3["Agents' search_code tool<br/>(scoped to the run's repository)"]
+</pre>
+<p class="hint">Open first: <code>apps/engine/src/engine/indexing/retrieval.py</code> —
+one ranking, three consumers, so they can never drift apart.</p>
+
+<h3>2.6 Database — tables and their history</h3>
+<pre class="mermaid">
+flowchart LR
+    subgraph IDY["Identity — owned by better-auth"]
+        t0["user · session · account<br/>organization · member"]
+    end
+    subgraph APPD["App data — owned by the engine (Alembic)"]
+        t1["Chat: conversations ·<br/>messages (+ citations)"]
+        t2["Runs: agent_runs · agent_tasks ·<br/>agent_events · artifacts"]
+        t3["Index: repositories ·<br/>code_chunks (vectors)"]
+        t4["audit_logs"]
+    end
+    t0 -.->|"linked by user id as plain text — no FK, on purpose"| APPD
+</pre>
+<table>
+  <tr><th>Migration</th><th>What it added</th></tr>
+  <tr><td><code>0001_foundation</code></td><td>chat, repositories, audit logs</td></tr>
+  <tr><td><code>0002_agent_runtime</code></td><td>runs, tasks, events, artifacts, budget cap</td></tr>
+  <tr><td><code>0003_run_base_sha</code></td><td>the commit each run's diff measures against</td></tr>
+  <tr><td><code>0004_code_chunks</code></td><td>the vector index (pgvector, 768 dims)</td></tr>
+  <tr><td><code>0005_message_citations</code></td><td>sources stored on grounded answers</td></tr>
+</table>
+<p class="hint">Rule: engine tables reference better-auth users by plain text id —
+the two migration systems never touch each other's tables.</p>
+
+<h3>2.7 Docker — the dev services (<code>infra/docker/docker-compose.dev.yml</code>)</h3>
+<pre class="mermaid">
+flowchart LR
+    subgraph HOST["Your machine (apps run on the host in dev)"]
+        WEBP["web :3000"] --- ENGP["engine :8000"]
+    end
+    subgraph COMPOSE["docker compose -f infra/docker/docker-compose.dev.yml"]
+        PG[("pgvector/pgvector:pg16<br/>host port 5433 →<br/>a local Windows Postgres owns 5432")]
+        RD[("redis:7<br/>reserved: live events, workers")]
+        MN[("minio<br/>reserved: artifacts, run logs")]
+    end
+    ENGP --> PG
+    WEBP -->|"better-auth tables"| PG
+</pre>
+<p class="hint">Start with <code>pnpm db:up</code>; healthchecks gate readiness.
+Only infrastructure is containerized — the sandbox that will run agent builds
+and tests in containers is Phase 3.</p>
+
+<h3>2.8 GitHub Actions — the quality gate (<code>.github/workflows/ci.yml</code>)</h3>
+<pre class="mermaid">
+flowchart LR
+    PUSH["every push and<br/>pull request"] --> J1 & J2 & J3
+    subgraph J1["Job: web"]
+        w1["pnpm install →<br/>eslint → tsc →<br/>vitest → next build"]
+    end
+    subgraph J2["Job: engine"]
+        e1["uv sync → ruff check →<br/>ruff format --check → pyright →<br/>alembic upgrade → pytest"]
+        e2["runs against a real<br/>pgvector Postgres<br/>service container, LLM_FAKE=1"]
+    end
+    subgraph J3["Job: compose"]
+        c1["the compose file<br/>must parse"]
+    end
+    J1 & J2 & J3 --> OK["✅ green main"]
+</pre>
+<p class="hint">Concurrency cancels superseded runs. Every pull request carries the
+Definition-of-Done checklist from the PR template. 91 engine tests + 10 web tests
+run on every push — all offline, no secrets needed.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>
