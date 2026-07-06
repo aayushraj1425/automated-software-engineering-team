@@ -75,10 +75,18 @@ async def test_approved_run_executes_to_completed(client):
     assert types[0] == "run.started"
     assert "plan.created" in types
     assert "plan.approved" in types
+    assert "tool.called" in types  # every tool invocation is audited
     assert "review.verdict" in types  # the Reviewer ran before completion
     assert types[-1] == "run.finished"
     ids = [e["id"] for e in events]
     assert ids == sorted(ids)
+
+    audited = [e for e in events if e["type"] == "tool.called"]
+    assert {e["payload"]["tool"] for e in audited} == {"write_file", "git_commit"}
+    assert all(e["payload"]["ok"] for e in audited)
+
+    diff = (await client.get(f"/v1/runs/{created['id']}/diff", headers=headers)).json()
+    assert ".asep/task-1.md" in diff["diff"]
 
 
 async def test_rejected_run_is_cancelled_and_tasks_skipped(client):
@@ -94,8 +102,9 @@ async def test_rejected_run_is_cancelled_and_tasks_skipped(client):
     assert all(t["status"] == "skipped" for t in detail["tasks"])
     events = (await client.get(f"/v1/runs/{created['id']}/events", headers=headers)).json()
     assert "plan.rejected" in [e["type"] for e in events]
-    # a rejected run's workspace is deleted
+    # a rejected run's workspace is deleted — and so is its diff
     assert not (workspaces_root() / created["id"]).exists()
+    assert (await client.get(f"/v1/runs/{created['id']}/diff", headers=headers)).status_code == 404
 
 
 async def test_run_on_a_local_repository_pushes_the_branch(client, tmp_path):
@@ -136,6 +145,35 @@ async def test_run_on_a_local_repository_pushes_the_branch(client, tmp_path):
 
     events = (await client.get(f"/v1/runs/{run_id}/events", headers=headers)).json()
     assert "branch.published" in [e["type"] for e in events]
+
+
+async def test_exhausted_budget_fails_the_run_before_any_task_starts(client):
+    from decimal import Decimal
+
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    headers = _headers()
+    resp = await client.post(
+        "/v1/runs",
+        json={"request": "hi", "repository_url": REPO, "max_cost_usd": 0.05},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    run_id = resp.json()["id"]
+
+    # Planning is free offline — spend the whole budget behind the scenes.
+    async with session_scope() as session:
+        run = await session.get(AgentRun, uuid.UUID(run_id))
+        assert run is not None
+        run.total_cost_usd = Decimal("0.05")
+        await session.commit()
+
+    await _decide(client, headers, run_id, approved=True)
+    detail = (await client.get(f"/v1/runs/{run_id}", headers=headers)).json()
+    assert detail["status"] == "failed"
+    assert "budget" in detail["error"]
+    assert all(t["status"] in ("failed", "skipped") for t in detail["tasks"])
 
 
 async def test_decision_only_allowed_while_awaiting_approval(client):

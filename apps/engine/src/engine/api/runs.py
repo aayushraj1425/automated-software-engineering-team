@@ -20,7 +20,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session
-from engine.workspace.manager import remove_workspace
+from engine.workspace.manager import WorkspaceError, load_workspace, remove_workspace, run_git
 
 router = APIRouter()
 
@@ -58,6 +58,13 @@ class RunOut(BaseModel):
 class RunDetailOut(RunOut):
     plan: dict[str, Any] | None
     tasks: list[TaskOut]
+    total_cost_usd: float
+    total_input_tokens: int
+    total_output_tokens: int
+
+
+class DiffOut(BaseModel):
+    diff: str
 
 
 class EventOut(BaseModel):
@@ -217,6 +224,9 @@ async def get_run(
     return RunDetailOut(
         **base.model_dump(),
         plan=run.plan,
+        total_cost_usd=float(run.total_cost_usd),
+        total_input_tokens=run.total_input_tokens,
+        total_output_tokens=run.total_output_tokens,
         tasks=[
             TaskOut(
                 id=t.id,
@@ -232,6 +242,24 @@ async def get_run(
             for t in tasks
         ],
     )
+
+
+@router.get("/v1/runs/{run_id}/diff")
+async def get_run_diff(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> DiffOut:
+    """Everything the agents changed in the run's workspace since its base commit."""
+    run = await _owned_run(db, run_id, principal)
+    if not run.base_sha:
+        raise HTTPException(status_code=404, detail="This run has no workspace yet")
+    try:
+        ws = load_workspace(run.id, run.branch_name or "", run.base_sha)
+        diff = await run_git(ws.path, "diff", run.base_sha)
+    except WorkspaceError:
+        raise HTTPException(status_code=404, detail="This run's workspace is gone") from None
+    return DiffOut(diff=diff)
 
 
 @router.get("/v1/runs/{run_id}/events")

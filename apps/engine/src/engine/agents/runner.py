@@ -69,6 +69,48 @@ def _apply_usage(run: AgentRun, usage: LlmUsage) -> None:
     run.total_cost_usd += Decimal(str(round(usage.cost_usd, 6)))
 
 
+class BudgetExceeded(Exception):
+    """The run spent its cost cap; no further model work may start."""
+
+
+def _check_budget(run: AgentRun) -> None:
+    if run.max_cost_usd is not None and run.total_cost_usd >= run.max_cost_usd:
+        raise BudgetExceeded(
+            f"run budget of ${run.max_cost_usd} exhausted (spent ${run.total_cost_usd})"
+        )
+
+
+def _summarize_args(args: dict[str, Any]) -> dict[str, str]:
+    # File contents don't belong in the timeline — record their size instead.
+    return {
+        key: f"({len(str(value))} chars)" if key == "content" else str(value)[:200]
+        for key, value in args.items()
+    }
+
+
+def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | None = None):
+    """Audit trail: one tool.called event per tool invocation (ADR-0008)."""
+
+    async def _record(name: str, args: dict[str, Any], result: str) -> None:
+        async with session_scope() as session:
+            _emit(
+                session,
+                run_id,
+                "tool.called",
+                {
+                    "tool": name,
+                    "args": _summarize_args(args),
+                    "ok": not result.startswith("ERROR:"),
+                    "result": result[:200],
+                },
+                agent=agent,
+                task_id=task_id,
+            )
+            await session.commit()
+
+    return _record
+
+
 async def plan_run(run_id: uuid.UUID) -> None:
     """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
     await _guarded(_plan_run, run_id)
@@ -124,7 +166,7 @@ async def _plan_run(run_id: uuid.UUID) -> None:
 
     ws = await _open_workspace(run_id, repo_url)
     usage = LlmUsage()
-    plan = await create_plan(request, ws, usage)
+    plan = await create_plan(request, ws, usage, _tool_observer(run_id, AgentRole.PRODUCT_MANAGER))
 
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
@@ -224,7 +266,9 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
             findings_by_role.setdefault(finding["role"], []).append(finding["issue"])
         for role, issues in findings_by_role.items():
             usage = LlmUsage()
-            summary = await execute_revision(role, issues, request, ws, usage)
+            summary = await execute_revision(
+                role, issues, request, ws, usage, _tool_observer(run_id, role)
+            )
             async with session_scope() as session:
                 run = await session.get(AgentRun, run_id)
                 assert run is not None
@@ -264,7 +308,9 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
 
 async def _review(run_id: uuid.UUID, request: str, plan_summary: str, ws: Workspace) -> dict:
     usage = LlmUsage()
-    verdict = await review_run(request, plan_summary, ws, usage)
+    verdict = await review_run(
+        request, plan_summary, ws, usage, _tool_observer(run_id, AgentRole.REVIEWER)
+    )
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
         assert run is not None
@@ -340,7 +386,9 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
         task_id = uuid.UUID(task["id"])
         async with session_scope() as session:
             row = await session.get(AgentTask, task_id)
-            assert row is not None
+            run = await session.get(AgentRun, run_id)
+            assert row is not None and run is not None
+            _check_budget(run)  # each attempt re-raises; the run fails with the reason
             row.status = TaskStatus.IN_PROGRESS
             row.attempts = task["attempts"]
             row.started_at = _now()
@@ -356,7 +404,9 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
 
         usage = LlmUsage()
         try:
-            result = await execute_task(task, request, ws, usage)
+            result = await execute_task(
+                task, request, ws, usage, _tool_observer(run_id, task["role"], task_id)
+            )
         except Exception as exc:
             async with session_scope() as session:
                 row = await session.get(AgentTask, task_id)
