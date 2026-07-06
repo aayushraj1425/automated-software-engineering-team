@@ -106,7 +106,7 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 
 ### Workstream: Repository Screens (planned)
 - [x] Repositories API: connect, list with index status and chunk counts
-- [ ] Repositories page: connect form, index button, search box with cited results
+- [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
 - [ ] Dependency / architecture graph views
 
 ## Phase 3 and beyond (headlines only)
@@ -193,3 +193,6 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   and the repositories API (connect / list / index / search). Searching with
   a file's exact content ranks that file first at score ≈ 1.0 offline.
   Engine 85 passed.
+- 2026-07-06 · Repositories page (`/repositories`): connect a repository, build
+  its index with live status polling, and search it — results cite file, line
+  range, language, and similarity score. Linked from the runs page.
