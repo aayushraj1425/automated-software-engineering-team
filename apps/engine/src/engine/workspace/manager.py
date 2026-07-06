@@ -125,15 +125,20 @@ def load_workspace(run_id: uuid.UUID, branch: str, base_sha: str) -> Workspace:
     return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
 
 
-def remove_workspace(run_id: uuid.UUID) -> None:
-    """Delete a run's workspace folder (git marks some files read-only on Windows)."""
-    path = workspaces_root() / str(run_id)
-    if not path.exists():
-        return
+def remove_tree(path: Path) -> None:
+    """Delete a folder tree (git marks some files read-only on Windows)."""
 
     def _make_writable(func, p, _exc):  # noqa: ANN001
         Path(p).chmod(stat.S_IWRITE)
         func(p)
 
     shutil.rmtree(path, onerror=_make_writable)
+
+
+def remove_workspace(run_id: uuid.UUID) -> None:
+    """Delete a run's workspace folder."""
+    path = workspaces_root() / str(run_id)
+    if not path.exists():
+        return
+    remove_tree(path)
     log.info("workspace.removed", run_id=str(run_id))
