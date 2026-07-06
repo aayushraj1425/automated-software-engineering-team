@@ -25,6 +25,9 @@ export type RunTask = {
 export type RunDetail = RunSummary & {
   plan: { summary?: string; tasks?: string[] } | null;
   tasks: RunTask[];
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
 };
 
 export type RunEvent = {

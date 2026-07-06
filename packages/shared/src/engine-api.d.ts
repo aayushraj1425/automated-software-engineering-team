@@ -127,6 +127,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Diff
+         * @description Everything the agents changed in the run's workspace since its base commit.
+         */
+        get: operations["get_run_diff_v1_runs__run_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}/events": {
         parameters: {
             query?: never;
@@ -179,6 +199,11 @@ export interface components {
         DecisionIn: {
             /** Approved */
             approved: boolean;
+        };
+        /** DiffOut */
+        DiffOut: {
+            /** Diff */
+            diff: string;
         };
         /** EventOut */
         EventOut: {
@@ -265,6 +290,12 @@ export interface components {
             } | null;
             /** Tasks */
             tasks: components["schemas"]["TaskOut"][];
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Total Input Tokens */
+            total_input_tokens: number;
+            /** Total Output Tokens */
+            total_output_tokens: number;
         };
         /** RunOut */
         RunOut: {
@@ -551,6 +582,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_diff_v1_runs__run_id__diff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiffOut"];
                 };
             };
             /** @description Validation Error */

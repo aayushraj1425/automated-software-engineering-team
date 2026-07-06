@@ -6,7 +6,7 @@ executed deterministically through the same tools — a file is written and
 committed — so the pipeline is testable end to end without a model.
 """
 
-from engine.agents.loop import LlmUsage, run_tool_loop
+from engine.agents.loop import LlmUsage, ToolObserver, run_tool_loop
 from engine.agents.registry import AgentSpec, get_agent_spec
 from engine.agents.supervisor import TaskState
 from engine.agents.tools import call_tool
@@ -18,10 +18,16 @@ class TaskExecutionError(Exception):
     """The engineer could not complete the task; the supervisor decides retries."""
 
 
-async def execute_task(task: TaskState, request: str, ws: Workspace, usage: LlmUsage) -> str:
+async def execute_task(
+    task: TaskState,
+    request: str,
+    ws: Workspace,
+    usage: LlmUsage,
+    on_tool: ToolObserver | None = None,
+) -> str:
     spec = get_agent_spec(task["role"])
     if get_settings().llm_fake:
-        return await _execute_offline(task, spec, ws)
+        return await _execute_offline(task, spec, ws, on_tool)
 
     messages = [
         {"role": "system", "content": spec.system_prompt},
@@ -36,29 +42,32 @@ async def execute_task(task: TaskState, request: str, ws: Workspace, usage: LlmU
             ),
         },
     ]
-    return await run_tool_loop(spec, ws, messages, usage)
+    return await run_tool_loop(spec, ws, messages, usage, on_tool)
 
 
 async def execute_revision(
-    role: str, findings: list[str], request: str, ws: Workspace, usage: LlmUsage
+    role: str,
+    findings: list[str],
+    request: str,
+    ws: Workspace,
+    usage: LlmUsage,
+    on_tool: ToolObserver | None = None,
 ) -> str:
     """One revision round: the engineer addresses the Reviewer's findings."""
     spec = get_agent_spec(role)
     if get_settings().llm_fake:
         issues = "\n".join(f"- {finding}" for finding in findings)
-        result = await call_tool(
-            ws,
-            spec.tools,
-            "write_file",
-            {"path": f".asep/revision-{role}.md", "content": f"# Review findings\n\n{issues}\n"},
+        steps = (
+            (
+                "write_file",
+                {
+                    "path": f".asep/revision-{role}.md",
+                    "content": f"# Review findings\n\n{issues}\n",
+                },
+            ),
+            ("git_commit", {"message": f"address review findings ({role})"}),
         )
-        if result.startswith("ERROR:"):
-            raise TaskExecutionError(result)
-        committed = await call_tool(
-            ws, spec.tools, "git_commit", {"message": f"address review findings ({role})"}
-        )
-        if committed.startswith("ERROR:"):
-            raise TaskExecutionError(committed)
+        await _run_offline_steps(spec, ws, steps, on_tool)
         return f"offline revision: addressed {len(findings)} finding(s)"
 
     issues = "\n".join(f"- {finding}" for finding in findings)
@@ -75,18 +84,32 @@ async def execute_revision(
             ),
         },
     ]
-    return await run_tool_loop(spec, ws, messages, usage)
+    return await run_tool_loop(spec, ws, messages, usage, on_tool)
 
 
-async def _execute_offline(task: TaskState, spec: AgentSpec, ws: Workspace) -> str:
+async def _execute_offline(
+    task: TaskState, spec: AgentSpec, ws: Workspace, on_tool: ToolObserver | None
+) -> str:
     """Deterministic offline path: same tools and allow-list, no model."""
     path = f".asep/task-{task['sequence']}.md"
     content = f"# {task['title']}\n\nCompleted offline (LLM_FAKE=1) by the {task['role']} agent.\n"
-    for name, args in (
+    steps = (
         ("write_file", {"path": path, "content": content}),
         ("git_commit", {"message": f"task {task['sequence']}: {task['title']}"}),
-    ):
+    )
+    await _run_offline_steps(spec, ws, steps, on_tool)
+    return f"offline: wrote and committed {path}"
+
+
+async def _run_offline_steps(
+    spec: AgentSpec,
+    ws: Workspace,
+    steps: tuple[tuple[str, dict], ...],
+    on_tool: ToolObserver | None,
+) -> None:
+    for name, args in steps:
         result = await call_tool(ws, spec.tools, name, args)
+        if on_tool is not None:
+            await on_tool(name, args, result)
         if result.startswith("ERROR:"):
             raise TaskExecutionError(result)
-    return f"offline: wrote and committed {path}"

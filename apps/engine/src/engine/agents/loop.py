@@ -6,6 +6,7 @@ model replies without tool calls — that text is the agent's final answer.
 """
 
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +21,9 @@ log = structlog.get_logger(__name__)
 
 # An agent gets this many model turns per task before the attempt fails.
 MAX_TURNS = 24
+
+# Audit callback: (tool name, arguments, result) after every tool call.
+ToolObserver = Callable[[str, dict[str, Any], str], Awaitable[None]]
 
 
 class AgentLoopError(Exception):
@@ -58,7 +62,11 @@ def parse_json_object(reply: str) -> dict[str, Any]:
 
 
 async def run_tool_loop(
-    spec: AgentSpec, ws: Workspace, messages: list[dict[str, Any]], usage: LlmUsage
+    spec: AgentSpec,
+    ws: Workspace,
+    messages: list[dict[str, Any]],
+    usage: LlmUsage,
+    on_tool: ToolObserver | None = None,
 ) -> str:
     tools = schemas_for(spec.tools)
     for _ in range(MAX_TURNS):
@@ -70,5 +78,7 @@ async def run_tool_loop(
         for call in turn.tool_calls:
             result = await call_tool(ws, spec.tools, call.name, call.arguments)
             log.info("agent.tool_call", role=spec.role, tool=call.name)
+            if on_tool is not None:
+                await on_tool(call.name, call.arguments, result)
             messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
     raise AgentLoopError(f"{spec.role} did not finish within {MAX_TURNS} model turns")

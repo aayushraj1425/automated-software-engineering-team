@@ -9,7 +9,7 @@ pipeline runs offline.
 
 from typing import Any
 
-from engine.agents.loop import LlmUsage, parse_json_object, run_tool_loop
+from engine.agents.loop import LlmUsage, ToolObserver, parse_json_object, run_tool_loop
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
 from engine.db.enums import AgentRole
@@ -63,7 +63,9 @@ _OFFLINE_PLAN: dict[str, Any] = {
 }
 
 
-async def create_plan(request: str, ws: Workspace, usage: LlmUsage) -> dict[str, Any]:
+async def create_plan(
+    request: str, ws: Workspace, usage: LlmUsage, on_tool: ToolObserver | None = None
+) -> dict[str, Any]:
     if get_settings().llm_fake:
         return validate_plan(_OFFLINE_PLAN)
 
@@ -72,7 +74,7 @@ async def create_plan(request: str, ws: Workspace, usage: LlmUsage) -> dict[str,
         {"role": "system", "content": spec.system_prompt},
         {"role": "user", "content": f"Feature request:\n{request}\n\n{PLAN_FORMAT}"},
     ]
-    reply = await run_tool_loop(spec, ws, messages, usage)
+    reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
     try:
         return validate_plan(parse_plan(reply))
     except PlanError as exc:
@@ -80,7 +82,7 @@ async def create_plan(request: str, ws: Workspace, usage: LlmUsage) -> dict[str,
         messages.append(
             {"role": "user", "content": f"That plan was rejected: {exc}\n\n{PLAN_FORMAT}"}
         )
-        reply = await run_tool_loop(spec, ws, messages, usage)
+        reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
         return validate_plan(parse_plan(reply))
 
 

@@ -32,6 +32,13 @@ export function describeEvent(event: RunEvent): string {
     }
     case "task.attempt_failed":
       return `${agentName(event.agent)} hit an error and will retry: ${String(p.error ?? "")}`;
+    case "tool.called": {
+      const args = (p.args ?? {}) as Record<string, unknown>;
+      const target = args.path ?? args.message ?? args.text ?? "";
+      const suffix = target ? `: ${String(target)}` : "";
+      const failed = p.ok === false ? " (failed)" : "";
+      return `${agentName(event.agent)} used ${String(p.tool)}${suffix}${failed}`;
+    }
     case "review.verdict":
       return p.verdict === "approve"
         ? "Reviewer approved the changes"

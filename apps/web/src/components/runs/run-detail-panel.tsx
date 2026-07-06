@@ -8,13 +8,25 @@ import { FINISHED_STATUSES, type RunDetail, type RunEvent } from "./types";
 
 const POLL_MS = 1500;
 
+// The diff exists once the engineers have worked (and the workspace remains).
+const DIFF_STATUSES = new Set(["reviewing", "completed", "failed"]);
+
+function diffLineClass(line: string): string {
+  if (line.startsWith("+")) return "text-emerald-400";
+  if (line.startsWith("-")) return "text-red-400";
+  if (line.startsWith("@@")) return "text-sky-400";
+  return "text-zinc-400";
+}
+
 /** Watches one run: polls the run (task board) and its events (timeline)
  * until the run finishes. */
 export function RunDetailPanel({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [deciding, setDeciding] = useState(false);
+  const [diff, setDiff] = useState<string | null>(null);
   const cursorRef = useRef(0);
+  const diffRequestedRef = useRef(false);
 
   async function decide(approved: boolean) {
     setDeciding(true);
@@ -66,6 +78,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     };
   }, [runId]);
 
+  useEffect(() => {
+    if (!run || diffRequestedRef.current || !DIFF_STATUSES.has(run.status)) return;
+    diffRequestedRef.current = true;
+    void (async () => {
+      const res = await fetch(`/api/runs/${runId}/diff`);
+      if (res.ok) setDiff(((await res.json()) as { diff: string }).diff);
+    })();
+  }, [run, runId]);
+
   if (!run) {
     return <p className="p-6 text-sm text-zinc-500">Loading run…</p>;
   }
@@ -80,6 +101,13 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         <h1 className="text-lg font-semibold">{run.request}</h1>
         {run.error && <p className="text-sm text-red-400">{run.error}</p>}
         {run.plan?.summary && <p className="text-sm text-zinc-400">{run.plan.summary}</p>}
+        {run.total_input_tokens + run.total_output_tokens > 0 && (
+          <p className="text-xs text-zinc-500">
+            {run.total_input_tokens.toLocaleString()} tokens in ·{" "}
+            {run.total_output_tokens.toLocaleString()} tokens out · $
+            {run.total_cost_usd.toFixed(4)}
+          </p>
+        )}
         {run.pr_url && (
           <a
             href={run.pr_url}
@@ -136,6 +164,19 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           </div>
         ))}
       </section>
+
+      {diff && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-zinc-300">Changes</h2>
+          <pre className="overflow-x-auto rounded-md border border-zinc-800 p-4 text-xs leading-5">
+            {diff.split("\n").map((line, index) => (
+              <div key={index} className={diffLineClass(line)}>
+                {line || " "}
+              </div>
+            ))}
+          </pre>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Timeline</h2>
