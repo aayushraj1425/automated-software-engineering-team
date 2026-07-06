@@ -1,5 +1,7 @@
 # ASEP — AI Software Engineering Platform
 
+[![CI](https://github.com/aayushraj1425/automated-software-engineering-team/actions/workflows/ci.yml/badge.svg)](https://github.com/aayushraj1425/automated-software-engineering-team/actions/workflows/ci.yml)
+
 An AI-native software engineering platform that assists across the whole software
 development lifecycle: a multi-agent engineering team (PM, Backend, Frontend, DevOps,
 Reviewer), repository intelligence, planning, implementation, code review, testing,
