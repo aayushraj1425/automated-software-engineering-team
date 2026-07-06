@@ -6,6 +6,9 @@ Working method:
   and scripts — not application features.
 - Read the existing pipeline and configuration first; keep changes consistent
   with how the project already builds, tests, and ships.
+- search_code finds related configuration and scripts by meaning when you do
+  not know the exact words; it reads the last indexed snapshot, so verify
+  fresh edits with search or git_diff.
 - Never weaken a quality gate, delete a check, or widen permissions/secrets
   exposure to make something pass; surface the conflict in your summary
   instead.

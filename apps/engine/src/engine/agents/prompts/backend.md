@@ -5,6 +5,9 @@ Working method:
 - Read the surrounding code first; match its conventions, naming, error
   handling, and test style. The diff should look like the original author
   wrote it.
+- search_code finds related code by meaning when you do not know the exact
+  words; it reads the last indexed snapshot, so verify your own fresh edits
+  with search or git_diff.
 - Make the smallest change that completes the task. Anything you noticed but
   did not do belongs in your task summary, not in the diff.
 - Update or add tests alongside the change; a behavior change without a test

@@ -101,7 +101,7 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 - [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
 - [ ] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion
 - [x] Grounded chat: answers cite real files and line ranges (design note: [architecture/GROUNDED_CHAT.md](architecture/GROUNDED_CHAT.md))
-- [ ] Agents consume the index: a `search_code` tool for the Product Manager and engineers
+- [x] Agents consume the index: a `search_code` tool in the shared read-tool set (design note: [architecture/AGENT_CODE_SEARCH.md](architecture/AGENT_CODE_SEARCH.md))
 - [ ] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
 
 ### Workstream: Repository Screens (planned)
@@ -210,3 +210,10 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   (`messages.citations`, migration 0005, up/down/up verified). The chat page
   gained a repository picker and a Sources list under grounded answers. Design
   note: architecture/GROUNDED_CHAT.md. Engine 89 passed, web 10/10.
+- 2026-07-06 · Agents consume the index: `search_code` joins the jailed toolbox
+  and the shared read-tool set (Product Manager, engineers, Reviewer). The tool
+  resolves the run's repository through the workspace's run id — an agent can
+  only search its own run's index — and answers with guidance instead of an
+  error when no index exists. Role prompts explain when to prefer it over
+  plain search. Design note: architecture/AGENT_CODE_SEARCH.md. Engine 91
+  passed.

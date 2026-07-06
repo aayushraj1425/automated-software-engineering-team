@@ -9,6 +9,9 @@ Every path an agent supplies goes through the jail before anything is touched.
 
 from typing import Any
 
+from engine.db.models import AgentRun
+from engine.db.session import session_scope
+from engine.indexing.retrieval import retrieve_chunks
 from engine.workspace.jail import JailViolation, resolve_inside
 from engine.workspace.manager import Workspace, WorkspaceError, run_git
 
@@ -16,6 +19,8 @@ MAX_READ_BYTES = 64_000
 MAX_LIST_ENTRIES = 200
 MAX_SEARCH_RESULTS = 50
 MAX_SEARCH_FILE_BYTES = 512_000
+SEARCH_CODE_RESULTS = 6
+SEARCH_CODE_SNIPPET_CHARS = 500
 
 
 class ToolError(Exception):
@@ -76,6 +81,29 @@ async def search(ws: Workspace, text: str, path: str = ".") -> str:
                 if len(hits) >= MAX_SEARCH_RESULTS:
                     return "\n".join(hits) + "\n... (more results cut off)"
     return "\n".join(hits) or f"no matches for {text!r}"
+
+
+async def search_code(ws: Workspace, query: str) -> str:
+    """Meaning-based search over the run repository's code index.
+
+    The repository is found through the workspace's run id, so an agent can
+    only ever search the index of the repository its run works on. A missing
+    index is guidance, not an error — the agent falls back to plain search.
+    """
+    if not query.strip():
+        raise ToolError("search query is empty")
+    async with session_scope() as db:
+        run = await db.get(AgentRun, ws.run_id)
+        if run is None:
+            return "no code index is connected to this run; use the plain 'search' tool instead"
+        chunks = await retrieve_chunks(db, run.repository_id, query, limit=SEARCH_CODE_RESULTS)
+    if not chunks:
+        return "the repository has no code index yet; use the plain 'search' tool instead"
+    return "\n\n".join(
+        f"{c.path}:{c.start_line}-{c.end_line} (score {c.score:.2f})\n"
+        f"{c.content[:SEARCH_CODE_SNIPPET_CHARS]}"
+        for c in chunks
+    )
 
 
 async def git_commit(ws: Workspace, message: str) -> str:
@@ -145,6 +173,23 @@ TOOLS: dict[str, tuple[Any, dict]] = {
                 "path": {**_PATH, "description": "Folder to search in; '.' for everything."},
             },
             ["text"],
+        ),
+    ),
+    "search_code": (
+        search_code,
+        _schema(
+            "search_code",
+            "Find code by meaning in the repository's semantic index. Best for "
+            "'where is X handled?' questions when you do not know the exact "
+            "words; results are from the last indexed snapshot, so use "
+            "'search' to verify fresh edits.",
+            {
+                "query": {
+                    "type": "string",
+                    "description": "What you are looking for, in plain words.",
+                }
+            },
+            ["query"],
         ),
     ),
     "write_file": (

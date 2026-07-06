@@ -13,6 +13,8 @@ Produce two artifacts:
 Rules:
 - Explore the repository with your read-only tools before planning; ground
   every task in what actually exists in the code.
+- search_code finds code by meaning — often the best first move on an
+  unfamiliar repository; the plain search tool matches exact text.
 - Prefer the smallest plan that satisfies the request. Do not add refactors,
   migrations, or tooling the request does not need.
 - Tasks must be independently reviewable increments; avoid one giant task.

@@ -14,8 +14,13 @@ from engine.agents.tools import (
     read_file,
     schemas_for,
     search,
+    search_code,
     write_file,
 )
+from engine.db.enums import RunStatus
+from engine.db.models import AgentRun, CodeChunk, Repository
+from engine.db.session import session_scope
+from engine.llm.router import model_router
 from engine.workspace.manager import Workspace
 
 
@@ -103,6 +108,53 @@ async def test_call_tool_returns_errors_instead_of_raising(ws):
     assert out.startswith("ERROR: path not allowed")
     out = await call_tool(ws, ("read_file",), "read_file", {"wrong_arg": "x"})
     assert out.startswith("ERROR: bad arguments")
+
+
+async def test_search_code_finds_indexed_chunks_by_meaning(ws, prepared_db):
+    content = "def list_items():\n    return ITEMS\n"
+    (embedding,) = await model_router.embed([content])
+    async with session_scope() as db:
+        repo = Repository(owner_id="tool-test", url=f"local://{uuid.uuid4().hex[:8]}")
+        db.add(repo)
+        await db.flush()
+        db.add(
+            AgentRun(
+                id=ws.run_id,
+                user_id="tool-test",
+                repository_id=repo.id,
+                request="test",
+                status=RunStatus.EXECUTING,
+            )
+        )
+        db.add(
+            CodeChunk(
+                repository_id=repo.id,
+                path="app/items.py",
+                language="python",
+                start_line=1,
+                end_line=2,
+                content=content,
+                embedding=embedding,
+            )
+        )
+        await db.commit()
+
+    # Fake embeddings are deterministic: identical text is the closest match.
+    out = await search_code(ws, content)
+    first_line = out.splitlines()[0]
+    assert first_line.startswith("app/items.py:1-2")
+    assert "score" in first_line
+    assert "return ITEMS" in out
+
+
+async def test_search_code_without_an_index_guides_the_agent(ws, prepared_db):
+    # The ws fixture's run id has no AgentRun row — same answer as no index.
+    out = await search_code(ws, "where is authentication handled?")
+    assert not out.startswith("ERROR")
+    assert "'search'" in out
+
+    with pytest.raises(ToolError):
+        await search_code(ws, "   ")
 
 
 def test_schemas_only_cover_implemented_tools():

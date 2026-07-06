@@ -17,8 +17,9 @@ from engine.llm.router import Tier
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-# Read-side tools are safe for every role that looks at the workspace.
-_READ_TOOLS = ("list_dir", "read_file", "search")
+# Read-side tools are safe for every role that looks at the workspace;
+# search_code queries the repository's semantic index (read-only by nature).
+_READ_TOOLS = ("list_dir", "read_file", "search", "search_code")
 # Write-side tools stay jailed to the per-run workspace (ADR-0008).
 _WRITE_TOOLS = ("apply_patch", "write_file")
 _GIT_TOOLS = ("git_branch", "git_commit", "git_diff")
