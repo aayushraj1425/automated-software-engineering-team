@@ -41,7 +41,7 @@ subset being built now.
 - [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
 - [ ] Postgres checkpointing per run, with a resume-after-restart test
 - [ ] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events`
-- [ ] Per-run budget guard (token and cost caps per ADR-0006 accounting); abort with a surfaced reason
+- [x] Per-run budget guard (cost cap per ADR-0006 accounting); the run fails with a surfaced reason before the next task starts
 - [ ] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work
 
 ### Workstream: Repository Connection & Workspaces (blocking)
@@ -56,7 +56,7 @@ subset being built now.
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
 - [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
 - [ ] Task-board tools: create tasks, update task status (writes `agent_tasks`)
-- [ ] Tool-call audit: every invocation recorded to `agent_events` and `audit_logs`
+- [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored; `audit_logs` mirror pending)
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
 
 ### Workstream: Specialist Agents (blocking)
@@ -70,8 +70,8 @@ subset being built now.
 - [x] Run detail: agent timeline and task board (polling; Redis streaming and per-agent output panes come later)
 - [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page (in-place plan editing still pending)
 - [x] Pull-request link on the run page
-- [ ] Diff viewer
-- [ ] Run cost widget (tokens and cost per agent)
+- [x] Diff viewer: the run page shows everything the agents changed, colored by +/-
+- [x] Run cost widget (token and cost totals in the run header)
 
 ### Workstream: Identity & Keys (planned)
 - [ ] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment)
@@ -154,3 +154,8 @@ subset being built now.
   (`engine/github.py`), PR link on the run page, review/publish timeline events.
   End-to-end test proves a local repository gets the run branch pushed back.
   Engine 80 passed, web 9/9.
+- 2026-07-05 · Run observability: every tool invocation lands in the timeline as a
+  `tool.called` event (arguments summarized, file contents never stored), the per-run
+  budget cap is enforced before each task with a surfaced reason, and the run page
+  gained a colored diff viewer (`GET /v1/runs/{id}/diff`) plus token/cost totals.
+  Engine 81 passed.
