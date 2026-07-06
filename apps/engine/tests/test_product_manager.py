@@ -49,6 +49,18 @@ def test_missing_summary_is_rejected():
         validate_plan(_plan(summary=""))
 
 
+def test_structured_summary_is_flattened():
+    # Models often answer with a summary object instead of a string; the
+    # validator accepts it rather than failing a good plan on shape.
+    structured = {
+        "problem": "No stats endpoint.",
+        "acceptance_criteria": ["GET /stats returns 200", "body has a count"],
+    }
+    plan = validate_plan(_plan(summary=structured))
+    assert "Problem: No stats endpoint." in plan["summary"]
+    assert "Acceptance criteria: GET /stats returns 200; body has a count" in plan["summary"]
+
+
 def test_unknown_role_is_rejected():
     bad = _plan()
     bad["tasks"][0]["role"] = "architect"

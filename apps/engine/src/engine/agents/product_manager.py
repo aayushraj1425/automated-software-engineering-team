@@ -93,10 +93,26 @@ def parse_plan(reply: str) -> dict[str, Any]:
         raise PlanError(f"plan {exc}") from exc
 
 
+def _coerce_summary(summary: Any) -> str:
+    """The contract asks for a string, but models often structure the summary
+    as an object (problem / behavior / acceptance criteria). That is a fine
+    summary — flatten it instead of rejecting the plan."""
+    if isinstance(summary, str):
+        return summary.strip()
+    if isinstance(summary, dict):
+        lines: list[str] = []
+        for key, value in summary.items():
+            if isinstance(value, list):
+                value = "; ".join(str(item) for item in value)
+            lines.append(f"{str(key).replace('_', ' ').capitalize()}: {value}")
+        return "\n".join(lines).strip()
+    return ""
+
+
 def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
-    summary = plan.get("summary")
+    summary = _coerce_summary(plan.get("summary"))
     tasks = plan.get("tasks")
-    if not isinstance(summary, str) or not summary.strip():
+    if not summary:
         raise PlanError("plan needs a non-empty summary")
     if not isinstance(tasks, list) or not 1 <= len(tasks) <= MAX_PLAN_TASKS:
         raise PlanError(f"plan needs between 1 and {MAX_PLAN_TASKS} tasks")
@@ -128,4 +144,4 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
                 "depends_on": depends_on,
             }
         )
-    return {"summary": summary.strip(), "tasks": clean_tasks}
+    return {"summary": summary, "tasks": clean_tasks}
