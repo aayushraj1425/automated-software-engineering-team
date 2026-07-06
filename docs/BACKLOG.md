@@ -79,9 +79,10 @@ subset being built now.
 - [ ] Organization switcher on top of the better-auth organization plugin
 
 ### Workstream: Evaluation Seed (planned)
-- [ ] Fixture repository (small TypeScript + Python service) committed under `fixtures/`
-- [ ] Three golden tasks (add an endpoint, fix a seeded bug, add a config flag) with a scoring rubric
-- [ ] `scripts/eval_agent_team.py`: run the team against the golden tasks, score plan/diff/PR; CI-runnable behind a real-model gate
+- [x] Fixture repository (small Python service + static web page, seeded bug) committed under `fixtures/demo-service/` — how-to: [EVALUATION.md](EVALUATION.md)
+- [x] Three golden tasks (add an endpoint, fix the seeded bug, add a config flag) with a four-check scoring rubric
+- [x] `apps/engine/scripts/eval_agent_team.py`: runs the team against the golden tasks and prints the scorecard (offline mode scores mechanics only; a real model adds the diff check)
+- [ ] CI job running the real-model evaluation behind a provider-key gate
 
 ## Phase 2 and beyond (headlines only)
 
@@ -159,3 +160,8 @@ subset being built now.
   budget cap is enforced before each task with a surfaced reason, and the run page
   gained a colored diff viewer (`GET /v1/runs/{id}/diff`) plus token/cost totals.
   Engine 81 passed.
+- 2026-07-06 · Evaluation seed: fixture service under `fixtures/demo-service/`
+  (seeded out-of-range bug), three golden tasks with a scoring rubric
+  (`engine/evaluation.py`), and the scorecard script
+  (`scripts/eval_agent_team.py`) — offline run scores 3/3 on pipeline
+  mechanics. Plain-language how-to in docs/EVALUATION.md. Engine 82 passed.
