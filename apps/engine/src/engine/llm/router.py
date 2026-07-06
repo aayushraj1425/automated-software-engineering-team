@@ -1,4 +1,7 @@
+import hashlib
 import json
+import math
+import struct
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -6,7 +9,7 @@ from typing import Any, Literal
 
 import structlog
 
-from engine.config import get_settings
+from engine.config import EMBEDDING_DIM, get_settings
 
 Tier = Literal["planner", "coder", "cheap"]
 
@@ -16,6 +19,22 @@ FAKE_REPLY = (
     "This is a canned reply from the ASEP walking skeleton (LLM_FAKE=1). "
     "Set a provider key in .env to talk to a real model."
 )
+
+
+def _fake_embedding(text: str) -> list[float]:
+    """Deterministic stand-in vector: same text, same vector, unit length."""
+    values: list[float] = []
+    seed = text.encode("utf-8", errors="replace")
+    counter = 0
+    while len(values) < EMBEDDING_DIM:
+        digest = hashlib.sha256(seed + counter.to_bytes(4, "big")).digest()
+        for offset in range(0, len(digest) - 3, 4):
+            (raw,) = struct.unpack_from(">i", digest, offset)
+            values.append(raw / 2**31)
+        counter += 1
+    values = values[:EMBEDDING_DIM]
+    norm = math.sqrt(sum(v * v for v in values)) or 1.0
+    return [v / norm for v in values]
 
 
 @dataclass(frozen=True)
@@ -143,6 +162,26 @@ class ModelRouter:
             output_tokens=getattr(usage, "completion_tokens", 0) or 0,
             cost_usd=cost,
         )
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """One EMBEDDING_DIM vector per text (MODEL_EMBEDDING; fake mode is
+        deterministic so index/search tests run offline)."""
+        settings = get_settings()
+        if settings.llm_fake:
+            return [_fake_embedding(text) for text in texts]
+
+        import litellm
+
+        started = time.monotonic()
+        response = await litellm.aembedding(model=settings.model_embedding, input=texts)
+        vectors = [item["embedding"] for item in response.data]  # type: ignore[union-attr]
+        log.info(
+            "llm.embed",
+            model=settings.model_embedding,
+            texts=len(texts),
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        return vectors
 
 
 model_router = ModelRouter()

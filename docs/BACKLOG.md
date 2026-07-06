@@ -84,11 +84,33 @@ subset being built now.
 - [x] `apps/engine/scripts/eval_agent_team.py`: runs the team against the golden tasks and prints the scorecard (offline mode scores mechanics only; a real model adds the diff check)
 - [ ] CI job running the real-model evaluation behind a provider-key gate
 
-## Phase 2 and beyond (headlines only)
+## Phase 2 — Repository Intelligence
 
-- Phase 2 — Repository Intelligence: indexing pipeline (tree-sitter for TypeScript/JavaScript
-  and Python, then Java/Kotlin), hybrid retrieval with reciprocal-rank fusion, dependency
-  graph, grounded citations in chat, retrieval evaluation harness.
+Design note: [architecture/REPOSITORY_INTELLIGENCE.md](architecture/REPOSITORY_INTELLIGENCE.md).
+Started 2026-07-06 while the Phase 1 durability items above remain open.
+
+### Workstream: Indexing Pipeline (blocking)
+- [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
+- [x] `code_chunks` schema (pgvector `vector(768)`, migration 0004) and the line-window chunker
+- [x] Indexer background task: clone → chunk → embed → replace the repository's chunks
+- [ ] AST-aware chunking with tree-sitter (TypeScript/JavaScript + Python first, then Java/Kotlin)
+- [ ] Incremental re-indexing (changed files only)
+- [ ] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search
+
+### Workstream: Retrieval & Grounding (blocking)
+- [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
+- [ ] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion
+- [ ] Grounded chat: answers cite real files and line ranges
+- [ ] Agents consume the index: a `search_code` tool for the Product Manager and engineers
+- [ ] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
+
+### Workstream: Repository Screens (planned)
+- [x] Repositories API: connect, list with index status and chunk counts
+- [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
+- [ ] Dependency / architecture graph views
+
+## Phase 3 and beyond (headlines only)
+
 - Phase 3 — Execution & QA: Docker sandbox runner, QA agent loops, webhook pull-request
   reviewer, secrets and dependency scanning.
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
@@ -165,3 +187,12 @@ subset being built now.
   (`engine/evaluation.py`), and the scorecard script
   (`scripts/eval_agent_team.py`) — offline run scores 3/3 on pipeline
   mechanics. Plain-language how-to in docs/EVALUATION.md. Engine 82 passed.
+- 2026-07-06 · Phase 2 first slice: embeddings route in the ModelRouter,
+  `code_chunks` schema (pgvector, migration 0004, up/down/up verified),
+  line-window chunker, background indexer (clone → chunk → embed → store),
+  and the repositories API (connect / list / index / search). Searching with
+  a file's exact content ranks that file first at score ≈ 1.0 offline.
+  Engine 85 passed.
+- 2026-07-06 · Repositories page (`/repositories`): connect a repository, build
+  its index with live status polling, and search it — results cite file, line
+  range, language, and similarity score. Linked from the runs page.

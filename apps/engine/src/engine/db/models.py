@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     DateTime,
@@ -19,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from engine.config import EMBEDDING_DIM
 from engine.db.enums import RunStatus, TaskStatus
 
 
@@ -50,6 +52,7 @@ class Repository(Base, TimestampMixin):
     url: Mapped[str] = mapped_column(String(512))
     default_branch: Mapped[str] = mapped_column(String(128), default="main")
     status: Mapped[str] = mapped_column(String(32), default="connected")
+    last_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Conversation(Base, TimestampMixin):
@@ -183,6 +186,27 @@ class Artifact(Base):
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     s3_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CodeChunk(Base):
+    """One indexed piece of a repository file (Repository Intelligence).
+    Re-indexing replaces all of a repository's chunks."""
+
+    __tablename__ = "code_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(512))
+    language: Mapped[str] = mapped_column(String(32))
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
