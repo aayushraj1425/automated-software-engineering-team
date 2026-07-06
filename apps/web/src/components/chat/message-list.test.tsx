@@ -22,4 +22,22 @@ describe("MessageList", () => {
     expect(document.querySelectorAll('[data-role="user"]')).toHaveLength(1);
     expect(document.querySelectorAll('[data-role="assistant"]')).toHaveLength(1);
   });
+
+  it("lists the sources under a grounded answer", () => {
+    render(
+      <MessageList
+        messages={[
+          {
+            id: "1",
+            role: "assistant",
+            content: "Items are listed in app/main.py.",
+            citations: [{ path: "app/main.py", start_line: 1, end_line: 42, score: 0.91 }],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText(/app\/main\.py:1–42/)).toBeInTheDocument();
+    expect(screen.getByText(/score 0\.91/)).toBeInTheDocument();
+  });
 });

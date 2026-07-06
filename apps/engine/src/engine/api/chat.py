@@ -10,19 +10,29 @@ from sqlalchemy import select
 
 from engine.agents.chat_graph import chat_graph
 from engine.auth import Principal, require_service_auth
-from engine.db.models import AuditLog, Conversation, Message
+from engine.db.models import AuditLog, Conversation, Message, Repository
 from engine.db.session import session_scope
+from engine.indexing.retrieval import retrieve_chunks
 from engine.llm.router import model_router
 
 router = APIRouter()
 log = structlog.get_logger(__name__)
 
 HISTORY_LIMIT = 50
+EXCERPT_CHARS = 1_500
+
+GROUNDING_PROMPT = (
+    "The user connected a repository; the code excerpts below were retrieved "
+    "for their question. Ground your answer in them and cite files as "
+    "path:start_line-end_line. If the excerpts do not contain the answer, say "
+    "what is missing instead of guessing.\n\n{excerpts}"
+)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=32_000)
     conversation_id: uuid.UUID | None = None
+    repository_id: uuid.UUID | None = None
 
 
 def _sse(event: str, data: dict) -> str:
@@ -50,6 +60,31 @@ async def chat(
             db.add(conversation)
             await db.flush()
 
+        # Grounding: retrieve the closest code chunks before anything persists,
+        # so an unknown repository rejects the request cleanly.
+        grounding: str | None = None
+        citations: list[dict] | None = None
+        if req.repository_id is not None:
+            repo = await db.get(Repository, req.repository_id)
+            if repo is None or repo.owner_id != principal.user_id:
+                raise HTTPException(status_code=404, detail="Repository not found")
+            chunks = await retrieve_chunks(db, repo.id, req.message)
+            if chunks:
+                citations = [
+                    {
+                        "path": c.path,
+                        "start_line": c.start_line,
+                        "end_line": c.end_line,
+                        "score": c.score,
+                    }
+                    for c in chunks
+                ]
+                excerpts = "\n\n".join(
+                    f"--- {c.path}:{c.start_line}-{c.end_line}\n{c.content[:EXCERPT_CHARS]}"
+                    for c in chunks
+                )
+                grounding = GROUNDING_PROMPT.format(excerpts=excerpts)
+
         conversation_id = conversation.id
         db.add(Message(conversation_id=conversation_id, role="user", content=req.message))
         db.add(
@@ -70,6 +105,8 @@ async def chat(
             )
         ).scalars()
         history = [{"role": m.role, "content": m.content} for m in reversed(list(history_rows))]
+        if grounding is not None:
+            history = [{"role": "system", "content": grounding}, *history]
         await db.commit()
 
     structlog.contextvars.bind_contextvars(
@@ -78,6 +115,8 @@ async def chat(
 
     async def event_stream() -> AsyncIterator[str]:
         parts: list[str] = []
+        if citations is not None:
+            yield _sse("citations", {"citations": citations})
         try:
             async for chunk in chat_graph.astream({"messages": history}, stream_mode="custom"):
                 if isinstance(chunk, dict) and chunk.get("type") == "token":
@@ -94,6 +133,7 @@ async def chat(
                 role="assistant",
                 content="".join(parts),
                 model=model_router.resolve("coder"),
+                citations=citations,
             )
             db.add(assistant)
             await db.commit()

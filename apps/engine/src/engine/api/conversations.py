@@ -25,6 +25,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     model: str | None
+    citations: list[dict] | None
     created_at: datetime
 
 
@@ -72,6 +73,13 @@ async def list_messages(
         .all()
     )
     return [
-        MessageOut(id=m.id, role=m.role, content=m.content, model=m.model, created_at=m.created_at)
+        MessageOut(
+            id=m.id,
+            role=m.role,
+            content=m.content,
+            model=m.model,
+            citations=m.citations,
+            created_at=m.created_at,
+        )
         for m in rows
     ]

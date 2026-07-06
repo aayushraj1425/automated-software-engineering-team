@@ -17,11 +17,10 @@ from engine.auth import Principal, require_service_auth
 from engine.db.models import CodeChunk, Repository
 from engine.db.session import get_session
 from engine.indexing.indexer import index_repository
-from engine.llm.router import model_router
+from engine.indexing.retrieval import retrieve_chunks
 
 router = APIRouter()
 
-SEARCH_LIMIT = 8
 SNIPPET_CHARS = 600
 
 
@@ -142,20 +141,7 @@ async def search_repository(
     db: AsyncSession = Depends(get_session),
 ) -> list[SearchHit]:
     await _owned_repository(db, repository_id, principal)
-    (query_vector,) = await model_router.embed([q])
-    distance = CodeChunk.embedding.cosine_distance(query_vector)
-    rows = (
-        (
-            await db.execute(
-                select(CodeChunk, distance.label("distance"))
-                .where(CodeChunk.repository_id == repository_id)
-                .order_by(distance)
-                .limit(SEARCH_LIMIT)
-            )
-        )
-        .tuples()
-        .all()
-    )
+    chunks = await retrieve_chunks(db, repository_id, q)
     return [
         SearchHit(
             path=chunk.path,
@@ -163,7 +149,7 @@ async def search_repository(
             start_line=chunk.start_line,
             end_line=chunk.end_line,
             snippet=chunk.content[:SNIPPET_CHARS],
-            score=round(max(0.0, 1.0 - float(dist)), 4),
+            score=chunk.score,
         )
-        for chunk, dist in rows
+        for chunk in chunks
     ]

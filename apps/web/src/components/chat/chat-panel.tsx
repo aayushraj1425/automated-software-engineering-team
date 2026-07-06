@@ -6,15 +6,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "@/lib/auth-client";
 import { parseSse } from "@/lib/sse";
 
+import type { RepositorySummary } from "@/components/repositories/types";
+
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
-import type { ChatMessage, ConversationSummary } from "./types";
+import type { ChatMessage, Citation, ConversationSummary } from "./types";
 
 export function ChatPanel({ userName }: { userName: string }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [repositories, setRepositories] = useState<RepositorySummary[]>([]);
+  const [repositoryId, setRepositoryId] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
@@ -24,6 +28,10 @@ export function ChatPanel({ userName }: { userName: string }) {
 
   useEffect(() => {
     void refreshConversations();
+    void (async () => {
+      const res = await fetch("/api/repositories");
+      if (res.ok) setRepositories(await res.json());
+    })();
   }, [refreshConversations]);
 
   useEffect(() => {
@@ -34,9 +42,20 @@ export function ChatPanel({ userName }: { userName: string }) {
     setConversationId(id);
     const res = await fetch(`/api/conversations/${id}/messages`);
     if (res.ok) {
-      const rows: { id: string; role: "user" | "assistant"; content: string }[] =
-        await res.json();
-      setMessages(rows.map((r) => ({ id: r.id, role: r.role, content: r.content })));
+      const rows: {
+        id: string;
+        role: "user" | "assistant";
+        content: string;
+        citations: Citation[] | null;
+      }[] = await res.json();
+      setMessages(
+        rows.map((r) => ({
+          id: r.id,
+          role: r.role,
+          content: r.content,
+          citations: r.citations ?? undefined,
+        })),
+      );
     }
   }
 
@@ -62,13 +81,19 @@ export function ChatPanel({ userName }: { userName: string }) {
         body: JSON.stringify({
           message: text,
           conversation_id: conversationId ?? undefined,
+          repository_id: repositoryId || undefined,
         }),
       });
       if (!res.ok || !res.body) {
         throw new Error(`Request failed (${res.status})`);
       }
       for await (const { event, data } of parseSse(res.body)) {
-        if (event === "token") {
+        if (event === "citations") {
+          const citations = (data.citations ?? []) as Citation[];
+          setMessages((prev) =>
+            prev.map((m) => (m.id === draftId ? { ...m, citations } : m)),
+          );
+        } else if (event === "token") {
           const tokenText = String(data.text ?? "");
           setMessages((prev) =>
             prev.map((m) => (m.id === draftId ? { ...m, content: m.content + tokenText } : m)),
@@ -140,6 +165,25 @@ export function ChatPanel({ userName }: { userName: string }) {
         </button>
       </aside>
       <section className="flex flex-1 flex-col">
+        <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-3">
+          <label htmlFor="chat-repository" className="text-xs text-zinc-500">
+            Answer from
+          </label>
+          <select
+            id="chat-repository"
+            value={repositoryId}
+            onChange={(e) => setRepositoryId(e.target.value)}
+            className="max-w-md truncate rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-zinc-500"
+          >
+            <option value="">No repository — general chat</option>
+            {repositories.map((repo) => (
+              <option key={repo.id} value={repo.id} disabled={repo.chunks === 0}>
+                {repo.url}
+                {repo.chunks === 0 ? " (not indexed yet)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
           <MessageList messages={messages} />
         </div>

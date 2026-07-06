@@ -100,7 +100,7 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 ### Workstream: Retrieval & Grounding (blocking)
 - [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
 - [ ] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion
-- [ ] Grounded chat: answers cite real files and line ranges
+- [x] Grounded chat: answers cite real files and line ranges (design note: [architecture/GROUNDED_CHAT.md](architecture/GROUNDED_CHAT.md))
 - [ ] Agents consume the index: a `search_code` tool for the Product Manager and engineers
 - [ ] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
 
@@ -196,3 +196,17 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 - 2026-07-06 · Repositories page (`/repositories`): connect a repository, build
   its index with live status polling, and search it — results cite file, line
   range, language, and similarity score. Linked from the runs page.
+- 2026-07-06 · Real-model hardening after the first live Gemini runs: the
+  ModelRouter waits out provider rate limits (15s/30s/60s), the plan validator
+  accepts the structured summary objects real models produce, and every
+  evaluation run carries a $2 budget cap with per-task cost on the scorecard.
+  Live run proved the loop: Gemini planned, coded, and committed the /stats
+  golden task with a matching diff for $0.009 before the free-tier daily quota
+  (20 requests) ended the session. Engine 86 passed.
+- 2026-07-06 · Grounded chat with citations: chat accepts a `repository_id`,
+  retrieves the eight closest chunks (shared `engine/indexing/retrieval.py`,
+  also behind the search endpoint), grounds the model's prompt in the excerpts,
+  streams a `citations` SSE event, and stores sources on the assistant message
+  (`messages.citations`, migration 0005, up/down/up verified). The chat page
+  gained a repository picker and a Sources list under grounded answers. Design
+  note: architecture/GROUNDED_CHAT.md. Engine 89 passed, web 10/10.

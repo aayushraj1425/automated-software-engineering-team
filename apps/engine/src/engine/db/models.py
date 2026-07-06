@@ -82,6 +82,8 @@ class Message(Base):
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Sources behind a grounded answer: [{path, start_line, end_line, score}]
+    citations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

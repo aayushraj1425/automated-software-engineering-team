@@ -23,6 +23,17 @@ export function MessageList({ messages }: { messages: ChatMessage[] }) {
               {m.content}
               {m.streaming && <span className="animate-pulse">▍</span>}
             </p>
+            {m.citations && m.citations.length > 0 && (
+              <div className="mt-2 border-t border-zinc-800 pt-2">
+                <p className="mb-1 text-xs font-medium text-zinc-500">Sources</p>
+                {m.citations.map((c, i) => (
+                  <p key={i} className="font-mono text-xs text-zinc-500">
+                    {c.path}:{c.start_line}–{c.end_line}
+                    <span className="ml-2 text-zinc-600">score {c.score.toFixed(2)}</span>
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         </li>
       ))}
