@@ -1,9 +1,10 @@
+import asyncio
 import hashlib
 import json
 import math
 import struct
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -19,6 +20,24 @@ FAKE_REPLY = (
     "This is a canned reply from the ASEP walking skeleton (LLM_FAKE=1). "
     "Set a provider key in .env to talk to a real model."
 )
+
+
+# Free-tier and burst-heavy providers throttle hard; wait and retry before
+# failing a whole agent run over a temporary 429.
+RATE_LIMIT_DELAYS_S = (15, 30, 60)
+
+
+async def _retry_rate_limits[T](call: Callable[[], Awaitable[T]]) -> T:
+    """Run an LLM call, sleeping through provider rate limits before giving up."""
+    import litellm
+
+    for attempt, delay in enumerate(RATE_LIMIT_DELAYS_S, start=1):
+        try:
+            return await call()
+        except litellm.exceptions.RateLimitError:
+            log.warning("llm.rate_limited", attempt=attempt, retry_in_s=delay)
+            await asyncio.sleep(delay)
+    return await call()
 
 
 def _fake_embedding(text: str) -> list[float]:
@@ -80,7 +99,9 @@ class ModelRouter:
 
         import litellm
 
-        response = await litellm.acompletion(model=model, messages=messages, stream=True)
+        response = await _retry_rate_limits(
+            lambda: litellm.acompletion(model=model, messages=messages, stream=True)
+        )
         chunks = 0
         async for chunk in response:  # type: ignore[union-attr]
             delta = chunk.choices[0].delta.content  # type: ignore[union-attr]
@@ -103,7 +124,9 @@ class ModelRouter:
 
         import litellm
 
-        response = await litellm.acompletion(model=model, messages=messages)
+        response = await _retry_rate_limits(
+            lambda: litellm.acompletion(model=model, messages=messages)
+        )
         content = response.choices[0].message.content  # type: ignore[union-attr]
         usage = getattr(response, "usage", None)
         log.info(
@@ -131,7 +154,9 @@ class ModelRouter:
         import litellm
 
         started = time.monotonic()
-        response = await litellm.acompletion(model=model, messages=messages, tools=tools or None)
+        response = await _retry_rate_limits(
+            lambda: litellm.acompletion(model=model, messages=messages, tools=tools or None)
+        )
         message = response.choices[0].message  # type: ignore[union-attr]
         calls: list[ToolCall] = []
         for call in message.tool_calls or []:
@@ -173,7 +198,9 @@ class ModelRouter:
         import litellm
 
         started = time.monotonic()
-        response = await litellm.aembedding(model=settings.model_embedding, input=texts)
+        response = await _retry_rate_limits(
+            lambda: litellm.aembedding(model=settings.model_embedding, input=texts)
+        )
         vectors = [item["embedding"] for item in response.data]  # type: ignore[union-attr]
         log.info(
             "llm.embed",

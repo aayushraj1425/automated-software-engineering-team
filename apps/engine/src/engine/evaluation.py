@@ -11,6 +11,7 @@ harness doubles as an offline pipeline smoke.
 import subprocess
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,9 @@ from engine.db.session import session_scope
 from engine.workspace.manager import run_git, workspaces_root
 
 FIXTURE_DIR = Path(__file__).resolve().parents[4] / "fixtures" / "demo-service"
+
+# Safety net for real-model runs: a task that spends this much is stopped.
+EVAL_MAX_COST_USD = Decimal("2.00")
 
 GOLDEN_TASKS: tuple[dict[str, Any], ...] = (
     {
@@ -59,6 +63,7 @@ class TaskScore:
     completed: bool = False
     committed: bool = False
     diff_matched: bool | None = None  # None: not judged (offline mode)
+    cost_usd: float = 0.0
     error: str | None = None
 
     @property
@@ -99,6 +104,7 @@ async def run_golden_task(origin: Path, golden: dict[str, Any]) -> TaskScore:
             repository_id=repo.id,
             request=golden["request"],
             status=RunStatus.QUEUED,
+            max_cost_usd=EVAL_MAX_COST_USD,
         )
         session.add(run)
         await session.commit()
@@ -125,6 +131,7 @@ async def run_golden_task(origin: Path, golden: dict[str, Any]) -> TaskScore:
         score.completed = run.status == RunStatus.COMPLETED
         if not score.completed:
             score.error = run.error or f"run ended in status {run.status}"
+        score.cost_usd = float(run.total_cost_usd or 0)
         base_sha = run.base_sha
 
     workspace = workspaces_root() / str(run_id)
