@@ -13,9 +13,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-# psycopg async cannot run on Windows' default ProactorEventLoop.
+# psycopg async cannot run on Windows' default ProactorEventLoop, and the
+# cp1252 console cannot print model output or em dashes — force UTF-8.
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 from engine.config import get_settings  # noqa: E402
 from engine.evaluation import evaluate_team  # noqa: E402
@@ -35,13 +38,15 @@ async def main() -> int:
             f"  [{verdict}] {score.name}\n"
             f"         planned {'yes' if score.planned else 'NO'} · "
             f"completed {'yes' if score.completed else 'NO'} · "
-            f"commits {'yes' if score.committed else 'NO'} · diff match {diff}"
+            f"commits {'yes' if score.committed else 'NO'} · diff match {diff} · "
+            f"cost ${score.cost_usd:.4f}"
         )
         if score.error:
             print(f"         reason: {score.error}")
 
     passed = sum(score.passed for score in scores)
-    print(f"\n{passed}/{len(scores)} golden tasks passed")
+    total_cost = sum(score.cost_usd for score in scores)
+    print(f"\n{passed}/{len(scores)} golden tasks passed · total cost ${total_cost:.4f}")
     return 0 if passed == len(scores) else 1
 
 
