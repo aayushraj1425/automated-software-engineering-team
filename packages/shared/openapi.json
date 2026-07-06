@@ -279,6 +279,47 @@
         }
       }
     },
+    "/v1/runs/{run_id}/diff": {
+      "get": {
+        "summary": "Get Run Diff",
+        "description": "Everything the agents changed in the run's workspace since its base commit.",
+        "operationId": "get_run_diff_v1_runs__run_id__diff_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}/events": {
       "get": {
         "summary": "List Events",
@@ -413,6 +454,19 @@
           "approved"
         ],
         "title": "DecisionIn"
+      },
+      "DiffOut": {
+        "properties": {
+          "diff": {
+            "type": "string",
+            "title": "Diff"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diff"
+        ],
+        "title": "DiffOut"
       },
       "EventOut": {
         "properties": {
@@ -650,6 +704,18 @@
             },
             "type": "array",
             "title": "Tasks"
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "total_input_tokens": {
+            "type": "integer",
+            "title": "Total Input Tokens"
+          },
+          "total_output_tokens": {
+            "type": "integer",
+            "title": "Total Output Tokens"
           }
         },
         "type": "object",
@@ -664,7 +730,10 @@
           "started_at",
           "finished_at",
           "plan",
-          "tasks"
+          "tasks",
+          "total_cost_usd",
+          "total_input_tokens",
+          "total_output_tokens"
         ],
         "title": "RunDetailOut"
       },
