@@ -108,7 +108,7 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 ### Workstream: Repository Screens (planned)
 - [x] Repositories API: connect, list with index status and chunk counts
 - [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
-- [x] Dependency / architecture graph views (design note: [architecture/DEPENDENCY_GRAPH.md](architecture/DEPENDENCY_GRAPH.md))
+- [x] Dependency / architecture graph views (Python, JS/TS/TSX, Java, Kotlin import resolution) (design note: [architecture/DEPENDENCY_GRAPH.md](architecture/DEPENDENCY_GRAPH.md))
 
 ## Phase 3 and beyond (headlines only)
 
@@ -238,6 +238,13 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
   unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
   re-index picks up the better boundaries. Design note:
   architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
+- 2026-07-08 · Dependency graph resolves Java and Kotlin imports: a first pass
+  indexes each JVM file's `package` and declared types into a fully-qualified
+  name → file map, then import statements resolve against it — wildcards link the
+  whole package and static/member imports fall back to their declaring type,
+  while third-party imports still drop out. Python and JS/TS keep their
+  path-based resolution. Design note: architecture/DEPENDENCY_GRAPH.md. Engine
+  107 passed, 1 skipped.
 - 2026-07-08 · AST chunking extended to Java and Kotlin: the tree-sitter
   chunker now splits `.java`, `.kt`, and `.kts` files at their top-level types
   and functions (Java class/interface/enum/record, Kotlin class/function/object),

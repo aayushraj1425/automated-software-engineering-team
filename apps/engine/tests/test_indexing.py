@@ -14,6 +14,7 @@ from engine.db.models import CodeChunk, IndexedFile
 from engine.db.session import session_scope
 from engine.evaluation import FIXTURE_DIR, prepare_fixture_repo
 from engine.indexing.chunker import CHUNK_LINES, chunk_repository
+from engine.indexing.dependency_graph import build_dependency_graph
 from tests.conftest import auth_headers
 
 
@@ -120,6 +121,50 @@ def test_ast_chunker_splits_kotlin_top_level(tmp_path):
     assert any(c.startswith("class Foo {") for c in contents)
     top = next(chunk for chunk in chunks if chunk.content.startswith("fun topLevel()"))
     assert "val v29 = 29" in top.content  # kept whole at its real boundary
+
+
+def test_dependency_graph_resolves_java_imports(tmp_path):
+    app = tmp_path / "src" / "main" / "java" / "com" / "demo" / "app"
+    util = tmp_path / "src" / "main" / "java" / "com" / "demo" / "util"
+    app.mkdir(parents=True)
+    util.mkdir(parents=True)
+    (util / "Helper.java").write_text("package com.demo.util;\nclass Helper {}\n")
+    (app / "Main.java").write_text(
+        "package com.demo.app;\n"
+        "import com.demo.util.Helper;\n"
+        "import java.util.List;\n"  # third-party — must be dropped
+        "class Main {}\n"
+    )
+
+    edges = {(e.source, e.target) for e in build_dependency_graph(tmp_path)}
+    assert (
+        "src/main/java/com/demo/app/Main.java",
+        "src/main/java/com/demo/util/Helper.java",
+    ) in edges
+    # The java.util.List import points outside the repo, so it is not an edge.
+    assert all(target.endswith("Helper.java") for _, target in edges)
+
+
+def test_dependency_graph_resolves_kotlin_imports(tmp_path):
+    (tmp_path / "app").mkdir()
+    (tmp_path / "util").mkdir()
+    (tmp_path / "util" / "Helpers.kt").write_text(
+        "package com.demo.util\nfun helperFn() {}\nclass Widget {}\n"
+    )
+    (tmp_path / "app" / "App.kt").write_text(
+        "package com.demo.app\n"
+        "import com.demo.util.helperFn\n"  # top-level function (member) import
+        "import kotlin.math.max\n"  # third-party — dropped
+        "fun main() { helperFn() }\n"
+    )
+    (tmp_path / "app" / "Wild.kt").write_text(
+        "package com.demo.app\nimport com.demo.util.*\nfun other() {}\n"
+    )
+
+    edges = {(e.source, e.target) for e in build_dependency_graph(tmp_path)}
+    assert ("app/App.kt", "util/Helpers.kt") in edges  # resolved by function name
+    assert ("app/Wild.kt", "util/Helpers.kt") in edges  # wildcard links the package
+    assert ("app/App.kt", "app/App.kt") not in edges  # no self-edges
 
 
 async def test_connect_index_and_search(client, tmp_path):
