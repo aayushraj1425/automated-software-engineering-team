@@ -94,7 +94,7 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 - [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
 - [x] `code_chunks` schema (pgvector `vector(768)`, migration 0004) and the line-window chunker
 - [x] Indexer background task: clone → chunk → embed → replace the repository's chunks
-- [x] AST-aware chunking with tree-sitter (Python + TypeScript/JavaScript/TSX first; Java/Kotlin later) — design note: [architecture/AST_CHUNKING.md](architecture/AST_CHUNKING.md)
+- [x] AST-aware chunking with tree-sitter (Python, TypeScript/JavaScript/TSX, Java, Kotlin) — design note: [architecture/AST_CHUNKING.md](architecture/AST_CHUNKING.md)
 - [x] Incremental re-indexing (changed files only) — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
 - [x] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
 
@@ -238,6 +238,13 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
   unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
   re-index picks up the better boundaries. Design note:
   architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
+- 2026-07-08 · AST chunking extended to Java and Kotlin: the tree-sitter
+  chunker now splits `.java`, `.kt`, and `.kts` files at their top-level types
+  and functions (Java class/interface/enum/record, Kotlin class/function/object),
+  keeping a definition whole instead of a blind line window; large types still
+  window past the 200-line cap and unknown grammars keep the fallback. The
+  dependency graph does not yet resolve Java/Kotlin imports. Design note:
+  architecture/AST_CHUNKING.md. Engine 105 passed, 1 skipped.
 - 2026-07-08 · Incremental re-indexing and HNSW index (Phase 2 indexing
   workstream complete): each source file's SHA-256 is recorded in `indexed_files`
   (migration 0008, up/down/up verified), so a re-index re-embeds only the files

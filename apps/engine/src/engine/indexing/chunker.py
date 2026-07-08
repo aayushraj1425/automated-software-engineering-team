@@ -1,9 +1,10 @@
 """Splits repository files into chunks for the search index.
 
 Small files stay whole. Larger files in a known grammar (Python, JavaScript,
-TypeScript, TSX) are split by tree-sitter at their real boundaries — one chunk
-per top-level function or class — so a definition is never cut in half; imports
-and loose code between definitions fall back to overlapping line windows. Any
+TypeScript, TSX, Java, Kotlin) are split by tree-sitter at their real
+boundaries — one chunk per top-level function or class — so a definition is
+never cut in half; imports and loose code between definitions fall back to
+overlapping line windows. Any
 unknown extension, empty parse, or parser error also falls back to line
 windows, so the chunker never fails a file. A chunk stays
 (path, language, line range, text), so the schema does not change.
@@ -34,6 +35,7 @@ LANGUAGES = {
     ".mjs": "javascript",
     ".java": "java",
     ".kt": "kotlin",
+    ".kts": "kotlin",
     ".go": "go",
     ".rs": "rust",
     ".md": "markdown",
@@ -57,6 +59,9 @@ AST_GRAMMARS = {
     ".mjs": "javascript",
     ".ts": "typescript",
     ".tsx": "tsx",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
 }
 
 # Node types that count as a top-level definition worth its own chunk.
@@ -75,6 +80,18 @@ _DEFINITION_TYPES: dict[str, set[str]] = {
         "interface_declaration",
         "enum_declaration",
         "type_alias_declaration",
+    },
+    "java": {
+        "class_declaration",
+        "interface_declaration",
+        "enum_declaration",
+        "record_declaration",
+        "annotation_type_declaration",
+    },
+    "kotlin": {
+        "class_declaration",  # class, interface, and enum class all parse to this
+        "function_declaration",
+        "object_declaration",
     },
 }
 _DEFINITION_TYPES["tsx"] = _DEFINITION_TYPES["typescript"]

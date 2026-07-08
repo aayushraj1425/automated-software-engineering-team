@@ -88,6 +88,40 @@ def test_ast_chunker_splits_javascript_exports(tmp_path):
     assert foo.start_line == 3 and "const a39 = 39;" in foo.content
 
 
+def test_ast_chunker_keeps_java_types_whole(tmp_path):
+    lines = ["package com.demo;", "", "import java.util.List;", ""]
+    lines += ["class Alpha {"] + [f"    int a{i}() {{ return {i}; }}" for i in range(40)] + ["}"]
+    lines += ["", "class Beta {"] + [f"    int b{i}() {{ return {i}; }}" for i in range(30)] + ["}"]
+    (tmp_path / "Svc.java").write_text("\n".join(lines))
+
+    chunks = chunk_repository(tmp_path)
+    contents = [chunk.content for chunk in chunks]
+
+    alpha = next(chunk for chunk in chunks if chunk.content.startswith("class Alpha {"))
+    assert "int a39()" in alpha.content  # the whole class, not a blind 60-line window
+    assert any(c.startswith("class Beta {") for c in contents)
+    # The package/import preamble before the first type is its own (windowed) chunk.
+    assert any(c.startswith("package com.demo;") for c in contents)
+
+
+def test_ast_chunker_splits_kotlin_top_level(tmp_path):
+    lines = ["package com.demo", "", "import kotlin.math.max", ""]
+    lines += ["class Foo {"] + [f"    fun m{i}() = {i}" for i in range(40)] + ["}"]
+    lines += (
+        ["", "fun topLevel(): Int {"]
+        + [f"    val v{i} = {i}" for i in range(30)]
+        + ["    return 0", "}"]
+    )
+    (tmp_path / "App.kt").write_text("\n".join(lines))
+
+    chunks = chunk_repository(tmp_path)
+    contents = [chunk.content for chunk in chunks]
+
+    assert any(c.startswith("class Foo {") for c in contents)
+    top = next(chunk for chunk in chunks if chunk.content.startswith("fun topLevel()"))
+    assert "val v29 = 29" in top.content  # kept whole at its real boundary
+
+
 async def test_connect_index_and_search(client, tmp_path):
     origin = prepare_fixture_repo(tmp_path / "origin")
     headers = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
