@@ -99,10 +99,10 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 
 ### Workstream: Retrieval & Grounding (blocking)
 - [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
-- [ ] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion
+- [x] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion (design note: [architecture/HYBRID_RETRIEVAL.md](architecture/HYBRID_RETRIEVAL.md))
 - [x] Grounded chat: answers cite real files and line ranges (design note: [architecture/GROUNDED_CHAT.md](architecture/GROUNDED_CHAT.md))
 - [x] Agents consume the index: a `search_code` tool in the shared read-tool set (design note: [architecture/AGENT_CODE_SEARCH.md](architecture/AGENT_CODE_SEARCH.md))
-- [ ] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
+- [x] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
 
 ### Workstream: Repository Screens (planned)
 - [x] Repositories API: connect, list with index status and chunk counts
@@ -217,3 +217,15 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   error when no index exists. Role prompts explain when to prefer it over
   plain search. Design note: architecture/AGENT_CODE_SEARCH.md. Engine 91
   passed.
+- 2026-07-08 · Hybrid retrieval: `retrieve_chunks` now runs a vector arm and a
+  Postgres full-text arm (generated `content_tsv` column + GIN index, migration
+  0006, up/down/up verified) and blends their rankings with reciprocal-rank
+  fusion — exact identifiers and error strings surface even offline, while the
+  displayed score stays cosine similarity. The signature is unchanged, so the
+  search endpoint, grounded chat, and `search_code` gain hybrid ranking for
+  free. Design note: architecture/HYBRID_RETRIEVAL.md.
+- 2026-07-08 · Retrieval evaluation (Phase 2 exit criterion): a golden question
+  set over the fixture service scored with recall and mean reciprocal rank
+  against a grep baseline (`engine/retrieval_eval.py`, `scripts/eval_retrieval.py`).
+  Offline the numbers measure the full-text arm plus fusion; a real embedding
+  model shows the semantic lift. Engine 94 passed, 1 skipped.

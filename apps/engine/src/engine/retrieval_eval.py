@@ -84,9 +84,7 @@ def grep_baseline(root: Path, question: str, limit: int = RETRIEVAL_LIMIT) -> li
     text_by_path: dict[str, str] = {}
     for chunk in chunk_repository(root):
         text_by_path[chunk.path] = text_by_path.get(chunk.path, "") + "\n" + chunk.content.lower()
-    scored = [
-        (sum(word in text for word in words), path) for path, text in text_by_path.items()
-    ]
+    scored = [(sum(word in text for word in words), path) for path, text in text_by_path.items()]
     scored = [pair for pair in scored if pair[0] > 0]
     scored.sort(key=lambda pair: (-pair[0], pair[1]))
     return [path for _, path in scored[:limit]]

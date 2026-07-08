@@ -201,9 +201,7 @@ class CodeChunk(Base):
     __tablename__ = "code_chunks"
     # GIN index over the generated tsvector powers the full-text arm of hybrid
     # retrieval (design note: docs/architecture/HYBRID_RETRIEVAL.md).
-    __table_args__ = (
-        Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),
-    )
+    __table_args__ = (Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(

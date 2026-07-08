@@ -35,8 +35,10 @@ flowchart LR
   language, the text, and the embedding (`vector(768)`). Re-indexing a
   repository replaces its chunks.
 - **Search** — embed the question, order chunks by cosine distance, return
-  the closest ones with file and line numbers. Hybrid search (adding
-  classic keyword matching, fused with RRF) is the planned upgrade.
+  the closest ones with file and line numbers. This is now the vector arm of
+  **hybrid search**, which adds a Postgres full-text arm and fuses the two with
+  reciprocal-rank fusion — design note:
+  [HYBRID_RETRIEVAL.md](HYBRID_RETRIEVAL.md).
 
 ## API
 

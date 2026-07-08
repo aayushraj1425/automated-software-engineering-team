@@ -98,9 +98,7 @@ def _fuse(vector_hits: list[Row], text_hits: list[Row], limit: int) -> list[Retr
             fused[chunk.id] = fused.get(chunk.id, 0.0) + 1.0 / (RRF_K + position)
             chunks[chunk.id] = chunk
             distances[chunk.id] = float(row.distance)
-    ranked = sorted(
-        fused, key=lambda cid: (-fused[cid], distances[cid], str(cid))
-    )[:limit]
+    ranked = sorted(fused, key=lambda cid: (-fused[cid], distances[cid], str(cid)))[:limit]
     return [
         RetrievedChunk(
             path=chunks[cid].path,

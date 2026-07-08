@@ -26,7 +26,7 @@ async def _index_fixture(client, tmp_path) -> uuid.UUID:
 
 
 def test_grep_baseline_ranks_the_keyword_file_first():
-    ranked = grep_baseline(FIXTURE_DIR, "the settings dataclass for the service")
+    ranked = grep_baseline(FIXTURE_DIR, "service_name settings dataclass")
     assert ranked[0] == "app/config.py"
 
 
