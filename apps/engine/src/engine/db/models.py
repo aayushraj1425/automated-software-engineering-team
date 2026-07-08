@@ -6,6 +6,7 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
+    Computed,
     DateTime,
     ForeignKey,
     Identity,
@@ -17,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from engine.config import EMBEDDING_DIM
@@ -198,6 +199,11 @@ class CodeChunk(Base):
     Re-indexing replaces all of a repository's chunks."""
 
     __tablename__ = "code_chunks"
+    # GIN index over the generated tsvector powers the full-text arm of hybrid
+    # retrieval (design note: docs/architecture/HYBRID_RETRIEVAL.md).
+    __table_args__ = (
+        Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(
@@ -209,6 +215,10 @@ class CodeChunk(Base):
     end_line: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    # Kept in sync by Postgres; the full-text search arm matches against it.
+    content_tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
