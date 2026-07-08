@@ -16,6 +16,8 @@ dependencies = [
     "structlog>=24.4",
     "pyjwt>=2.10",
     "pgvector>=0.4.2",
+    "tree-sitter>=0.26.0",
+    "tree-sitter-language-pack>=1.12.5",
 ]
 
 [dependency-groups]

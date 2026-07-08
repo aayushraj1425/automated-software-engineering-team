@@ -24,10 +24,11 @@ flowchart LR
     F --> G[Top matches:<br/>file, lines, snippet]
 ```
 
-- **Chunker** (`engine/indexing/chunker.py`) — version 1 splits every text
-  file into overlapping line windows and records the language from the file
-  extension. AST-aware chunking with tree-sitter (split at functions and
-  classes) replaces this later; the table schema doesn't change.
+- **Chunker** (`engine/indexing/chunker.py`) — splits larger Python, JS, TS,
+  and TSX files by tree-sitter at their real boundaries (one chunk per top-level
+  function or class); small files stay whole and other languages fall back to
+  overlapping line windows. The record is still (path, language, line range,
+  text). Design note: [AST_CHUNKING.md](AST_CHUNKING.md).
 - **Embeddings** — one new `ModelRouter.embed()` route (`MODEL_EMBEDDING` in
   `.env`, Gemini's embedding model by default, 768 numbers per chunk).
   `LLM_FAKE=1` produces deterministic fake vectors so tests run offline.

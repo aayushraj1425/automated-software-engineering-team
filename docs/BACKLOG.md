@@ -93,7 +93,7 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 - [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
 - [x] `code_chunks` schema (pgvector `vector(768)`, migration 0004) and the line-window chunker
 - [x] Indexer background task: clone → chunk → embed → replace the repository's chunks
-- [ ] AST-aware chunking with tree-sitter (TypeScript/JavaScript + Python first, then Java/Kotlin)
+- [x] AST-aware chunking with tree-sitter (Python + TypeScript/JavaScript/TSX first; Java/Kotlin later) — design note: [architecture/AST_CHUNKING.md](architecture/AST_CHUNKING.md)
 - [ ] Incremental re-indexing (changed files only)
 - [ ] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search
 
@@ -229,3 +229,11 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   against a grep baseline (`engine/retrieval_eval.py`, `scripts/eval_retrieval.py`).
   Offline the numbers measure the full-text arm plus fusion; a real embedding
   model shows the semantic lift. Engine 94 passed, 1 skipped.
+- 2026-07-08 · AST-aware chunking: the chunker now splits larger Python,
+  JavaScript, TypeScript, and TSX files by tree-sitter at their real
+  boundaries — one chunk per top-level function or class, so a definition is
+  never cut in half — while small files stay whole and unknown grammars or
+  parser errors fall back to the version-1 line windows. The chunk record is
+  unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
+  re-index picks up the better boundaries. Design note:
+  architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.

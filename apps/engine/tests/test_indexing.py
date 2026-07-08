@@ -24,9 +24,44 @@ def test_chunker_windows_languages_and_skips(tmp_path):
     paths = {chunk.path for chunk in chunks}
     assert paths == {"big.py", "notes.md"}  # binaries and node_modules skipped
     big = [chunk for chunk in chunks if chunk.path == "big.py"]
-    assert [chunk.start_line for chunk in big] == [1, 51, 101]  # overlapping windows
+    # No definitions in this file, so it falls back to overlapping line windows.
+    assert [chunk.start_line for chunk in big] == [1, 51, 101]
     assert big[0].end_line == CHUNK_LINES
     assert big[0].language == "python"
+
+
+def test_ast_chunker_keeps_python_functions_whole(tmp_path):
+    lines = ["import os", ""]
+    lines += ["def alpha():"] + [f"    a = {i}" for i in range(40)]  # lines 3..43
+    lines += ["", "def beta():"] + [f"    b = {i}" for i in range(40)]  # lines 45..85
+    (tmp_path / "svc.py").write_text("\n".join(lines))
+
+    chunks = chunk_repository(tmp_path)
+    by_start = {chunk.start_line: chunk for chunk in chunks}
+
+    # Each function is one chunk at its real boundary — not cut at line 60.
+    assert 3 in by_start and by_start[3].content.startswith("def alpha():")
+    assert by_start[3].end_line == 43 and "a = 39" in by_start[3].content
+    assert 45 in by_start and by_start[45].content.startswith("def beta():")
+    assert "b = 39" in by_start[45].content
+    # The imports before the first definition are their own (windowed) chunk.
+    assert by_start[1].content == "import os"
+
+
+def test_ast_chunker_splits_javascript_exports(tmp_path):
+    lines = ["import x from 'y'", ""]
+    lines += ["export function foo() {"] + [f"  const a{i} = {i};" for i in range(40)] + ["}"]
+    lines += ["", "function bar() {"] + [f"  const b{i} = {i};" for i in range(20)] + ["}"]
+    (tmp_path / "app.js").write_text("\n".join(lines))
+
+    chunks = chunk_repository(tmp_path)
+    contents = [chunk.content for chunk in chunks]
+
+    assert any(c.startswith("export function foo()") for c in contents)
+    assert any(c.startswith("function bar()") for c in contents)
+    # foo is kept whole rather than sliced into a blind 60-line window.
+    foo = next(chunk for chunk in chunks if chunk.content.startswith("export function foo()"))
+    assert foo.start_line == 3 and "const a39 = 39;" in foo.content
 
 
 async def test_connect_index_and_search(client, tmp_path):
