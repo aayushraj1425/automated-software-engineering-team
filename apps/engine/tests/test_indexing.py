@@ -93,6 +93,37 @@ async def test_connect_index_and_search(client, tmp_path):
     assert hits[0]["start_line"] == 1
 
 
+async def test_repository_dependency_graph(client, tmp_path):
+    origin = prepare_fixture_repo(tmp_path / "origin")
+    headers = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
+
+    repo = (
+        await client.post("/v1/repositories", json={"url": str(origin)}, headers=headers)
+    ).json()
+    await client.post(f"/v1/repositories/{repo['id']}/index", headers=headers)
+
+    graph = (await client.get(f"/v1/repositories/{repo['id']}/graph", headers=headers)).json()
+    edges = {(edge["source"], edge["target"]) for edge in graph["edges"]}
+    assert ("app/main.py", "app/config.py") in edges
+    assert ("tests/test_app.py", "app/main.py") in edges
+
+    node_paths = {node["path"] for node in graph["nodes"]}
+    assert {"app/main.py", "app/config.py", "tests/test_app.py"} <= node_paths
+    main = next(node for node in graph["nodes"] if node["path"] == "app/main.py")
+    assert main["in_degree"] == 1  # imported by the test
+    assert main["out_degree"] == 1  # imports the config
+
+
+async def test_graph_is_owner_scoped(client, tmp_path):
+    origin = prepare_fixture_repo(tmp_path / "origin")
+    owner = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
+    intruder = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
+
+    repo = (await client.post("/v1/repositories", json={"url": str(origin)}, headers=owner)).json()
+    denied = await client.get(f"/v1/repositories/{repo['id']}/graph", headers=intruder)
+    assert denied.status_code == 404
+
+
 async def test_repositories_are_owner_scoped(client, tmp_path):
     origin = prepare_fixture_repo(tmp_path / "origin")
     owner = auth_headers(f"user_{uuid.uuid4().hex[:8]}")

@@ -15,3 +15,20 @@ export type SearchHit = {
   snippet: string;
   score: number;
 };
+
+export type GraphNode = {
+  path: string;
+  language: string;
+  in_degree: number;
+  out_degree: number;
+};
+
+export type GraphEdge = {
+  source: string;
+  target: string;
+};
+
+export type DependencyGraph = {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+};

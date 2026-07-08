@@ -222,6 +222,25 @@ class CodeChunk(Base):
     )
 
 
+class CodeEdge(Base):
+    """One first-party import: `source_path` imports `target_path` within the
+    same repository (Repository Intelligence). Re-indexing replaces a
+    repository's edges. Design note: docs/architecture/DEPENDENCY_GRAPH.md."""
+
+    __tablename__ = "code_edges"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    source_path: Mapped[str] = mapped_column(String(512))
+    target_path: Mapped[str] = mapped_column(String(512))
+    kind: Mapped[str] = mapped_column(String(32), default="import")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

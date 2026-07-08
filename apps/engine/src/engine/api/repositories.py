@@ -14,8 +14,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
-from engine.db.models import CodeChunk, Repository
+from engine.db.models import CodeChunk, CodeEdge, Repository
 from engine.db.session import get_session
+from engine.indexing.chunker import LANGUAGES
 from engine.indexing.indexer import index_repository
 from engine.indexing.retrieval import retrieve_chunks
 
@@ -44,6 +45,28 @@ class SearchHit(BaseModel):
     end_line: int
     snippet: str
     score: float  # 1.0 = identical meaning, 0.0 = unrelated
+
+
+class GraphNode(BaseModel):
+    path: str
+    language: str
+    in_degree: int  # files that import this one
+    out_degree: int  # files this one imports
+
+
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+
+
+class DependencyGraph(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+
+
+def _language_for(path: str) -> str:
+    dot = path.rfind(".")
+    return LANGUAGES.get(path[dot:].lower(), "other") if dot != -1 else "other"
 
 
 async def _owned_repository(
@@ -153,3 +176,56 @@ async def search_repository(
         )
         for chunk in chunks
     ]
+
+
+@router.get("/v1/repositories/{repository_id}/graph")
+async def repository_graph(
+    repository_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> DependencyGraph:
+    await _owned_repository(db, repository_id, principal)
+
+    chunk_rows = (
+        (
+            await db.execute(
+                select(CodeChunk.path, CodeChunk.language)
+                .where(CodeChunk.repository_id == repository_id)
+                .distinct()
+            )
+        )
+        .tuples()
+        .all()
+    )
+    edge_rows = (
+        (
+            await db.execute(
+                select(CodeEdge.source_path, CodeEdge.target_path).where(
+                    CodeEdge.repository_id == repository_id
+                )
+            )
+        )
+        .tuples()
+        .all()
+    )
+
+    languages = {path: language for path, language in chunk_rows}
+    edges = [GraphEdge(source=source, target=target) for source, target in edge_rows]
+    out_degree: dict[str, int] = {}
+    in_degree: dict[str, int] = {}
+    for edge in edges:
+        out_degree[edge.source] = out_degree.get(edge.source, 0) + 1
+        in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
+
+    paths = set(languages) | {edge.source for edge in edges} | {edge.target for edge in edges}
+    nodes = [
+        GraphNode(
+            path=path,
+            language=languages.get(path) or _language_for(path),
+            in_degree=in_degree.get(path, 0),
+            out_degree=out_degree.get(path, 0),
+        )
+        for path in paths
+    ]
+    nodes.sort(key=lambda node: (-(node.in_degree + node.out_degree), node.path))
+    return DependencyGraph(nodes=nodes, edges=edges)

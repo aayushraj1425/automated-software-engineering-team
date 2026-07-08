@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { StatusChip } from "@/components/runs/status-chip";
-import type { RepositorySummary, SearchHit } from "./types";
+import { DependencyGraphView } from "./dependency-graph";
+import type { DependencyGraph, RepositorySummary, SearchHit } from "./types";
 
 const POLL_MS = 2000;
 
@@ -17,6 +18,8 @@ export function RepositoriesPanel() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [graph, setGraph] = useState<DependencyGraph | null>(null);
+  const [graphLoading, setGraphLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/repositories");
@@ -74,6 +77,27 @@ export function RepositoriesPanel() {
     }
   }
 
+  function selectRepository(id: string) {
+    setSelectedId(id);
+    setHits(null);
+    setGraph(null); // the graph belongs to the previously selected repository
+  }
+
+  async function toggleGraph() {
+    if (graph) {
+      setGraph(null);
+      return;
+    }
+    if (!selectedId) return;
+    setGraphLoading(true);
+    try {
+      const res = await fetch(`/api/repositories/${selectedId}/graph`);
+      if (res.ok) setGraph(await res.json());
+    } finally {
+      setGraphLoading(false);
+    }
+  }
+
   const selected = repositories.find((repo) => repo.id === selectedId);
 
   return (
@@ -107,7 +131,7 @@ export function RepositoriesPanel() {
         {repositories.map((repo) => (
           <div
             key={repo.id}
-            onClick={() => setSelectedId(repo.id)}
+            onClick={() => selectRepository(repo.id)}
             className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-4 py-3 ${
               repo.id === selectedId
                 ? "border-zinc-500 bg-zinc-900"
@@ -186,6 +210,25 @@ export function RepositoriesPanel() {
               </pre>
             </div>
           ))}
+        </section>
+      )}
+
+      {selected && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-300">Dependencies</h2>
+            <button
+              onClick={() => void toggleGraph()}
+              disabled={graphLoading || selected.chunks === 0}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {graphLoading ? "Loading…" : graph ? "Hide graph" : "Show graph"}
+            </button>
+          </div>
+          {selected.chunks === 0 && (
+            <p className="text-sm text-zinc-500">Index the repository first to see its graph.</p>
+          )}
+          {graph && <DependencyGraphView graph={graph} />}
         </section>
       )}
     </div>

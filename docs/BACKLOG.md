@@ -107,7 +107,7 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
 ### Workstream: Repository Screens (planned)
 - [x] Repositories API: connect, list with index status and chunk counts
 - [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
-- [ ] Dependency / architecture graph views
+- [x] Dependency / architecture graph views (design note: [architecture/DEPENDENCY_GRAPH.md](architecture/DEPENDENCY_GRAPH.md))
 
 ## Phase 3 and beyond (headlines only)
 
@@ -237,3 +237,11 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
   re-index picks up the better boundaries. Design note:
   architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
+- 2026-07-08 · Dependency / architecture graph: the indexer now also extracts
+  first-party import edges with tree-sitter (`engine/indexing/dependency_graph.py`,
+  Python + JS/TS/TSX, third-party packages dropped) and stores them in
+  `code_edges` (migration 0007, up/down/up verified), rebuilt on every
+  re-index. `GET /v1/repositories/{id}/graph` returns nodes with in/out degree
+  plus edges; the repositories page draws it as a dependency-light circular
+  SVG (nodes sized by how many files import them). Design note:
+  architecture/DEPENDENCY_GRAPH.md. Engine 101 passed 1 skipped, web 12 passed.

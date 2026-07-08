@@ -14,9 +14,10 @@ from pathlib import Path
 import structlog
 from sqlalchemy import delete
 
-from engine.db.models import CodeChunk, Repository
+from engine.db.models import CodeChunk, CodeEdge, Repository
 from engine.db.session import session_scope
 from engine.indexing.chunker import chunk_repository
+from engine.indexing.dependency_graph import build_dependency_graph
 from engine.llm.router import model_router
 from engine.workspace.manager import remove_tree, run_git
 
@@ -59,6 +60,7 @@ async def _build_index(repository_id: uuid.UUID, url: str) -> int:
         clone = tmp / "clone"
         await run_git(tmp, "clone", "--depth", "1", url, str(clone))
         chunks = chunk_repository(clone)
+        edges = build_dependency_graph(clone)
     finally:
         remove_tree(tmp)
 
@@ -69,6 +71,7 @@ async def _build_index(repository_id: uuid.UUID, url: str) -> int:
 
     async with session_scope() as session:
         await session.execute(delete(CodeChunk).where(CodeChunk.repository_id == repository_id))
+        await session.execute(delete(CodeEdge).where(CodeEdge.repository_id == repository_id))
         session.add_all(
             CodeChunk(
                 repository_id=repository_id,
@@ -80,6 +83,15 @@ async def _build_index(repository_id: uuid.UUID, url: str) -> int:
                 embedding=vector,
             )
             for chunk, vector in zip(chunks, vectors, strict=True)
+        )
+        session.add_all(
+            CodeEdge(
+                repository_id=repository_id,
+                source_path=edge.source,
+                target_path=edge.target,
+                kind=edge.kind,
+            )
+            for edge in edges
         )
         await session.commit()
     return len(chunks)
