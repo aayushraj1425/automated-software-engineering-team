@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-05
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-08
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -87,15 +87,16 @@ subset being built now.
 ## Phase 2 — Repository Intelligence
 
 Design note: [architecture/REPOSITORY_INTELLIGENCE.md](architecture/REPOSITORY_INTELLIGENCE.md).
-Started 2026-07-06 while the Phase 1 durability items above remain open.
+Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07-08
+(exit criteria met). Java/Kotlin AST grammar remains a later, non-blocking item.
 
 ### Workstream: Indexing Pipeline (blocking)
 - [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
 - [x] `code_chunks` schema (pgvector `vector(768)`, migration 0004) and the line-window chunker
 - [x] Indexer background task: clone → chunk → embed → replace the repository's chunks
 - [x] AST-aware chunking with tree-sitter (Python + TypeScript/JavaScript/TSX first; Java/Kotlin later) — design note: [architecture/AST_CHUNKING.md](architecture/AST_CHUNKING.md)
-- [ ] Incremental re-indexing (changed files only)
-- [ ] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search
+- [x] Incremental re-indexing (changed files only) — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
+- [x] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
 
 ### Workstream: Retrieval & Grounding (blocking)
 - [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
@@ -237,6 +238,16 @@ Started 2026-07-06 while the Phase 1 durability items above remain open.
   unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
   re-index picks up the better boundaries. Design note:
   architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
+- 2026-07-08 · Incremental re-indexing and HNSW index (Phase 2 indexing
+  workstream complete): each source file's SHA-256 is recorded in `indexed_files`
+  (migration 0008, up/down/up verified), so a re-index re-embeds only the files
+  whose bytes changed, drops chunks of deleted files, and leaves unchanged files'
+  rows untouched — the first index still does a full build. Import edges stay a
+  full rebuild each run (cheap, no embedding call). An HNSW index over the
+  embedding column (`vector_cosine_ops`, migration 0009) keeps cosine-distance
+  vector search fast as repositories grow; retrieval uses it automatically with
+  no code change. Design note: architecture/INCREMENTAL_INDEXING.md. Engine 103
+  passed, 1 skipped.
 - 2026-07-08 · Dependency / architecture graph: the indexer now also extracts
   first-party import edges with tree-sitter (`engine/indexing/dependency_graph.py`,
   Python + JS/TS/TSX, third-party packages dropped) and stores them in

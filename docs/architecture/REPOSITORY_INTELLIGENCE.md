@@ -33,8 +33,10 @@ flowchart LR
   `.env`, Gemini's embedding model by default, 768 numbers per chunk).
   `LLM_FAKE=1` produces deterministic fake vectors so tests run offline.
 - **Storage** — one table, `code_chunks`: repository id, path, line range,
-  language, the text, and the embedding (`vector(768)`). Re-indexing a
-  repository replaces its chunks.
+  language, the text, and the embedding (`vector(768)`). Re-indexing is
+  incremental — only files whose bytes changed are re-embedded — and an HNSW
+  index keeps vector search fast as a repository grows. Design note:
+  [INCREMENTAL_INDEXING.md](INCREMENTAL_INDEXING.md).
 - **Search** — embed the question, order chunks by cosine distance, return
   the closest ones with file and line numbers. This is now the vector arm of
   **hybrid search**, which adds a Postgres full-text arm and fuses the two with
@@ -50,5 +52,6 @@ flowchart LR
 
 ## What this is not (yet)
 
-No dependency graphs, no citations inside chat, no incremental re-indexing,
-no Java/Kotlin grammar — those are separate backlog items in this phase.
+No Java/Kotlin AST grammar — those files fall back to line windows. The
+dependency graph, citations inside chat, incremental re-indexing, and the HNSW
+index are done; see the linked design notes.

@@ -199,9 +199,19 @@ class CodeChunk(Base):
     Re-indexing replaces all of a repository's chunks."""
 
     __tablename__ = "code_chunks"
-    # GIN index over the generated tsvector powers the full-text arm of hybrid
-    # retrieval (design note: docs/architecture/HYBRID_RETRIEVAL.md).
-    __table_args__ = (Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),)
+    __table_args__ = (
+        # GIN index over the generated tsvector powers the full-text arm of
+        # hybrid retrieval (design note: docs/architecture/HYBRID_RETRIEVAL.md).
+        Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),
+        # HNSW approximate-nearest-neighbor index keeps cosine-distance vector
+        # search fast as repositories grow (docs/architecture/INCREMENTAL_INDEXING.md).
+        Index(
+            "ix_code_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(
@@ -238,6 +248,25 @@ class CodeEdge(Base):
     kind: Mapped[str] = mapped_column(String(32), default="import")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class IndexedFile(Base):
+    """One source file's content fingerprint from the last index, letting a
+    re-index re-embed only the files whose bytes changed (Repository
+    Intelligence). Design note: docs/architecture/INCREMENTAL_INDEXING.md."""
+
+    __tablename__ = "indexed_files"
+    __table_args__ = (UniqueConstraint("repository_id", "path", name="uq_indexed_files_repo_path"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(512))
+    content_hash: Mapped[str] = mapped_column(String(64))  # SHA-256 of the file bytes
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 

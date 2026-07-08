@@ -5,11 +5,35 @@ so searching with a file's exact content must rank that file's chunk first
 with a near-perfect score.
 """
 
+import subprocess
 import uuid
 
+from sqlalchemy import select
+
+from engine.db.models import CodeChunk, IndexedFile
+from engine.db.session import session_scope
 from engine.evaluation import FIXTURE_DIR, prepare_fixture_repo
 from engine.indexing.chunker import CHUNK_LINES, chunk_repository
 from tests.conftest import auth_headers
+
+
+def _git(repo, *args):
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+
+async def _chunks_by_path(repository_id):
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                select(CodeChunk.path, CodeChunk.id, CodeChunk.content).where(
+                    CodeChunk.repository_id == repository_id
+                )
+            )
+        ).all()
+    by_path: dict[str, list] = {}
+    for path, chunk_id, content in rows:
+        by_path.setdefault(path, []).append((chunk_id, content))
+    return by_path
 
 
 def test_chunker_windows_languages_and_skips(tmp_path):
@@ -91,6 +115,78 @@ async def test_connect_index_and_search(client, tmp_path):
     assert hits[0]["path"] == "app/config.py"
     assert hits[0]["score"] > 0.99
     assert hits[0]["start_line"] == 1
+
+
+async def test_incremental_reindex_only_touches_changed_files(client, tmp_path):
+    origin = prepare_fixture_repo(tmp_path / "origin")
+    headers = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
+
+    repo = (
+        await client.post("/v1/repositories", json={"url": str(origin)}, headers=headers)
+    ).json()
+    repo_id = uuid.UUID(repo["id"])
+    await client.post(f"/v1/repositories/{repo['id']}/index", headers=headers)
+
+    before = await _chunks_by_path(repo_id)
+    assert "app/main.py" in before and "README.md" in before
+    main_ids_before = {cid for cid, _ in before["app/main.py"]}
+
+    # One file changed, one added, one deleted — then re-index.
+    (origin / "app" / "config.py").write_text(
+        (origin / "app" / "config.py").read_text(encoding="utf-8") + "\nNEW_SETTING = 42\n"
+    )
+    (origin / "app" / "extra.py").write_text("def extra():\n    return 'incremental'\n")
+    (origin / "README.md").unlink()
+    _git(origin, "add", "-A")
+    _git(origin, "commit", "-m", "change, add, delete")
+
+    await client.post(f"/v1/repositories/{repo['id']}/index", headers=headers)
+    after = await _chunks_by_path(repo_id)
+
+    # Unchanged file keeps its exact chunk rows — not re-embedded.
+    assert {cid for cid, _ in after["app/main.py"]} == main_ids_before
+    # Changed file re-embedded: new content present, old rows gone.
+    changed_ids_before = {cid for cid, _ in before["app/config.py"]}
+    assert {cid for cid, _ in after["app/config.py"]}.isdisjoint(changed_ids_before)
+    assert any("NEW_SETTING = 42" in content for _, content in after["app/config.py"])
+    # Added file now indexed; deleted file gone.
+    assert "app/extra.py" in after
+    assert "README.md" not in after
+
+
+async def test_incremental_reindex_tracks_fingerprints(client, tmp_path):
+    origin = prepare_fixture_repo(tmp_path / "origin")
+    headers = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
+
+    repo = (
+        await client.post("/v1/repositories", json={"url": str(origin)}, headers=headers)
+    ).json()
+    repo_id = uuid.UUID(repo["id"])
+    await client.post(f"/v1/repositories/{repo['id']}/index", headers=headers)
+
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                select(IndexedFile.path, IndexedFile.content_hash).where(
+                    IndexedFile.repository_id == repo_id
+                )
+            )
+        ).all()
+    fingerprints = {path: content_hash for path, content_hash in rows}
+    assert "app/config.py" in fingerprints
+    assert len(fingerprints["app/config.py"]) == 64  # sha-256 hex
+
+    # Re-index with no changes: fingerprints stay identical, nothing re-embedded.
+    await client.post(f"/v1/repositories/{repo['id']}/index", headers=headers)
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                select(IndexedFile.path, IndexedFile.content_hash).where(
+                    IndexedFile.repository_id == repo_id
+                )
+            )
+        ).all()
+    assert {path: content_hash for path, content_hash in rows} == fingerprints
 
 
 async def test_repository_dependency_graph(client, tmp_path):

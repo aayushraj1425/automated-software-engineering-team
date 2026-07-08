@@ -11,6 +11,7 @@ windows, so the chunker never fails a file. A chunk stays
 Design note: docs/architecture/AST_CHUNKING.md.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -101,8 +102,12 @@ class Chunk:
     content: str
 
 
-def chunk_repository(root: Path) -> list[Chunk]:
-    chunks: list[Chunk] = []
+def iter_source_files(root: Path) -> Iterator[tuple[Path, str, str]]:
+    """Every indexable file as (absolute path, POSIX relative path, language).
+
+    Applies the same skip-list, size, and file-count caps the index relies on,
+    so the chunker and the incremental indexer always agree on which files count.
+    """
     files_seen = 0
     for file in sorted(root.rglob("*")):
         if any(part in SKIP_DIRS for part in file.parts):
@@ -115,8 +120,19 @@ def chunk_repository(root: Path) -> list[Chunk]:
         files_seen += 1
         if files_seen > MAX_FILES:
             break
-        chunks.extend(_chunk_file(file, file.relative_to(root).as_posix(), language))
+        yield file, file.relative_to(root).as_posix(), language
+
+
+def chunk_repository(root: Path) -> list[Chunk]:
+    chunks: list[Chunk] = []
+    for file, rel_path, language in iter_source_files(root):
+        chunks.extend(_chunk_file(file, rel_path, language))
     return chunks
+
+
+def chunk_file(file: Path, rel_path: str, language: str) -> list[Chunk]:
+    """Chunks a single already-selected file (used by incremental re-indexing)."""
+    return _chunk_file(file, rel_path, language)
 
 
 def _chunk_file(file: Path, rel_path: str, language: str) -> list[Chunk]:
