@@ -29,9 +29,9 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   work" answers cite real files/lines; retrieval evaluation beats a naive grep baseline
   on the golden question set. ✅ *Blocking indexing + retrieval workstreams met 2026-07-08;
   re-indexing is incremental and an HNSW index backs vector search.*
-- **Phase 3 — Execution & QA:** agent-modified code runs its tests in the sandbox before
-  the PR; review agent comments on a webhook'd PR within 5 min; secrets scanner blocks a
-  seeded leak.
+- **Phase 3 — Execution & QA** *(started 2026-07-08)*: agent-modified code runs its tests
+  in the sandbox before the PR; review agent comments on a webhook'd PR within 5 min;
+  secrets scanner blocks a seeded leak *(✅ met 2026-07-08 — the runner's pre-PR gate)*.
 
 ## Standing tracks (every phase)
 

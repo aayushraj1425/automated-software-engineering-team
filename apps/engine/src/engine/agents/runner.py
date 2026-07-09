@@ -29,12 +29,14 @@ from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.github import open_pull_request, parse_github_repo
+from engine.security.secrets_scanner import scan_diff
 from engine.workspace.manager import (
     Workspace,
     create_scratch_workspace,
     create_workspace,
     load_workspace,
     push_branch,
+    run_git,
 )
 
 log = structlog.get_logger()
@@ -294,6 +296,9 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
             await session.commit()
         return
 
+    if not await _security_gate(run_id, ws):
+        return  # a leaked secret blocks the pull request; the run is already failed
+
     pr_url = await _publish(run_id, repo_url, default_branch, request, plan_summary, ws)
 
     async with session_scope() as session:
@@ -362,6 +367,40 @@ async def _publish(
         )
         await session.commit()
     return pr_url
+
+
+async def _security_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
+    """Scan what the run added for leaked secrets (ADR-0008 secrets hygiene).
+
+    Returns True when the run may proceed to open its pull request. On a hit it
+    records the redacted findings, fails the run, and returns False so no branch
+    is pushed and no pull request opens. Design note: SECRETS_SCANNING.md.
+    """
+    diff = await run_git(ws.path, "diff", ws.base_sha)
+    findings = scan_diff(diff)
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        _emit(
+            session,
+            run_id,
+            "security.scan",
+            {
+                "blocked": bool(findings),
+                "findings": [
+                    {"rule": f.rule, "path": f.path, "line": f.line, "match": f.redacted}
+                    for f in findings
+                ],
+            },
+        )
+        if findings:
+            summary = ", ".join(f"{f.rule} in {f.path}:{f.line}" for f in findings[:5])
+            run.error = f"secret scan blocked the pull request: {summary}"
+            _set_run_status(session, run, RunStatus.FAILED)
+            run.finished_at = _now()
+            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+        await session.commit()
+    return not findings
 
 
 def _to_task_state(task: AgentTask) -> TaskState:

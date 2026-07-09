@@ -110,10 +110,28 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 - [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
 - [x] Dependency / architecture graph views (Python, JS/TS/TSX, Java, Kotlin import resolution) (design note: [architecture/DEPENDENCY_GRAPH.md](architecture/DEPENDENCY_GRAPH.md))
 
-## Phase 3 and beyond (headlines only)
+## Phase 3 — Execution & QA
 
-- Phase 3 — Execution & QA: Docker sandbox runner, QA agent loops, webhook pull-request
-  reviewer, secrets and dependency scanning.
+Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture/EXECUTION_AND_QA.md).
+
+### Workstream: Security Scanning (blocking)
+- [x] Secrets scanner blocks a leaked secret before the pull request opens (phase exit criterion; design note: [architecture/SECRETS_SCANNING.md](architecture/SECRETS_SCANNING.md))
+- [ ] Dependency vulnerability scan of manifest changes (lockfiles / requirements)
+
+### Workstream: Sandbox Execution (blocking)
+- [ ] Docker sandbox runner: build and test the run's branch with no network egress
+- [ ] Sandbox results land in the run timeline (pass/fail, captured output)
+
+### Workstream: QA Agent (blocking)
+- [ ] QA agent runs the project's tests in the sandbox and reads the failures
+- [ ] Self-correction loop: failing tests route back to the engineer with the failure text
+
+### Workstream: Webhook Reviewer (planned)
+- [ ] GitHub webhook receives pull-request events and queues a review
+- [ ] Review agent comments on the pull request within five minutes (phase exit criterion)
+
+## Beyond Phase 3 (headlines only)
+
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
 - LiteLLM proxy-server evaluation if callers beyond the engine appear (ADR-0006).
 - Langfuse in compose plus a ModelRouter trace exporter (ADR-0010).
@@ -130,6 +148,15 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 
 ## Done
 
+- 2026-07-08 · Phase 3 opens with the secrets gate (phase exit criterion met):
+  `engine/security/secrets_scanner.py` scans only the lines a run *adds*
+  (unified diff, high-confidence patterns for cloud keys, tokens, private
+  keys, and labelled secret assignments; placeholders suppressed; findings
+  stored redacted). The runner checks the diff after review approval and
+  before the branch push — a hit fails the run with a `security.scan`
+  timeline event and no pull request opens; a clean scan records the same
+  event and proceeds. Design notes: architecture/EXECUTION_AND_QA.md (phase
+  plan), architecture/SECRETS_SCANNING.md. Engine 116 passed, 1 skipped.
 - 2026-07-02 · Phase 0 document pack: PRD, architecture overview, ADR-0001…0010, roadmap, backlog, security baseline.
 - 2026-07-02 · Phase 0 walking skeleton verified end-to-end: compose services healthy
   (postgres on host port 5433), alembic up/down/up cycle + better-auth migration,
