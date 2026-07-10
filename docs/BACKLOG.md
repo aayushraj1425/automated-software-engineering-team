@@ -116,19 +116,19 @@ Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture
 
 ### Workstream: Security Scanning (blocking)
 - [x] Secrets scanner blocks a leaked secret before the pull request opens (phase exit criterion; design note: [architecture/SECRETS_SCANNING.md](architecture/SECRETS_SCANNING.md))
-- [ ] Dependency vulnerability scan of manifest changes (lockfiles / requirements)
+- [x] Dependency vulnerability scan of manifest changes (lockfiles / requirements) (design note: [architecture/DEPENDENCY_SCANNING.md](architecture/DEPENDENCY_SCANNING.md))
 
 ### Workstream: Sandbox Execution (blocking)
-- [ ] Docker sandbox runner: build and test the run's branch with no network egress
-- [ ] Sandbox results land in the run timeline (pass/fail, captured output)
+- [x] Docker sandbox runner: build and test the run's branch with no network egress (design note: [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md))
+- [x] Sandbox results land in the run timeline (pass/fail, captured output — the `sandbox.run` event)
 
 ### Workstream: QA Agent (blocking)
-- [ ] QA agent runs the project's tests in the sandbox and reads the failures
-- [ ] Self-correction loop: failing tests route back to the engineer with the failure text
+- [x] QA agent runs the project's tests in the sandbox and reads the failures (design note: [architecture/QA_AGENT.md](architecture/QA_AGENT.md))
+- [x] Self-correction loop: failing tests route back to the QA agent with the failure text (bounded by `QA_MAX_ATTEMPTS`)
 
 ### Workstream: Webhook Reviewer (planned)
-- [ ] GitHub webhook receives pull-request events and queues a review
-- [ ] Review agent comments on the pull request within five minutes (phase exit criterion)
+- [x] GitHub webhook receives pull-request events and queues a review (HMAC-signature auth; design note: [architecture/WEBHOOK_REVIEWER.md](architecture/WEBHOOK_REVIEWER.md))
+- [x] Review agent comments on the pull request within five minutes (phase exit criterion)
 
 ## Beyond Phase 3 (headlines only)
 
@@ -148,6 +148,40 @@ Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture
 
 ## Done
 
+- 2026-07-10 · Dependency vulnerability scan gates the pull request: a sibling of
+  the secrets scanner (`engine/security/dependency_scanner.py`) reads only the
+  *added* lines of the run's diff, extracts (package, version) pairs from
+  requirements.txt, package.json, and package-lock.json manifests, and matches
+  them against a curated, offline advisory list (known CVEs with a clear fixed
+  version, matched by PEP 440 specifiers). The runner's `_dependency_gate` fails
+  the run and records a `dependency.scan` timeline event when a known-vulnerable
+  pin is introduced. Deterministic and network-free, so it runs in tests like the
+  secrets gate. Design note: architecture/DEPENDENCY_SCANNING.md.
+- 2026-07-09 · Webhook reviewer comments on real pull requests (Phase 3 exit
+  criterion 2): `POST /v1/webhooks/github` authenticates GitHub deliveries by
+  HMAC-SHA256 signature (constant-time, fail-closed on an unconfigured secret),
+  queues a background review for `opened`/`reopened`/`synchronize` events, and
+  returns 202 immediately. The task fetches the PR's unified diff, the
+  diff-based Reviewer (`engine/agents/pr_reviewer.py`) returns strict-JSON
+  findings, and one review comment is posted (`event: COMMENT`) — well inside
+  five minutes. Design note: architecture/WEBHOOK_REVIEWER.md.
+- 2026-07-09 · QA agent closes the self-correction loop: when the sandbox tests
+  fail, `engine/agents/qa.py` hands the captured output to a new QA role (full
+  engineer tool set, forbidden from gaming the tests), which fixes the code and
+  commits; the runner re-runs the sandbox and repeats up to `QA_MAX_ATTEMPTS`
+  (default 2) before failing the run. Each cycle is on the timeline — a
+  `qa.attempt` event per fix and a `sandbox.run` event per re-run, both stamped
+  with the attempt number. Design note: architecture/QA_AGENT.md.
+- 2026-07-08 · Docker sandbox runs the tests before the pull request (Phase 3
+  exit criterion 1): `engine/sandbox/runner.py` copies the workspace into a
+  disposable container (2 GB / 2 CPUs / 256 processes, no host env vars),
+  installs dependencies with the network on, disconnects the network, runs the
+  detected test command time-boxed, and removes the container no matter what.
+  The runner gates publication on the result: failed tests fail the run with a
+  `sandbox.run` timeline event carrying the output tail; Docker-missing or
+  no-test-setup skips are recorded, never silent. Live smoke test proved
+  egress really is blocked during the test phase. Design note:
+  architecture/SANDBOX_EXECUTION.md. Engine 132 passed, 1 skipped.
 - 2026-07-08 · Phase 3 opens with the secrets gate (phase exit criterion met):
   `engine/security/secrets_scanner.py` scans only the lines a run *adds*
   (unified diff, high-confidence patterns for cloud keys, tokens, private

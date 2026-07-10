@@ -8,6 +8,9 @@ import time
 os.environ["LLM_FAKE"] = "1"
 os.environ["ENGINE_SERVICE_SECRET"] = "test-service-secret-0123456789abcdef"
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://asep:asep@localhost:5433/asep_test")
+# Tests must never reach the real Docker daemon; sandbox tests opt back in
+# with a monkeypatched settings object and a fake docker call.
+os.environ["SANDBOX_ENABLED"] = "0"
 
 # psycopg async cannot run on Windows' default ProactorEventLoop.
 if sys.platform == "win32":

@@ -35,6 +35,7 @@ class AgentRole(StrEnum):
     FRONTEND = "frontend"
     DEVOPS = "devops"
     REVIEWER = "reviewer"
+    QA = "qa"
 
 
 class ArtifactKind(StrEnum):

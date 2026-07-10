@@ -82,6 +82,14 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             tools=(*_READ_TOOLS, "git_diff"),
             prompt_file="reviewer.md",
         ),
+        AgentSpec(
+            role=AgentRole.QA,
+            model_tier="coder",
+            # QA fixes failing tests, so it needs the full engineer tool set
+            # (read, edit, commit) — minus task-board tools it never touches.
+            tools=(*_READ_TOOLS, *_WRITE_TOOLS, *_GIT_TOOLS),
+            prompt_file="qa.md",
+        ),
     )
 }
 

@@ -28,7 +28,12 @@ class Settings(BaseSettings):
 
     llm_fake: bool = False
     workspaces_dir: str = ".workspaces"
+    sandbox_enabled: bool = True  # run the workspace's tests in Docker before the PR
+    sandbox_required: bool = False  # fail the run (instead of skipping) when Docker is down
+    sandbox_timeout_seconds: int = 300  # per phase: dependency install, then tests
+    qa_max_attempts: int = 2  # QA fix-and-retry cycles before a red sandbox fails the run
     github_token: str = ""  # pushes the run branch and opens the pull request
+    github_webhook_secret: str = ""  # verifies GitHub webhooks; empty rejects all webhook calls
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"

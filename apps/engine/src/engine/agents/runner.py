@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from engine.agents.engineer import execute_revision, execute_task
 from engine.agents.loop import LlmUsage
 from engine.agents.product_manager import create_plan
+from engine.agents.qa import fix_failing_tests
 from engine.agents.reviewer import APPROVE, REQUEST_CHANGES, review_run
 from engine.agents.supervisor import TaskState, build_supervisor_graph
 from engine.config import get_settings
@@ -29,6 +30,8 @@ from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.github import open_pull_request, parse_github_repo
+from engine.sandbox.runner import SandboxResult, run_sandbox
+from engine.security.dependency_scanner import scan_diff as scan_dependency_diff
 from engine.security.secrets_scanner import scan_diff
 from engine.workspace.manager import (
     Workspace,
@@ -63,6 +66,17 @@ def _set_run_status(session: AsyncSession, run: AgentRun, status: RunStatus) -> 
     old = run.status
     run.status = status
     _emit(session, run.id, "run.status_changed", {"from": old, "to": status})
+
+
+def _fail_run(session: AsyncSession, run: AgentRun, error: str) -> None:
+    """The one way a run ends in failure: set the error, transition to FAILED,
+    stamp the finish time, and emit run.finished. Every failure path (a crash,
+    a task giving up, the reviewer refusing, either gate blocking) funnels
+    through here so they can never drift apart. The caller still commits."""
+    run.error = error
+    _set_run_status(session, run, RunStatus.FAILED)
+    run.finished_at = _now()
+    _emit(session, run.id, "run.finished", {"status": run.status, "error": run.error})
 
 
 def _apply_usage(run: AgentRun, usage: LlmUsage) -> None:
@@ -132,15 +146,7 @@ async def _guarded(work, run_id: uuid.UUID) -> None:
         async with session_scope() as session:
             run = await session.get(AgentRun, run_id)
             if run is not None:
-                run.status = RunStatus.FAILED
-                run.error = str(exc)[:500] or "internal error while executing the run"
-                run.finished_at = _now()
-                _emit(
-                    session,
-                    run_id,
-                    "run.finished",
-                    {"status": RunStatus.FAILED, "error": run.error},
-                )
+                _fail_run(session, run, str(exc)[:500] or "internal error while executing the run")
                 await session.commit()
 
 
@@ -251,10 +257,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
                 row.status = state["status"]
                 row.attempts = state["attempts"]
         if final["failure"] is not None:
-            run.error = final["failure"]
-            _set_run_status(session, run, RunStatus.FAILED)
-            run.finished_at = _now()
-            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+            _fail_run(session, run, final["failure"])
             await session.commit()
             return
         _set_run_status(session, run, RunStatus.REVIEWING)
@@ -289,15 +292,18 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         async with session_scope() as session:
             run = await session.get(AgentRun, run_id)
             assert run is not None
-            run.error = "the reviewer did not approve the changes after one revision"
-            _set_run_status(session, run, RunStatus.FAILED)
-            run.finished_at = _now()
-            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+            _fail_run(session, run, "the reviewer did not approve the changes after one revision")
             await session.commit()
         return
 
+    if not await _sandbox_gate(run_id, request, ws):
+        return  # the tests did not pass; the run is already failed
+
     if not await _security_gate(run_id, ws):
         return  # a leaked secret blocks the pull request; the run is already failed
+
+    if not await _dependency_gate(run_id, ws):
+        return  # a known-vulnerable dependency blocks the PR; the run is already failed
 
     pr_url = await _publish(run_id, repo_url, default_branch, request, plan_summary, ws)
 
@@ -369,6 +375,84 @@ async def _publish(
     return pr_url
 
 
+async def _sandbox_gate(run_id: uuid.UUID, request: str, ws: Workspace) -> bool:
+    """Run the workspace's tests in the Docker sandbox before publishing.
+
+    Returns True when the run may proceed: tests passed, or the sandbox was
+    skipped (Docker unavailable, disabled, or no recognized test setup — the
+    reason lands on the timeline either way). When the tests fail, the QA agent
+    fixes the code and the sandbox re-runs, up to QA_MAX_ATTEMPTS times; only
+    then does the run fail, so no pull request opens with failing tests.
+    Design notes: SANDBOX_EXECUTION.md, QA_AGENT.md.
+    """
+    result = await run_sandbox(ws.path, run_id)
+    await _emit_sandbox_run(run_id, result, attempt=0)
+    if result.status != "failed":
+        return True  # passed, or skipped — there is no failure for QA to act on
+
+    max_attempts = get_settings().qa_max_attempts
+    for attempt in range(1, max_attempts + 1):
+        await _run_qa_fix(run_id, request, ws, result.output, attempt, max_attempts)
+        result = await run_sandbox(ws.path, run_id)
+        await _emit_sandbox_run(run_id, result, attempt=attempt)
+        if result.status != "failed":
+            return True
+
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        _fail_run(
+            session,
+            run,
+            f"sandbox tests still failing after {max_attempts} QA attempt(s): {result.reason}",
+        )
+        await session.commit()
+    return False
+
+
+async def _emit_sandbox_run(run_id: uuid.UUID, result: SandboxResult, attempt: int) -> None:
+    """Record one sandbox run on the timeline (attempt 0 is the first pass, then
+    one per QA retry). Output is capped so a run can never bloat a single row."""
+    async with session_scope() as session:
+        _emit(
+            session,
+            run_id,
+            "sandbox.run",
+            {
+                "attempt": attempt,
+                "status": result.status,
+                "reason": result.reason,
+                "exit_code": result.exit_code,
+                "image": result.plan.image if result.plan else None,
+                "test_command": result.plan.test if result.plan else None,
+                "output": result.output[-2000:],
+            },
+        )
+        await session.commit()
+
+
+async def _run_qa_fix(
+    run_id: uuid.UUID, request: str, ws: Workspace, failure_output: str, attempt: int, total: int
+) -> None:
+    """The QA agent reads the sandbox failure and commits a fix in the workspace."""
+    usage = LlmUsage()
+    summary = await fix_failing_tests(
+        request, failure_output, ws, usage, attempt, total, _tool_observer(run_id, AgentRole.QA)
+    )
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        _apply_usage(run, usage)
+        _emit(
+            session,
+            run_id,
+            "qa.attempt",
+            {"attempt": attempt, "summary": summary[:500]},
+            agent=AgentRole.QA,
+        )
+        await session.commit()
+
+
 async def _security_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
     """Scan what the run added for leaked secrets (ADR-0008 secrets hygiene).
 
@@ -387,18 +471,58 @@ async def _security_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
             "security.scan",
             {
                 "blocked": bool(findings),
+                "total_findings": len(findings),
+                # Cap what one timeline event stores — a pathological diff could
+                # match thousands of times and bloat the row.
                 "findings": [
                     {"rule": f.rule, "path": f.path, "line": f.line, "match": f.redacted}
-                    for f in findings
+                    for f in findings[:50]
                 ],
             },
         )
         if findings:
             summary = ", ".join(f"{f.rule} in {f.path}:{f.line}" for f in findings[:5])
-            run.error = f"secret scan blocked the pull request: {summary}"
-            _set_run_status(session, run, RunStatus.FAILED)
-            run.finished_at = _now()
-            _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
+            _fail_run(session, run, f"secret scan blocked the pull request: {summary}")
+        await session.commit()
+    return not findings
+
+
+async def _dependency_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
+    """Block a pull request that adds a known-vulnerable dependency.
+
+    Sibling of the secrets gate: scans the run's added manifest lines against a
+    curated advisory list and fails the run on a match, so no pull request opens
+    with a known-vulnerable package. Design note: DEPENDENCY_SCANNING.md.
+    """
+    diff = await run_git(ws.path, "diff", ws.base_sha)
+    findings = scan_dependency_diff(diff)
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        assert run is not None
+        _emit(
+            session,
+            run_id,
+            "dependency.scan",
+            {
+                "blocked": bool(findings),
+                "total_findings": len(findings),
+                "findings": [
+                    {
+                        "package": f.package,
+                        "version": f.version,
+                        "ecosystem": f.ecosystem,
+                        "advisory": f.advisory_id,
+                        "severity": f.severity,
+                        "path": f.path,
+                        "line": f.line,
+                    }
+                    for f in findings[:50]
+                ],
+            },
+        )
+        if findings:
+            summary = ", ".join(f"{f.package} {f.version} ({f.advisory_id})" for f in findings[:5])
+            _fail_run(session, run, f"dependency scan blocked the pull request: {summary}")
         await session.commit()
     return not findings
 

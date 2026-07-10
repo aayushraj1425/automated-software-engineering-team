@@ -1,11 +1,13 @@
-"""Opens the pull request for a finished run (GitHub REST API).
+"""GitHub REST API: open a run's pull request, and (for the webhook reviewer)
+read a pull request's diff and post a review comment.
 
-The only GitHub write the engine performs: after the Reviewer approves and
-the run branch is pushed, one POST creates the pull request. Authentication
-is a personal access token from the environment for now; per-user encrypted
-tokens are the Identity & Keys workstream.
+Authentication is a personal access token from the environment for now; per-user
+encrypted tokens are the Identity & Keys workstream. Webhook payloads are
+authenticated separately, by HMAC signature (see verify_webhook_signature).
 """
 
+import hashlib
+import hmac
 import re
 
 import httpx
@@ -22,6 +24,71 @@ _GITHUB_URL = re.compile(r"github\.com[:/](?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)(
 
 class PullRequestError(Exception):
     """The pull request could not be created; the message is safe to show."""
+
+
+class GitHubApiError(Exception):
+    """A GitHub read/write the webhook reviewer needs failed; message is safe."""
+
+
+def verify_webhook_signature(secret: str, body: bytes, signature_header: str | None) -> bool:
+    """True when X-Hub-Signature-256 matches an HMAC-SHA256 of the raw body.
+
+    Fail closed: an empty secret, a missing header, or a malformed header is
+    never a match. The comparison is constant-time (hmac.compare_digest) so the
+    secret cannot be recovered by timing the response.
+    """
+    if not secret or not signature_header:
+        return False
+    prefix = "sha256="
+    if not signature_header.startswith(prefix):
+        return False
+    sent = signature_header[len(prefix) :]
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sent, expected)
+
+
+async def fetch_pull_request_diff(owner: str, repo: str, number: int) -> str:
+    """The unified diff of a pull request (the `application/vnd.github.diff` media type)."""
+    token = get_settings().github_token
+    if not token:
+        raise GitHubApiError("GITHUB_TOKEN is not configured")
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
+            f"{API_BASE}/repos/{owner}/{repo}/pulls/{number}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.diff",
+            },
+        )
+    if response.status_code != 200:
+        raise GitHubApiError(f"could not fetch PR #{number} diff (HTTP {response.status_code})")
+    return response.text
+
+
+async def post_pull_request_review(owner: str, repo: str, number: int, body: str) -> str:
+    """Post a single review comment on a pull request; return its API URL.
+
+    The review uses event COMMENT (neither approve nor request-changes) with a
+    markdown body — reliable, unlike position-mapped inline comments.
+    """
+    token = get_settings().github_token
+    if not token:
+        raise GitHubApiError("GITHUB_TOKEN is not configured")
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(
+            f"{API_BASE}/repos/{owner}/{repo}/pulls/{number}/reviews",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+            json={"event": "COMMENT", "body": body},
+        )
+    if response.status_code not in (200, 201):
+        detail = response.json().get("message", response.text[:200])
+        raise GitHubApiError(f"GitHub refused the review comment: {detail}")
+    url = response.json().get("html_url", "")
+    log.info("pr.reviewed", repo=f"{owner}/{repo}", number=number, url=url)
+    return url
 
 
 def parse_github_repo(url: str) -> tuple[str, str] | None:
