@@ -4,8 +4,10 @@ Read this first. Plain language, real file names, no jargon.
 
 ## What the app does today
 
-You sign in, type a message, and get a streamed AI reply that is saved to the
-database. That's it — everything else is being built on top of this spine.
+You sign in and can do two things: **chat** with an AI that answers with
+citations into your connected repository, and **start a run** — describe a
+feature and an AI agent team plans it, writes the code, reviews it, tests it
+in a sandbox, scans it for leaked secrets, and opens a pull request.
 
 ## The three processes
 
@@ -33,15 +35,15 @@ flowchart LR
    (a short-lived token proving "the web app sent this").
 3. The engine (`apps/engine/src/engine/api/chat.py`) loads your conversation
    history from Postgres.
-4. `engine/llm/router.py` picks the model (set by `MODEL_CODER` in `.env`,
-   currently Gemini 2.5 Flash) and calls it.
+4. `engine/llm/router.py` picks the model (set by the `MODEL_*` variables in
+   `.env`) and calls it.
 5. Each word streams back through the same path and appears on your screen.
 6. When the reply finishes, the engine saves both messages to Postgres.
 
 Set `LLM_FAKE=1` in `.env` and the engine skips step 4 and returns a canned
 reply — that's how tests run without an API key.
 
-## What we're building now (Phase 1)
+## The agent team (Phases 1–3)
 
 A team of AI agents that ships a feature for you:
 
@@ -54,7 +56,11 @@ flowchart TD
     D --> E[Agents edit code in an isolated<br/>copy of your repository]
     E --> F[Reviewer agent checks the changes]
     F -->|problems found| D
-    F -->|approved| G[Pull request opened on GitHub]
+    F -->|approved| S[Tests run in a Docker sandbox<br/>network unplugged]
+    S -->|tests fail| X2[Run fails — no pull request]
+    S -->|tests pass| SEC[Secrets scan of the diff]
+    SEC -->|leak found| X2
+    SEC -->|clean| G[Pull request opened on GitHub]
 ```
 
 The whole flow above exists now. Open `/runs`, describe a feature, and the
@@ -62,12 +68,27 @@ Product Manager reads a clone of your repository and writes a plan; after you
 press Approve, the engineer agents edit files and make git commits inside
 that clone — never in your real repository. The Reviewer then checks the full
 diff: it can send findings back to the engineers once, and its second verdict
-is final. On approval the branch is pushed and — when the repository is on
-GitHub and `GITHUB_TOKEN` is set in `.env` — a pull request opens, linked
-from the run page. Every step lands in the timeline. With `LLM_FAKE=1` the
-same pipeline runs without an AI model (a fixed plan, real files, real
+is final. After approval two gates run: the run's tests execute in a
+disposable Docker container with the network unplugged, and the diff is
+scanned for leaked keys — failing either one fails the run and no pull
+request opens. On a clean pass the branch is pushed and — when the repository
+is on GitHub and `GITHUB_TOKEN` is set in `.env` — a pull request opens,
+linked from the run page. Every step lands in the timeline. With `LLM_FAKE=1`
+the same pipeline runs without an AI model (a fixed plan, real files, real
 commits) — that's how the tests work. Progress lives in
 [BACKLOG.md](BACKLOG.md).
+
+The agents can also *understand* a connected repository (Phase 2): it is
+indexed into searchable chunks, chat answers cite real files and lines, and
+the agents use the same search as a tool while they work.
+
+The team can also *plan* and *remember* (Phases 4–5). On `/planning`, a
+Scrum Master agent turns a one-line goal into an estimated, dependency-aware
+backlog and flags what is blocked. On `/knowledge`, you can browse the
+platform's long-term memory: every finished run saves its approved plan and
+its outcome, a rejected plan is saved as a team preference, and the next
+time a run is planned the most relevant memories are recalled into the
+planner's context automatically.
 
 ## Run it
 
