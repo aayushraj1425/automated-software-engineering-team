@@ -179,6 +179,20 @@ async def test_a_broken_install_never_reaches_the_tests(tmp_path, monkeypatch):
     assert fake.commands().count("exec") == 1  # the test command never ran
 
 
+async def test_pytest_collecting_no_tests_skips_instead_of_failing(tmp_path, monkeypatch):
+    # pytest exit code 5 means it started but found zero tests — a workspace
+    # with nothing to test must not fail the whole run.
+    _enable_sandbox(monkeypatch)
+    fake = FakeDocker(fails={"exec:python -m pytest -q": (5, "no tests ran in 0.01s")})
+    monkeypatch.setattr(sandbox, "_docker", fake)
+
+    result = await run_sandbox(_python_workspace(tmp_path), RUN_ID)
+
+    assert result.status == "skipped"
+    assert result.reason == "no tests were collected"
+    assert fake.calls[-1][:2] == ("rm", "-f")  # still cleaned up
+
+
 async def test_a_test_timeout_reads_as_a_timeout(tmp_path, monkeypatch):
     _enable_sandbox(monkeypatch)
     fake = FakeDocker(fails={"exec:python -m pytest -q": (-1, "timed out after 300s")})

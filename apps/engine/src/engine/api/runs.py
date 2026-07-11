@@ -8,11 +8,11 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.agents.runner import execute_tasks, plan_run
@@ -29,6 +29,15 @@ class RunCreate(BaseModel):
     request: str = Field(min_length=1, max_length=4000)
     repository_url: str = Field(min_length=8, max_length=512)
     max_cost_usd: Decimal | None = Field(default=None, gt=0)
+
+    @field_validator("request", "repository_url")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        # min_length runs before stripping, so "   " would otherwise pass.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
 
 
 class TaskOut(BaseModel):
@@ -146,11 +155,19 @@ async def decide_run(
 ) -> RunOut:
     """The human approval gate: approve starts the work, reject ends the run."""
     run = await _owned_run(db, run_id, principal)
-    if run.status != RunStatus.AWAITING_APPROVAL:
+    new_status = RunStatus.EXECUTING if body.approved else RunStatus.CANCELLED
+    # Claim the decision atomically: two concurrent decisions (a double-click,
+    # two tabs) must never both pass a plain status check and execute twice.
+    claim = await db.execute(
+        update(AgentRun)
+        .where(AgentRun.id == run_id, AgentRun.status == RunStatus.AWAITING_APPROVAL)
+        .values(status=new_status)
+    )
+    if cast(CursorResult, claim).rowcount != 1:
         raise HTTPException(status_code=409, detail="This run is not waiting for approval")
+    run.status = new_status
 
     if body.approved:
-        run.status = RunStatus.EXECUTING
         db.add(AgentEvent(run_id=run.id, type="plan.approved", payload={"by": principal.user_id}))
         db.add(
             AgentEvent(
@@ -160,7 +177,6 @@ async def decide_run(
             )
         )
     else:
-        run.status = RunStatus.CANCELLED
         run.finished_at = datetime.now(UTC)
         tasks = (
             (await db.execute(select(AgentTask).where(AgentTask.run_id == run.id))).scalars().all()

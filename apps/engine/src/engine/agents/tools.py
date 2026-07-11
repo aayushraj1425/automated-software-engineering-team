@@ -7,6 +7,7 @@ any ToolError into a plain error message the agent can read and react to.
 Every path an agent supplies goes through the jail before anything is touched.
 """
 
+import asyncio
 from typing import Any
 
 from engine.db.models import AgentRun
@@ -66,21 +67,27 @@ async def search(ws: Workspace, text: str, path: str = ".") -> str:
         raise ToolError("search text is empty")
     root = _safe(ws, path)
     needle = text.lower()
-    hits: list[str] = []
-    for file in sorted(root.rglob("*")):
-        if ".git" in file.parts or not file.is_file():
-            continue
-        if file.stat().st_size > MAX_SEARCH_FILE_BYTES:
-            continue
-        rel = file.relative_to(ws.path)
-        for lineno, line in enumerate(
-            file.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
-        ):
-            if needle in line.lower():
-                hits.append(f"{rel.as_posix()}:{lineno}: {line.strip()[:200]}")
-                if len(hits) >= MAX_SEARCH_RESULTS:
-                    return "\n".join(hits) + "\n... (more results cut off)"
-    return "\n".join(hits) or f"no matches for {text!r}"
+
+    def _scan() -> str:
+        # Walks and reads the whole tree — run in a thread so a large
+        # repository cannot stall the event loop (and every other run).
+        hits: list[str] = []
+        for file in sorted(root.rglob("*")):
+            if ".git" in file.parts or not file.is_file():
+                continue
+            if file.stat().st_size > MAX_SEARCH_FILE_BYTES:
+                continue
+            rel = file.relative_to(ws.path)
+            for lineno, line in enumerate(
+                file.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
+            ):
+                if needle in line.lower():
+                    hits.append(f"{rel.as_posix()}:{lineno}: {line.strip()[:200]}")
+                    if len(hits) >= MAX_SEARCH_RESULTS:
+                        return "\n".join(hits) + "\n... (more results cut off)"
+        return "\n".join(hits) or f"no matches for {text!r}"
+
+    return await asyncio.to_thread(_scan)
 
 
 async def search_code(ws: Workspace, query: str) -> str:

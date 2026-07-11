@@ -141,6 +141,40 @@ async def test_create_rejects_a_blank_title(client):
     assert resp.status_code == 422
 
 
+async def test_create_rejects_a_whitespace_only_title(client):
+    # "   " passes a plain min_length check but would be stored as an empty title.
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items", json={"title": "   "}, headers=headers
+    )
+    assert resp.status_code == 422
+
+
+async def test_update_rejects_a_dependency_cycle(client):
+    # A waits on B, then B waits on A — that plan can never make progress,
+    # so the update that would close the cycle is refused.
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    a = await _create_item(client, headers, repo_id, title="Model the reset token")
+    b = await _create_item(client, headers, repo_id, title="Send the reset email")
+
+    resp = await client.patch(
+        f"/v1/repositories/{repo_id}/work-items/{a['id']}",
+        json={"depends_on": [b["id"]]},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.patch(
+        f"/v1/repositories/{repo_id}/work-items/{b['id']}",
+        json={"depends_on": [a["id"]]},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "cycle" in resp.json()["detail"].lower()
+
+
 async def test_generate_roadmap_saves_work_items(client):
     headers = _headers()
     repo_id = await _create_repo(client, headers)
@@ -162,6 +196,27 @@ async def test_generate_roadmap_saves_work_items(client):
     # the roadmap is now the repository's backlog
     listed = (await client.get(f"/v1/repositories/{repo_id}/work-items", headers=headers)).json()
     assert [i["id"] for i in listed] == [i["id"] for i in created]
+
+
+async def test_generate_roadmap_returns_only_the_items_it_created(client):
+    # A roadmap generated onto a non-empty backlog must not report the
+    # pre-existing items as newly created.
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    existing = await _create_item(client, headers, repo_id, title="Already planned")
+
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/roadmap",
+        json={"goal": "Add password reset by email"},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    created_ids = {item["id"] for item in resp.json()}
+    assert existing["id"] not in created_ids
+
+    # ...while the board itself now holds both the old item and the roadmap
+    listed = (await client.get(f"/v1/repositories/{repo_id}/work-items", headers=headers)).json()
+    assert {i["id"] for i in listed} == created_ids | {existing["id"]}
 
 
 async def test_generate_roadmap_is_owner_scoped(client):

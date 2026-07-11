@@ -30,6 +30,17 @@ class GitHubApiError(Exception):
     """A GitHub read/write the webhook reviewer needs failed; message is safe."""
 
 
+def _refusal_detail(response: httpx.Response) -> str:
+    """GitHub's error message when it sent JSON; the raw body tail otherwise.
+    (A proxy's HTML error page must not crash the error path itself.)"""
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    message = data.get("message") if isinstance(data, dict) else None
+    return str(message) if message else response.text[:200]
+
+
 def verify_webhook_signature(secret: str, body: bytes, signature_header: str | None) -> bool:
     """True when X-Hub-Signature-256 matches an HMAC-SHA256 of the raw body.
 
@@ -84,8 +95,7 @@ async def post_pull_request_review(owner: str, repo: str, number: int, body: str
             json={"event": "COMMENT", "body": body},
         )
     if response.status_code not in (200, 201):
-        detail = response.json().get("message", response.text[:200])
-        raise GitHubApiError(f"GitHub refused the review comment: {detail}")
+        raise GitHubApiError(f"GitHub refused the review comment: {_refusal_detail(response)}")
     url = response.json().get("html_url", "")
     log.info("pr.reviewed", repo=f"{owner}/{repo}", number=number, url=url)
     return url
@@ -121,8 +131,7 @@ async def open_pull_request(
             json={"title": title, "head": branch, "base": base_branch, "body": body},
         )
     if response.status_code != 201:
-        detail = response.json().get("message", response.text[:200])
-        raise PullRequestError(f"GitHub refused the pull request: {detail}")
+        raise PullRequestError(f"GitHub refused the pull request: {_refusal_detail(response)}")
     url = response.json()["html_url"]
     log.info("pr.opened", repo=f"{owner}/{repo}", branch=branch, url=url)
     return url

@@ -76,9 +76,19 @@ async def test_commits_in_the_workspace_do_not_touch_the_origin(origin, workspac
 
 
 async def test_clone_failure_raises_a_readable_error(workspace_root, tmp_path):
+    # An existing folder that is not a git repository passes the URL guard
+    # but fails the clone itself — the git error must surface readably.
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+    with pytest.raises(WorkspaceError) as err:
+        await create_workspace(uuid.uuid4(), str(not_a_repo))
+    assert "git clone failed" in str(err.value)
+
+
+async def test_a_missing_repository_path_is_rejected_before_git_runs(workspace_root, tmp_path):
     with pytest.raises(WorkspaceError) as err:
         await create_workspace(uuid.uuid4(), str(tmp_path / "does-not-exist"))
-    assert "git clone failed" in str(err.value)
+    assert "not cloneable" in str(err.value)
 
 
 async def test_removing_a_missing_workspace_is_fine(workspace_root):

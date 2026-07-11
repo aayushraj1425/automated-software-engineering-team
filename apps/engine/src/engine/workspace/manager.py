@@ -37,6 +37,24 @@ def workspaces_root() -> Path:
     return Path(get_settings().workspaces_dir).resolve()
 
 
+def ensure_cloneable_url(url: str) -> str:
+    """Only https URLs and existing local paths may reach `git clone`.
+
+    A user-controlled URL passed to git unchecked is remote code execution:
+    git's `ext::` transport runs an arbitrary shell command, and a URL that
+    starts with "-" is parsed as a git option. Reject both classes here; the
+    clone calls also put the URL after `--` for defence in depth.
+    """
+    cleaned = url.strip()
+    if not cleaned:
+        raise WorkspaceError("repository URL is not cloneable: it is empty")
+    if cleaned.lower().startswith("https://"):
+        return cleaned
+    if not cleaned.startswith("-") and "::" not in cleaned and Path(cleaned).exists():
+        return cleaned  # a local repository (dev fixtures, tests)
+    raise WorkspaceError(f"repository URL is not cloneable: {cleaned[:200]!r}")
+
+
 async def run_git(cwd: Path, *args: str) -> str:
     """Run one git command inside `cwd` and return its output.
 
@@ -69,7 +87,8 @@ async def create_workspace(run_id: uuid.UUID, repo_url: str) -> Workspace:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     branch = f"asep/run-{run_id.hex[:8]}"
-    await run_git(path.parent, "clone", "--depth", "1", repo_url, str(path))
+    url = ensure_cloneable_url(repo_url)
+    await run_git(path.parent, "clone", "--depth", "1", "--", url, str(path))
     await run_git(path, "checkout", "-b", branch)
     # Commits made by agents are attributed to the platform, not to the user.
     await run_git(path, "config", "user.name", "ASEP Agent Team")

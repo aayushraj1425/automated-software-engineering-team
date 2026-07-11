@@ -177,17 +177,19 @@ async def persist_roadmap(
         db.add(work_item)
         created.append(work_item)
     await db.flush()  # assign ids before wiring dependencies
+    created_ids = [work_item.id for work_item in created]
 
     for work_item, item in zip(created, items, strict=True):
         work_item.depends_on = [str(created[dep - 1].id) for dep in item["depends_on"]]
     await db.commit()
 
-    # Re-query ordered rather than reading the just-committed (expired) objects.
+    # Re-query ordered rather than reading the just-committed (expired) objects —
+    # and only the items this roadmap created, not whatever the backlog already held.
     return list(
         (
             await db.execute(
                 select(WorkItem)
-                .where(WorkItem.repository_id == repository_id)
+                .where(WorkItem.id.in_(created_ids))
                 .order_by(WorkItem.position, WorkItem.created_at)
             )
         )

@@ -251,6 +251,10 @@ async def _execute(plan: SandboxPlan, workspace: Path, name: str, timeout: int) 
     output = _tail(f"{install_out}\n{test_out}".strip())
     if code == -1:
         return SandboxResult("failed", f"tests timed out after {timeout}s", output, None, plan)
+    if code == 5 and "pytest" in plan.test:
+        # pytest exit code 5: it started but collected zero tests. A workspace
+        # with nothing to test must skip the gate, not fail the whole run.
+        return SandboxResult("skipped", "no tests were collected", output, code, plan)
     if code != 0:
         return SandboxResult("failed", f"tests failed (exit code {code})", output, code, plan)
     log.info("sandbox.passed", container=name, image=plan.image)

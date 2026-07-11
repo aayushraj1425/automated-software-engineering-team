@@ -113,11 +113,12 @@ export function PlanningBoard() {
 
   async function patch(id: string, changes: Partial<WorkItem>) {
     if (!repositoryId) return;
-    await fetch(`/api/repositories/${repositoryId}/work-items/${id}`, {
+    const res = await fetch(`/api/repositories/${repositoryId}/work-items/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(changes),
     });
+    setError(res.ok ? null : `Could not update the work item (${res.status})`);
     await refresh();
   }
 

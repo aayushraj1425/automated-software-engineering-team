@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,17 @@ router = APIRouter()
 _CONTEXT_FILE_LIMIT = 60
 
 
+def _stripped_title(value: str | None) -> str | None:
+    """min_length validates before stripping, so '   ' would otherwise pass
+    and be stored as an empty title."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("title must not be blank")
+    return stripped
+
+
 class WorkItemIn(BaseModel):
     title: str = Field(min_length=1, max_length=256)
     description: str | None = None
@@ -36,6 +47,8 @@ class WorkItemIn(BaseModel):
     estimate: Estimate | None = None
     milestone: str | None = Field(default=None, max_length=128)
     depends_on: list[uuid.UUID] = Field(default_factory=list)
+
+    _title = field_validator("title")(_stripped_title)
 
 
 class WorkItemUpdate(BaseModel):
@@ -51,6 +64,8 @@ class WorkItemUpdate(BaseModel):
     depends_on: list[uuid.UUID] | None = None
     rationale: str | None = None
     position: int | None = None
+
+    _title = field_validator("title")(_stripped_title)
 
 
 class ReorderIn(BaseModel):
@@ -155,7 +170,34 @@ async def _validate_dependencies(
         raise HTTPException(
             status_code=400, detail=f"Unknown dependency work item(s): {', '.join(missing)}"
         )
+    if this_id is not None:
+        await _reject_dependency_cycles(db, repository_id, this_id, ids)
     return [str(d) for d in ids]
+
+
+async def _reject_dependency_cycles(
+    db: AsyncSession, repository_id: uuid.UUID, this_id: uuid.UUID, new_deps: list[uuid.UUID]
+) -> None:
+    """A dependency cycle (A waits on B, B waits on A) deadlocks the plan:
+    blocker detection would report both items blocked forever with nothing to
+    recommend. Walk the existing graph from each proposed dependency; if the
+    item being updated is reachable, the update would close a cycle."""
+    rows = (
+        await db.execute(
+            select(WorkItem.id, WorkItem.depends_on).where(WorkItem.repository_id == repository_id)
+        )
+    ).all()
+    graph = {str(item_id): list(deps or []) for item_id, deps in rows}
+    stack = [str(d) for d in new_deps]
+    seen: set[str] = set()
+    while stack:
+        node = stack.pop()
+        if node == str(this_id):
+            raise HTTPException(status_code=400, detail="These dependencies would create a cycle")
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(graph.get(node, []))
 
 
 @router.post("/v1/repositories/{repository_id}/work-items", status_code=201)
@@ -169,7 +211,7 @@ async def create_work_item(
     depends_on = await _validate_dependencies(db, repository_id, body.depends_on, None)
     item = WorkItem(
         repository_id=repository_id,
-        title=body.title.strip(),
+        title=body.title,
         description=body.description,
         kind=body.kind,
         priority=body.priority,
@@ -218,8 +260,6 @@ async def update_work_item(
         changes["depends_on"] = await _validate_dependencies(
             db, repository_id, body.depends_on or [], item_id
         )
-    if "title" in changes and changes["title"] is not None:
-        changes["title"] = changes["title"].strip()
     for field, value in changes.items():
         setattr(item, field, value)
     await db.commit()

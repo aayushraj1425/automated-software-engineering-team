@@ -28,7 +28,7 @@ from engine.db.session import session_scope
 from engine.indexing.chunker import Chunk, chunk_file, iter_source_files
 from engine.indexing.dependency_graph import build_dependency_graph
 from engine.llm.router import model_router
-from engine.workspace.manager import remove_tree, run_git
+from engine.workspace.manager import ensure_cloneable_url, remove_tree, run_git
 
 log = structlog.get_logger(__name__)
 
@@ -82,7 +82,7 @@ async def _build_index(repository_id: uuid.UUID, url: str) -> IndexResult:
     tmp = Path(tempfile.mkdtemp(prefix="asep-index-"))
     try:
         clone = tmp / "clone"
-        await run_git(tmp, "clone", "--depth", "1", url, str(clone))
+        await run_git(tmp, "clone", "--depth", "1", "--", ensure_cloneable_url(url), str(clone))
 
         sources = list(iter_source_files(clone))
         current_hashes = {rel_path: _digest(file) for file, rel_path, _ in sources}
