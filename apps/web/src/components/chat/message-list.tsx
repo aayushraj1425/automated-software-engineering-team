@@ -34,6 +34,16 @@ export function MessageList({ messages }: { messages: ChatMessage[] }) {
                 ))}
               </div>
             )}
+            {m.memories && m.memories.length > 0 && (
+              <div className="mt-2 border-t border-zinc-800 pt-2">
+                <p className="mb-1 text-xs font-medium text-zinc-500">Remembered</p>
+                {m.memories.map((mem, i) => (
+                  <p key={i} className="text-xs text-zinc-500">
+                    <span className="text-zinc-600">[{mem.kind}]</span> {mem.title}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         </li>
       ))}

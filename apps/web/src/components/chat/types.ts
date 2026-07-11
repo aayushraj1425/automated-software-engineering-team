@@ -5,11 +5,19 @@ export interface Citation {
   score: number;
 }
 
+/** One memory the engine recalled while answering (shown live, not persisted). */
+export interface RecalledMemoryRef {
+  kind: string;
+  title: string;
+  score: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  memories?: RecalledMemoryRef[];
   streaming?: boolean;
 }
 

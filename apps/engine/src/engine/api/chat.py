@@ -13,6 +13,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.models import AuditLog, Conversation, Message, Repository
 from engine.db.session import session_scope
 from engine.indexing.retrieval import retrieve_chunks
+from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.router import model_router
 
 router = APIRouter()
@@ -61,9 +62,13 @@ async def chat(
             await db.flush()
 
         # Grounding: retrieve the closest code chunks before anything persists,
-        # so an unknown repository rejects the request cleanly.
+        # so an unknown repository rejects the request cleanly. Team memory
+        # rides along the same way (KNOWLEDGE_AND_MEMORY.md): the memories most
+        # relevant to the question join the system context next to the code.
         grounding: str | None = None
         citations: list[dict] | None = None
+        memory_block: str | None = None
+        recalled: list[dict] | None = None
         if req.repository_id is not None:
             repo = await db.get(Repository, req.repository_id)
             if repo is None or repo.owner_id != principal.user_id:
@@ -84,6 +89,10 @@ async def chat(
                     for c in chunks
                 )
                 grounding = GROUNDING_PROMPT.format(excerpts=excerpts)
+            memories = await recall_memories(db, repo.id, req.message)
+            if memories:
+                memory_block = format_memories(memories)
+                recalled = [{"kind": m.kind, "title": m.title, "score": m.score} for m in memories]
 
         conversation_id = conversation.id
         db.add(Message(conversation_id=conversation_id, role="user", content=req.message))
@@ -105,8 +114,9 @@ async def chat(
             )
         ).scalars()
         history = [{"role": m.role, "content": m.content} for m in reversed(list(history_rows))]
-        if grounding is not None:
-            history = [{"role": "system", "content": grounding}, *history]
+        preamble = "\n\n".join(part for part in (grounding, memory_block) if part)
+        if preamble:
+            history = [{"role": "system", "content": preamble}, *history]
         await db.commit()
 
     structlog.contextvars.bind_contextvars(
@@ -117,6 +127,10 @@ async def chat(
         parts: list[str] = []
         if citations is not None:
             yield _sse("citations", {"citations": citations})
+        if recalled is not None:
+            # Like citations, the recall is visible to the client — the UI can
+            # show which memories informed the answer.
+            yield _sse("memory", {"memories": recalled})
         try:
             async for chunk in chat_graph.astream({"messages": history}, stream_mode="custom"):
                 if isinstance(chunk, dict) and chunk.get("type") == "token":

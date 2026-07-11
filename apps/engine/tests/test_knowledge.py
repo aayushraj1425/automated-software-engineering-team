@@ -6,6 +6,7 @@ run can complete inside a test and leave real memories behind.
 Design note: docs/architecture/KNOWLEDGE_AND_MEMORY.md.
 """
 
+import json
 import uuid
 
 import pytest
@@ -226,6 +227,48 @@ async def test_planning_without_memory_emits_no_recall_event(client):
     )
     events = (await client.get(f"/v1/runs/{resp.json()['id']}/events", headers=headers)).json()
     assert not [e for e in events if e["type"] == "memory.recalled"]
+
+
+async def test_grounded_chat_recalls_memory(client):
+    """The stretch item: repository chat blends recalled memories into its
+    context, announced by a `memory` SSE event (the citations pattern)."""
+    headers = _headers()
+    url = _repo_url()
+    repo_id = await _create_repo(client, headers, url)
+    await _add_note(
+        client,
+        headers,
+        repo_id,
+        kind="decision",
+        title="Retries capped at two",
+        content="The team decided every agent task retries at most twice.",
+    )
+
+    resp = await client.post(
+        "/v1/chat",
+        json={"message": "How many times does a task retry?", "repository_id": repo_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    memory_events = [e for e in resp.text.split("\n\n") if e.startswith("event: memory")]
+    assert memory_events, "grounded chat did not announce the recalled memory"
+    (data_line,) = [line for line in memory_events[0].splitlines() if line.startswith("data:")]
+    titles = [m["title"] for m in json.loads(data_line.removeprefix("data:"))["memories"]]
+    assert "Retries capped at two" in titles
+
+
+async def test_grounded_chat_without_memory_emits_no_memory_event(client):
+    headers = _headers()
+    url = _repo_url()
+    repo_id = await _create_repo(client, headers, url)
+
+    resp = await client.post(
+        "/v1/chat",
+        json={"message": "hello there", "repository_id": repo_id},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert "event: memory" not in resp.text
 
 
 def test_format_memories_reads_as_context_not_command():

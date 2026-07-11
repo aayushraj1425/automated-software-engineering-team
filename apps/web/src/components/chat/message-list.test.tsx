@@ -40,4 +40,21 @@ describe("MessageList", () => {
     expect(screen.getByText(/app\/main\.py:1–42/)).toBeInTheDocument();
     expect(screen.getByText(/score 0\.91/)).toBeInTheDocument();
   });
+
+  it("lists the recalled memories under a grounded answer", () => {
+    render(
+      <MessageList
+        messages={[
+          {
+            id: "1",
+            role: "assistant",
+            content: "Tasks retry at most twice.",
+            memories: [{ kind: "decision", title: "Retries capped at two", score: 0.88 }],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Remembered")).toBeInTheDocument();
+    expect(screen.getByText(/Retries capped at two/)).toBeInTheDocument();
+  });
 });

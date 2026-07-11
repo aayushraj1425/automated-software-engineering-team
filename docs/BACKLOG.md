@@ -151,7 +151,7 @@ Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/
 
 ## Phase 5 — Knowledge & Memory
 
-Core complete 2026-07-11 (exit criteria met). Design note:
+Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Design note:
 [architecture/KNOWLEDGE_AND_MEMORY.md](architecture/KNOWLEDGE_AND_MEMORY.md).
 
 ### Workstream: Knowledge Store (blocking)
@@ -172,7 +172,7 @@ Core complete 2026-07-11 (exit criteria met). Design note:
 - [x] Knowledge page: browse with kind badges and source-run links, search box, add-a-note form
 
 ### Workstream: Grounded Chat Reads Memory (stretch)
-- [ ] Repository chat blends recalled memories into its context next to code citations
+- [x] Repository chat blends recalled memories into its context next to code citations (`memory` SSE event; a "Remembered" list under the answer)
 
 ## Beyond Phase 3 (headlines only)
 

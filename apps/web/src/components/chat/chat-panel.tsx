@@ -10,7 +10,7 @@ import type { RepositorySummary } from "@/components/repositories/types";
 
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
-import type { ChatMessage, Citation, ConversationSummary } from "./types";
+import type { ChatMessage, Citation, ConversationSummary, RecalledMemoryRef } from "./types";
 
 export function ChatPanel({ userName }: { userName: string }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -92,6 +92,11 @@ export function ChatPanel({ userName }: { userName: string }) {
           const citations = (data.citations ?? []) as Citation[];
           setMessages((prev) =>
             prev.map((m) => (m.id === draftId ? { ...m, citations } : m)),
+          );
+        } else if (event === "memory") {
+          const memories = (data.memories ?? []) as RecalledMemoryRef[];
+          setMessages((prev) =>
+            prev.map((m) => (m.id === draftId ? { ...m, memories } : m)),
           );
         } else if (event === "token") {
           const tokenText = String(data.text ?? "");
