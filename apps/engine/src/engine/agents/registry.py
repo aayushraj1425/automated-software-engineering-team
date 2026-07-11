@@ -90,6 +90,14 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             tools=(*_READ_TOOLS, *_WRITE_TOOLS, *_GIT_TOOLS),
             prompt_file="qa.md",
         ),
+        AgentSpec(
+            role=AgentRole.SCRUM_MASTER,
+            model_tier="planner",
+            # Planning is read-only: the Scrum Master reads the repository index
+            # for context and returns a roadmap; it never edits the workspace.
+            tools=_READ_TOOLS,
+            prompt_file="scrum_master.md",
+        ),
     )
 }
 

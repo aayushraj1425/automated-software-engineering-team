@@ -216,16 +216,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{repository_id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Repository Graph */
+        get: operations["repository_graph_v1_repositories__repository_id__graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Github Webhook */
+        post: operations["github_webhook_v1_webhooks_github_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/work-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Work Items */
+        get: operations["list_work_items_v1_repositories__repository_id__work_items_get"];
+        put?: never;
+        /** Create Work Item */
+        post: operations["create_work_item_v1_repositories__repository_id__work_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/work-items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Work Item */
+        patch: operations["update_work_item_v1_repositories__repository_id__work_items__item_id__patch"];
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/work-items/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reorder Work Items
+         * @description Set each item's board position from its index in `ordered_ids`.
+         */
+        post: operations["reorder_work_items_v1_repositories__repository_id__work_items_reorder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/roadmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Repository Roadmap
+         * @description Scrum Master: turn a one-line goal into work items saved to the backlog.
+         */
+        post: operations["generate_repository_roadmap_v1_repositories__repository_id__roadmap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/work-items/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Work Item Insights
+         * @description Blocked items and the recommended next item — computed, never stored.
+         */
+        get: operations["work_item_insights_v1_repositories__repository_id__work_items_insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BlockedItemOut */
+        BlockedItemOut: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Title */
+            title: string;
+            /** Waiting On */
+            waiting_on: string[];
+        };
         /** ChatRequest */
         ChatRequest: {
             /** Message */
             message: string;
             /** Conversation Id */
             conversation_id?: string | null;
+            /** Repository Id */
+            repository_id?: string | null;
         };
         /** ConversationOut */
         ConversationOut: {
@@ -252,11 +395,24 @@ export interface components {
             /** Approved */
             approved: boolean;
         };
+        /** DependencyGraph */
+        DependencyGraph: {
+            /** Nodes */
+            nodes: components["schemas"]["GraphNode"][];
+            /** Edges */
+            edges: components["schemas"]["GraphEdge"][];
+        };
         /** DiffOut */
         DiffOut: {
             /** Diff */
             diff: string;
         };
+        /**
+         * Estimate
+         * @description Relative size only — never a false-precision hour count.
+         * @enum {string}
+         */
+        Estimate: "small" | "medium" | "large";
         /** EventOut */
         EventOut: {
             /** Id */
@@ -277,6 +433,24 @@ export interface components {
              */
             created_at: string;
         };
+        /** GraphEdge */
+        GraphEdge: {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** GraphNode */
+        GraphNode: {
+            /** Path */
+            path: string;
+            /** Language */
+            language: string;
+            /** In Degree */
+            in_degree: number;
+            /** Out Degree */
+            out_degree: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -295,11 +469,31 @@ export interface components {
             content: string;
             /** Model */
             model: string | null;
+            /** Citations */
+            citations: {
+                [key: string]: unknown;
+            }[] | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+        };
+        /** PlanInsightsOut */
+        PlanInsightsOut: {
+            /** Blocked */
+            blocked: components["schemas"]["BlockedItemOut"][];
+            recommended: components["schemas"]["WorkItemOut"] | null;
+        };
+        /**
+         * Priority
+         * @enum {string}
+         */
+        Priority: "low" | "medium" | "high" | "critical";
+        /** ReorderIn */
+        ReorderIn: {
+            /** Ordered Ids */
+            ordered_ids: string[];
         };
         /** RepositoryIn */
         RepositoryIn: {
@@ -323,6 +517,11 @@ export interface components {
             last_indexed_at: string | null;
             /** Chunks */
             chunks: number;
+        };
+        /** RoadmapIn */
+        RoadmapIn: {
+            /** Goal */
+            goal: string;
         };
         /** RunCreate */
         RunCreate: {
@@ -450,6 +649,99 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkItemIn */
+        WorkItemIn: {
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** @default feature */
+            kind: components["schemas"]["WorkItemKind"];
+            /** @default medium */
+            priority: components["schemas"]["Priority"];
+            estimate?: components["schemas"]["Estimate"] | null;
+            /** Milestone */
+            milestone?: string | null;
+            /** Depends On */
+            depends_on?: string[];
+        };
+        /**
+         * WorkItemKind
+         * @enum {string}
+         */
+        WorkItemKind: "feature" | "bug" | "chore" | "spike";
+        /** WorkItemOut */
+        WorkItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Repository Id
+             * Format: uuid
+             */
+            repository_id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string | null;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Estimate */
+            estimate: string | null;
+            /** Priority */
+            priority: string;
+            /** Milestone */
+            milestone: string | null;
+            /** Depends On */
+            depends_on: string[];
+            /** Rationale */
+            rationale: string | null;
+            /** Position */
+            position: number;
+            /** Implemented By Run Id */
+            implemented_by_run_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * WorkItemStatus
+         * @enum {string}
+         */
+        WorkItemStatus: "proposed" | "ready" | "in_progress" | "blocked" | "done" | "cancelled";
+        /**
+         * WorkItemUpdate
+         * @description Every field optional; only the fields sent are changed (partial update).
+         */
+        WorkItemUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            kind?: components["schemas"]["WorkItemKind"] | null;
+            status?: components["schemas"]["WorkItemStatus"] | null;
+            priority?: components["schemas"]["Priority"] | null;
+            estimate?: components["schemas"]["Estimate"] | null;
+            /** Milestone */
+            milestone?: string | null;
+            /** Depends On */
+            depends_on?: string[] | null;
+            /** Rationale */
+            rationale?: string | null;
+            /** Position */
+            position?: number | null;
         };
     };
     responses: never;
@@ -853,6 +1145,274 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repository_graph_v1_repositories__repository_id__graph_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DependencyGraph"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    github_webhook_v1_webhooks_github_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-github-event"?: string;
+                "x-hub-signature-256"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_work_items_v1_repositories__repository_id__work_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_work_item_v1_repositories__repository_id__work_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkItemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_work_item_v1_repositories__repository_id__work_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_work_items_v1_repositories__repository_id__work_items_reorder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_repository_roadmap_v1_repositories__repository_id__roadmap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoadmapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    work_item_insights_v1_repositories__repository_id__work_items_insights_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanInsightsOut"];
                 };
             };
             /** @description Validation Error */

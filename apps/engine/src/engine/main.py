@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from engine.api import chat, conversations, health, repositories, runs, webhooks
+from engine.api import chat, conversations, health, repositories, runs, webhooks, work_items
 from engine.config import get_settings
 from engine.db.session import dispose_engine
 from engine.logging import setup_logging
@@ -38,3 +38,4 @@ app.include_router(conversations.router)
 app.include_router(runs.router)
 app.include_router(repositories.router)
 app.include_router(webhooks.router)
+app.include_router(work_items.router)

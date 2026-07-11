@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-08
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-10
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -112,7 +112,7 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 
 ## Phase 3 — Execution & QA
 
-Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture/EXECUTION_AND_QA.md).
+Complete 2026-07-10. Design note: [architecture/EXECUTION_AND_QA.md](architecture/EXECUTION_AND_QA.md).
 
 ### Workstream: Security Scanning (blocking)
 - [x] Secrets scanner blocks a leaked secret before the pull request opens (phase exit criterion; design note: [architecture/SECRETS_SCANNING.md](architecture/SECRETS_SCANNING.md))
@@ -129,6 +129,25 @@ Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture
 ### Workstream: Webhook Reviewer (planned)
 - [x] GitHub webhook receives pull-request events and queues a review (HMAC-signature auth; design note: [architecture/WEBHOOK_REVIEWER.md](architecture/WEBHOOK_REVIEWER.md))
 - [x] Review agent comments on the pull request within five minutes (phase exit criterion)
+
+## Phase 4 — Planning Suite
+
+Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/PLANNING_SUITE.md).
+
+### Workstream: Planning Domain & Backlog Store (blocking)
+- [x] Define the durable, repository-scoped `work_items` model and its Alembic migration (title, description, kind, status, estimate, priority, dependencies, optional implementing-run link)
+- [x] Work-items API: create / list / update / reorder under `/v1/repositories/{id}/work-items`
+- [x] Task-board screen: reorderable backlog (drag to set order) with status, estimate, priority, milestone, and dependency badges; inline status and estimate edits
+
+### Workstream: Roadmap Generation (blocking)
+- [x] Scrum Master agent role: registry entry (prompt + tool policy + model tier) and roadmap generation that writes work items
+- [x] Generate a milestone roadmap from a one-line goal plus repository context, saved to the backlog and shown on the task board (phase exit criterion)
+
+### Workstream: Estimation (planned)
+- [x] The agent assigns each work item a relative size (small / medium / large) with a one-sentence rationale, shown on the task board
+
+### Workstream: Blocker Detection & Priority (planned)
+- [x] Flag a work item whose dependency is unfinished; recommend the next unblocked, highest-value item (phase exit criterion; deterministic — `engine/planning/insights.py`)
 
 ## Beyond Phase 3 (headlines only)
 
@@ -148,6 +167,24 @@ Started 2026-07-08. Design note: [architecture/EXECUTION_AND_QA.md](architecture
 
 ## Done
 
+- 2026-07-10 · Scrum Master roadmap generation, estimation, and plan insights:
+  `POST /v1/repositories/{id}/roadmap` hands a one-line goal (plus the indexed
+  file paths as context) to the new Scrum Master role, whose validated JSON
+  roadmap — items with milestones, kinds, relative estimates, priorities, a
+  one-sentence rationale, and acyclic dependencies — is persisted to the backlog
+  with position-based dependencies resolved to real work-item ids
+  (`engine/agents/scrum_master.py`). Blocker detection and the next-item
+  recommendation are deterministic (`engine/planning/insights.py`), served by
+  `GET …/work-items/insights`, and shown as the Plan health section on the
+  planning board. Design note: architecture/PLANNING_SUITE.md.
+- 2026-07-10 · Durable work-items backlog and the planning board: the
+  repository-scoped `work_items` table (migration 0010) holds planned work that
+  outlives any single run — deleting the implementing run only nulls the link.
+  Owner-scoped CRUD plus reorder under `/v1/repositories/{id}/work-items`
+  validates that dependencies stay inside the repository. The `/planning` page
+  lists the backlog in board order with drag-to-reorder, kind / priority /
+  estimate / milestone badges, and inline status and estimate edits. Design
+  note: architecture/PLANNING_SUITE.md.
 - 2026-07-10 · Dependency vulnerability scan gates the pull request: a sibling of
   the secrets scanner (`engine/security/dependency_scanner.py`) reads only the
   *added* lines of the run's diff, extracts (package, version) pairs from

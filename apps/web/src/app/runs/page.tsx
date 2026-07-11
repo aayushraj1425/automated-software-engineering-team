@@ -23,6 +23,9 @@ export default async function RunsPage() {
           >
             repositories
           </Link>{" "}
+          <Link href="/planning" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
+            planning
+          </Link>{" "}
           <Link href="/chat" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             chat
           </Link>

@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** Living document · **Last updated:** 2026-07-06
+**Status:** Living document · **Last updated:** 2026-07-10
 Effort is relative (small / medium / large). Every phase ships the full engineering
 loop: architecture note → API spec → schema migration → UI/UX → implementation →
 unit + integration tests → docs → performance/security pass (enforced by the PR
@@ -11,8 +11,8 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **0** | **Foundation** *(complete)* | small | PRD, ADRs 0001–0010, roadmap, backlog; monorepo + turbo; compose dev env (pgvector, redis, minio); CI; better-auth skeleton; walking-skeleton chat through LiteLLM + minimal LangGraph; repo on GitHub | enables all |
 | **1** | **Multi-Agent Engineering Team** *(core loop shipped; durability + BYO keys remain in the backlog)* | large | Product Manager / Backend / Frontend / DevOps / Reviewer agents under a Supervisor: feature request → spec + task breakdown → human approval → implementation in a per-run git worktree → review loop → GitHub PR. Mission-control UI (live timeline, task board, diff viewer, approval gates). Budget caps, encrypted BYO keys, evaluation seed (fixture repo + 3 golden tasks) | multi-agent collaboration; partial AI software engineer & project planning |
 | **2** | **Repository Intelligence** *(blocking workstreams complete 2026-07-08; Java/Kotlin AST grammar deferred)* | medium | Indexing pipeline: tree-sitter parsing (TS/JS + Python first, then Java/Kotlin), AST-aware chunking, embeddings (LiteLLM route), hybrid vector+FTS retrieval with RRF, dependency/architecture graphs, grounded chat with citations; agents consume the index | repository intelligence; partial AI software engineer |
-| **3** | **Execution & QA** | medium | Docker sandbox (no-egress build/test runs), QA agent with self-correction loops, PR-review agent via GitHub webhooks, secrets detection + dependency scanning | code review; testing & security |
-| **4** | **Planning Suite** | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
+| **3** | **Execution & QA** *(complete 2026-07-10)* | medium | Docker sandbox (no-egress build/test runs), QA agent with self-correction loops, PR-review agent via GitHub webhooks, secrets detection + dependency scanning | code review; testing & security |
+| **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
 | **7** | **Production Hardening** | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
@@ -29,9 +29,15 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   work" answers cite real files/lines; retrieval evaluation beats a naive grep baseline
   on the golden question set. ✅ *Blocking indexing + retrieval workstreams met 2026-07-08;
   re-indexing is incremental and an HNSW index backs vector search.*
-- **Phase 3 — Execution & QA** *(started 2026-07-08)*: agent-modified code runs its tests
-  in the sandbox before the PR; review agent comments on a webhook'd PR within 5 min;
-  secrets scanner blocks a seeded leak *(✅ met 2026-07-08 — the runner's pre-PR gate)*.
+- **Phase 3 — Execution & QA** *(complete 2026-07-10)*: agent-modified code runs its tests
+  in the sandbox before the PR; the review agent comments on a webhook'd PR within 5 min;
+  the secrets scanner blocks a seeded leak. ✅ *All three met 2026-07-10; a dependency
+  vulnerability scan gates the pull request alongside the secrets scanner.*
+- **Phase 4 — Planning Suite** *(complete 2026-07-10)*: from a one-line goal the Scrum Master
+  agent generates a milestone roadmap of estimated, dependency-linked work items saved to
+  the backlog and shown on the task board; blocker detection flags an item waiting on an
+  unfinished dependency and recommends the next unblocked, highest-value item to start.
+  ✅ *Both met 2026-07-10.* Design note: [PLANNING_SUITE.md](architecture/PLANNING_SUITE.md).
 
 ## Standing tracks (every phase)
 

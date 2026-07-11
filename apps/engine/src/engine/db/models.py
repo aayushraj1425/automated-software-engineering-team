@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from engine.config import EMBEDDING_DIM
-from engine.db.enums import RunStatus, TaskStatus
+from engine.db.enums import Priority, RunStatus, TaskStatus, WorkItemKind, WorkItemStatus
 
 
 class Base(DeclarativeBase):
@@ -267,6 +267,42 @@ class IndexedFile(Base):
     content_hash: Mapped[str] = mapped_column(String(64))  # SHA-256 of the file bytes
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+# ── Planning Suite (docs/architecture/PLANNING_SUITE.md) ────────────────────
+
+
+class WorkItem(Base, TimestampMixin):
+    """A durable, repository-scoped unit of planned work — a backlog item.
+
+    Distinct from AgentTask: an AgentTask is ephemeral and lives inside one run,
+    while a WorkItem is planned once and lives on (estimated, reordered, blocked)
+    until a coding run implements it and records itself in `implemented_by_run_id`.
+    """
+
+    __tablename__ = "work_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), default=WorkItemKind.FEATURE)
+    status: Mapped[str] = mapped_column(String(32), default=WorkItemStatus.PROPOSED, index=True)
+    # Relative size (small / medium / large); null until the agent estimates it.
+    estimate: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    priority: Mapped[str] = mapped_column(String(16), default=Priority.MEDIUM, index=True)
+    milestone: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Ids of other work items this one waits on (mirrors AgentTask.depends_on).
+    depends_on: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    # The agent's one-sentence reasoning behind the estimate / priority.
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Manual ordering within a milestone on the task board.
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    implemented_by_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
     )
 
 
