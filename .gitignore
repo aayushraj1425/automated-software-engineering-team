@@ -30,6 +30,7 @@ test-results/
 .coverage
 
 # OS / editor
+.claude/
 .DS_Store
 Thumbs.db
 .idea/
