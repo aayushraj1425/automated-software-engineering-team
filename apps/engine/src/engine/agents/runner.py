@@ -30,6 +30,8 @@ from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.github import open_pull_request, parse_github_repo
+from engine.knowledge.capture import capture_run_memory
+from engine.knowledge.recall import format_memories, recall_memories
 from engine.sandbox.runner import SandboxResult, run_sandbox
 from engine.security.dependency_scanner import scan_diff as scan_dependency_diff
 from engine.security.secrets_scanner import scan_diff
@@ -130,11 +132,17 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
 async def plan_run(run_id: uuid.UUID) -> None:
     """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
     await _guarded(_plan_run, run_id)
+    # A run that failed during planning still leaves memory behind; a run
+    # waiting for approval is not terminal, so capture does nothing.
+    await capture_run_memory(run_id)
 
 
 async def execute_tasks(run_id: uuid.UUID) -> None:
     """Background entrypoint after the human approves the plan."""
     await _guarded(_execute_tasks, run_id)
+    # The run is terminal either way now — remember what happened
+    # (KNOWLEDGE_AND_MEMORY.md); capture never raises.
+    await capture_run_memory(run_id)
 
 
 async def _guarded(work, run_id: uuid.UUID) -> None:
@@ -166,15 +174,19 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         repo = await session.get(Repository, run.repository_id)
         assert repo is not None
         repo_url = repo.url
+        repository_id = run.repository_id
         request = run.request
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
         await session.commit()
 
+    memory = await _recall_for_planning(run_id, repository_id, request)
     ws = await _open_workspace(run_id, repo_url)
     usage = LlmUsage()
-    plan = await create_plan(request, ws, usage, _tool_observer(run_id, AgentRole.PRODUCT_MANAGER))
+    plan = await create_plan(
+        request, ws, usage, _tool_observer(run_id, AgentRole.PRODUCT_MANAGER), memory=memory
+    )
 
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
@@ -200,6 +212,34 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         # Stop here: nothing executes until the human approves the plan.
         _set_run_status(session, run, RunStatus.AWAITING_APPROVAL)
         await session.commit()
+
+
+async def _recall_for_planning(run_id: uuid.UUID, repository_id: uuid.UUID, request: str) -> str:
+    """Long-term memory feeding agent context (KNOWLEDGE_AND_MEMORY.md): the
+    memories most relevant to the request, formatted for the planner's prompt.
+    The memory.recalled event makes the recall visible on the run timeline.
+    Recall failing must not fail the run — planning just proceeds without it."""
+    try:
+        async with session_scope() as session:
+            memories = await recall_memories(session, repository_id, request)
+            if memories:
+                _emit(
+                    session,
+                    run_id,
+                    "memory.recalled",
+                    {
+                        "count": len(memories),
+                        "memories": [
+                            {"kind": m.kind, "title": m.title, "score": m.score} for m in memories
+                        ],
+                    },
+                    agent=AgentRole.PRODUCT_MANAGER,
+                )
+                await session.commit()
+            return format_memories(memories)
+    except Exception:
+        log.exception("memory.recall_failed", run_id=str(run_id))
+        return ""
 
 
 async def _execute_tasks(run_id: uuid.UUID) -> None:

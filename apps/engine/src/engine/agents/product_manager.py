@@ -64,15 +64,22 @@ _OFFLINE_PLAN: dict[str, Any] = {
 
 
 async def create_plan(
-    request: str, ws: Workspace, usage: LlmUsage, on_tool: ToolObserver | None = None
+    request: str,
+    ws: Workspace,
+    usage: LlmUsage,
+    on_tool: ToolObserver | None = None,
+    memory: str = "",
 ) -> dict[str, Any]:
     if get_settings().llm_fake:
         return validate_plan(_OFFLINE_PLAN)
 
     spec = get_agent_spec(AgentRole.PRODUCT_MANAGER)
+    # Recalled team memory rides along as context, never as command
+    # (docs/architecture/KNOWLEDGE_AND_MEMORY.md).
+    memory_block = f"{memory}\n\n" if memory else ""
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},
-        {"role": "user", "content": f"Feature request:\n{request}\n\n{PLAN_FORMAT}"},
+        {"role": "user", "content": f"{memory_block}Feature request:\n{request}\n\n{PLAN_FORMAT}"},
     ]
     reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
     try:

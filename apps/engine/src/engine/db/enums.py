@@ -74,6 +74,17 @@ class Priority(StrEnum):
     CRITICAL = "critical"
 
 
+# ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────
+# A knowledge item is one durable, repository-scoped memory.
+
+
+class KnowledgeKind(StrEnum):
+    DECISION = "decision"  # an approved plan — what the team agreed to build
+    OUTCOME = "outcome"  # how a run ended: pull request opened, or why it failed
+    PREFERENCE = "preference"  # how the team likes things done (rejections land here)
+    NOTE = "note"  # anything worth remembering, including meeting notes
+
+
 class ArtifactKind(StrEnum):
     SPECIFICATION = "specification"
     DIFF = "diff"

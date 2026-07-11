@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** Living document · **Last updated:** 2026-07-10
+**Status:** Living document · **Last updated:** 2026-07-11
 Effort is relative (small / medium / large). Every phase ships the full engineering
 loop: architecture note → API spec → schema migration → UI/UX → implementation →
 unit + integration tests → docs → performance/security pass (enforced by the PR
@@ -13,7 +13,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **2** | **Repository Intelligence** *(blocking workstreams complete 2026-07-08; Java/Kotlin AST grammar deferred)* | medium | Indexing pipeline: tree-sitter parsing (TS/JS + Python first, then Java/Kotlin), AST-aware chunking, embeddings (LiteLLM route), hybrid vector+FTS retrieval with RRF, dependency/architecture graphs, grounded chat with citations; agents consume the index | repository intelligence; partial AI software engineer |
 | **3** | **Execution & QA** *(complete 2026-07-10)* | medium | Docker sandbox (no-egress build/test runs), QA agent with self-correction loops, PR-review agent via GitHub webhooks, secrets detection + dependency scanning | code review; testing & security |
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
-| **5** | **Knowledge & Memory** | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
+| **5** | **Knowledge & Memory** *(core complete 2026-07-11; grounded-chat memory remains a stretch item)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
 | **7** | **Production Hardening** | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
@@ -38,6 +38,12 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   the backlog and shown on the task board; blocker detection flags an item waiting on an
   unfinished dependency and recommends the next unblocked, highest-value item to start.
   ✅ *Both met 2026-07-10.* Design note: [PLANNING_SUITE.md](architecture/PLANNING_SUITE.md).
+- **Phase 5 — Knowledge & Memory:** a finished run leaves durable memory behind (the
+  approved plan as a `decision`, the result as an `outcome`), searchable on the knowledge
+  page after the run is gone; planning a new run recalls the most relevant memories into
+  the planner's context — a stored preference demonstrably reaches the next run's
+  planning prompt (the `memory.recalled` timeline event proves it). ✅ *Both met
+  2026-07-11.* Design note: [KNOWLEDGE_AND_MEMORY.md](architecture/KNOWLEDGE_AND_MEMORY.md).
 
 ## Standing tracks (every phase)
 

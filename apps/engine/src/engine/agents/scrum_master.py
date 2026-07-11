@@ -86,16 +86,19 @@ _OFFLINE_ROADMAP: dict[str, Any] = {
 }
 
 
-async def generate_roadmap(goal: str, repo_context: str = "") -> dict[str, Any]:
+async def generate_roadmap(goal: str, repo_context: str = "", memory: str = "") -> dict[str, Any]:
     """A validated roadmap for the goal. Offline mode returns a fixed roadmap."""
     if get_settings().llm_fake:
         return validate_roadmap(_OFFLINE_ROADMAP)
 
     spec = get_agent_spec(AgentRole.SCRUM_MASTER)
     context = f"\n\nRepository context (existing files):\n{repo_context}" if repo_context else ""
+    # Recalled team memory rides along as context, never as command
+    # (docs/architecture/KNOWLEDGE_AND_MEMORY.md).
+    memory_block = f"\n\n{memory}" if memory else ""
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},
-        {"role": "user", "content": f"Goal:\n{goal}{context}\n\n{ROADMAP_FORMAT}"},
+        {"role": "user", "content": f"Goal:\n{goal}{context}{memory_block}\n\n{ROADMAP_FORMAT}"},
     ]
     reply = await model_router.complete("planner", messages)
     try:

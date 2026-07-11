@@ -22,7 +22,14 @@ from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from engine.config import EMBEDDING_DIM
-from engine.db.enums import Priority, RunStatus, TaskStatus, WorkItemKind, WorkItemStatus
+from engine.db.enums import (
+    KnowledgeKind,
+    Priority,
+    RunStatus,
+    TaskStatus,
+    WorkItemKind,
+    WorkItemStatus,
+)
 
 
 class Base(DeclarativeBase):
@@ -303,6 +310,46 @@ class WorkItem(Base, TimestampMixin):
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     implemented_by_run_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+# ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────
+
+
+class KnowledgeItem(Base):
+    """One durable, repository-scoped memory: a decision, a run outcome, a team
+    preference, or a note. Written automatically as runs finish (and manually on
+    the knowledge page), recalled by hybrid retrieval when new work is planned.
+    The optional run link is the first edge of the knowledge graph."""
+
+    __tablename__ = "knowledge_items"
+    __table_args__ = (
+        # Full-text arm of memory recall, mirroring the code_chunks index.
+        Index("ix_knowledge_items_content_tsv", "content_tsv", postgresql_using="gin"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), default=KnowledgeKind.NOTE, index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    content: Mapped[str] = mapped_column(Text)
+    # The run this memory came from; the memory outlives the run (SET NULL).
+    source_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    # better-auth user id for hand-written memories; null when auto-captured.
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    # Kept in sync by Postgres; the full-text recall arm matches against it.
+    content_tsv: Mapped[str] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', title || ' ' || content)", persisted=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

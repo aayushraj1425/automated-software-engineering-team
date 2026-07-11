@@ -20,6 +20,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session
+from engine.knowledge.capture import capture_plan_rejected
 from engine.workspace.manager import WorkspaceError, load_workspace, remove_workspace, run_git
 
 router = APIRouter()
@@ -191,6 +192,9 @@ async def decide_run(
                 payload={"status": RunStatus.CANCELLED, "error": None},
             )
         )
+        # A rejection is a preference worth remembering (KNOWLEDGE_AND_MEMORY.md);
+        # capture never fails the request.
+        await capture_plan_rejected(db, run, principal.user_id)
     await db.commit()
 
     if body.approved:

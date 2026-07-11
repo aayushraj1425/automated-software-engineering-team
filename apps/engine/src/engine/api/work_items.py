@@ -20,6 +20,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import Estimate, Priority, WorkItemKind, WorkItemStatus
 from engine.db.models import CodeChunk, Repository, WorkItem
 from engine.db.session import get_session
+from engine.knowledge.recall import format_memories, recall_memories
 from engine.planning.insights import plan_insights
 
 router = APIRouter()
@@ -331,7 +332,8 @@ async def generate_repository_roadmap(
     """Scrum Master: turn a one-line goal into work items saved to the backlog."""
     await _owned_repository(db, repository_id, principal)
     context = await _repository_context(db, repository_id)
-    roadmap = await generate_roadmap(body.goal, context)
+    memory = format_memories(await recall_memories(db, repository_id, body.goal))
+    roadmap = await generate_roadmap(body.goal, context, memory)
     created = await persist_roadmap(db, repository_id, roadmap)
     return [_work_item_out(item) for item in created]
 

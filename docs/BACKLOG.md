@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-10
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-11
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -149,6 +149,31 @@ Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/
 ### Workstream: Blocker Detection & Priority (planned)
 - [x] Flag a work item whose dependency is unfinished; recommend the next unblocked, highest-value item (phase exit criterion; deterministic — `engine/planning/insights.py`)
 
+## Phase 5 — Knowledge & Memory
+
+Core complete 2026-07-11 (exit criteria met). Design note:
+[architecture/KNOWLEDGE_AND_MEMORY.md](architecture/KNOWLEDGE_AND_MEMORY.md).
+
+### Workstream: Knowledge Store (blocking)
+- [x] `knowledge_items` model and its Alembic migration (repository-scoped; kind = decision / outcome / preference / note; embedding + generated full-text column; optional source-run link)
+- [x] Write path: `remember()` embeds and stores one memory
+- [x] Recall path: hybrid retrieval over memories (vector + full-text, reciprocal-rank fusion), mirroring the Phase 2 code retrieval
+
+### Workstream: Automatic Capture (blocking)
+- [x] A run reaching a terminal state writes its memory: the approved plan as a `decision`, the result (pull request or failure reason) as an `outcome` (phase exit criterion; capture never breaks a run)
+- [x] Rejecting a plan at the approval gate records a `preference`
+
+### Workstream: Memory Feeding Agent Context (blocking)
+- [x] Product Manager planning recalls relevant memories into its prompt, with a `memory.recalled` timeline event (phase exit criterion)
+- [x] Scrum Master roadmap generation recalls memories relevant to the goal alongside the repository file context
+
+### Workstream: Knowledge API & Page (planned)
+- [x] Knowledge API: list / add / delete / search under `/v1/repositories/{id}/knowledge`
+- [x] Knowledge page: browse with kind badges and source-run links, search box, add-a-note form
+
+### Workstream: Grounded Chat Reads Memory (stretch)
+- [ ] Repository chat blends recalled memories into its context next to code citations
+
 ## Beyond Phase 3 (headlines only)
 
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
@@ -167,6 +192,22 @@ Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/
 
 ## Done
 
+- 2026-07-11 · Phase 5 core — Knowledge & Memory (both exit criteria met): the
+  `knowledge_items` table (migration 0011, up/down/up verified) holds durable,
+  repository-scoped memories — decisions, run outcomes, preferences, notes —
+  each embedded and full-text indexed. Runs write their own history: a
+  completed run captures its approved plan as a `decision` and its result as
+  an `outcome` (a failed run captures why), and rejecting a plan at the
+  approval gate records a `preference`; capture never breaks a run and is
+  idempotent. Recall (`engine/knowledge/recall.py`, mirroring the Phase 2
+  hybrid retrieval) feeds agent context: Product Manager planning injects a
+  "Team memory" block with a `memory.recalled` timeline event, and Scrum
+  Master roadmap generation recalls memories next to the repository file
+  context. The knowledge API (list / search / add / delete under
+  `/v1/repositories/{id}/knowledge`) and the `/knowledge` page (kind badges,
+  source-run links, search, add-a-note form) make memory visible. Design
+  note: architecture/KNOWLEDGE_AND_MEMORY.md. Engine 227 passed, 1 skipped;
+  web 12 passed, build clean.
 - 2026-07-10 · Scrum Master roadmap generation, estimation, and plan insights:
   `POST /v1/repositories/{id}/roadmap` hands a one-line goal (plus the indexed
   file paths as context) to the new Scrum Master role, whose validated JSON
