@@ -23,6 +23,9 @@ export default async function RepositoriesPage() {
           <Link href="/runs" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             agent runs
           </Link>{" "}
+          <Link href="/knowledge" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
+            knowledge
+          </Link>{" "}
           <Link href="/chat" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             chat
           </Link>

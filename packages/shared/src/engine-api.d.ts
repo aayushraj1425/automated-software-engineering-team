@@ -345,6 +345,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{repository_id}/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge
+         * @description Newest memories first; with `q`, the hybrid-recall ranking instead.
+         */
+        get: operations["list_knowledge_v1_repositories__repository_id__knowledge_get"];
+        put?: never;
+        /** Create Knowledge */
+        post: operations["create_knowledge_v1_repositories__repository_id__knowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}/knowledge/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Knowledge
+         * @description Memories that turn out to be wrong are deleted, not argued with.
+         */
+        delete: operations["delete_knowledge_v1_repositories__repository_id__knowledge__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -456,6 +497,54 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * KnowledgeItemIn
+         * @description A hand-written memory. Decisions and outcomes are captured automatically
+         *     by runs; the page adds notes and preferences (and corrections as notes).
+         */
+        KnowledgeItemIn: {
+            /** @default note */
+            kind: components["schemas"]["KnowledgeKind"];
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+        };
+        /** KnowledgeItemOut */
+        KnowledgeItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Repository Id
+             * Format: uuid
+             */
+            repository_id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+            /** Source Run Id */
+            source_run_id: string | null;
+            /** Created By */
+            created_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Score */
+            score?: number | null;
+        };
+        /**
+         * KnowledgeKind
+         * @enum {string}
+         */
+        KnowledgeKind: "decision" | "outcome" | "preference" | "note";
         /** MessageOut */
         MessageOut: {
             /**
@@ -1414,6 +1503,104 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PlanInsightsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_v1_repositories__repository_id__knowledge_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_knowledge_v1_repositories__repository_id__knowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeItemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_knowledge_v1_repositories__repository_id__knowledge__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
