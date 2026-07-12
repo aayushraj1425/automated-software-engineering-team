@@ -162,6 +162,12 @@ export function ChatPanel({ userName }: { userName: string }) {
         >
           Agent runs →
         </Link>
+        <Link
+          href="/settings"
+          className="mx-3 rounded-md px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-900"
+        >
+          Settings →
+        </Link>
         <button
           onClick={() => void signOut({ fetchOptions: { onSuccess: () => location.assign("/") } })}
           className="m-3 rounded-md px-3 py-2 text-left text-sm text-zinc-500 hover:bg-zinc-900"

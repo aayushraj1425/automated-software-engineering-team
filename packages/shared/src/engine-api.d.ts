@@ -411,6 +411,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/provider-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Provider Keys */
+        get: operations["list_provider_keys_v1_provider_keys_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/provider-keys/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Provider Key */
+        put: operations["set_provider_key_v1_provider_keys__provider__put"];
+        post?: never;
+        /** Delete Provider Key */
+        delete: operations["delete_provider_key_v1_provider_keys__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -604,6 +639,23 @@ export interface components {
          * @enum {string}
          */
         Priority: "low" | "medium" | "high" | "critical";
+        /** ProviderKeyIn */
+        ProviderKeyIn: {
+            /** Key */
+            key: string;
+        };
+        /** ProviderKeyOut */
+        ProviderKeyOut: {
+            /** Provider */
+            provider: string;
+            /** Last4 */
+            last4: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** ReorderIn */
         ReorderIn: {
             /** Ordered Ids */
@@ -1648,6 +1700,90 @@ export interface operations {
             path: {
                 repository_id: string;
                 item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_provider_keys_v1_provider_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyOut"][];
+                };
+            };
+        };
+    };
+    set_provider_key_v1_provider_keys__provider__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_key_v1_provider_keys__provider__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
             };
             cookie?: never;
         };

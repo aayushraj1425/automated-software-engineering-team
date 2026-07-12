@@ -33,6 +33,7 @@ from engine.events.bus import publish_run_ping
 from engine.github import open_pull_request, parse_github_repo
 from engine.knowledge.capture import capture_run_memory
 from engine.knowledge.recall import format_memories, recall_memories
+from engine.llm.keys import load_provider_keys, provider_keys_var
 from engine.sandbox.runner import SandboxResult, run_sandbox
 from engine.security.dependency_scanner import scan_diff as scan_dependency_diff
 from engine.security.secrets_scanner import scan_diff
@@ -184,6 +185,9 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         repo_url = repo.url
         repository_id = run.repository_id
         request = run.request
+        # The run owner's provider keys ride this task's context to the
+        # ModelRouter (PROVIDER_KEYS.md); no keys means the .env keys apply.
+        provider_keys_var.set(await load_provider_keys(session, run.user_id))
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
@@ -264,6 +268,8 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         plan_summary = str((run.plan or {}).get("summary", ""))
         branch = run.branch_name or ""
         base_sha = run.base_sha or ""
+        # The run owner's provider keys, for every model call this task makes.
+        provider_keys_var.set(await load_provider_keys(session, run.user_id))
         rows = (
             (
                 await session.execute(

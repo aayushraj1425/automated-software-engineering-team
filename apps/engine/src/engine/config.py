@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     engine_service_secret: str = "dev-only-service-secret-change-me-00"
+    # AES-GCM key (base64, 32 bytes) for secrets at rest (PROVIDER_KEYS.md);
+    # empty derives one from engine_service_secret — development only.
+    engine_encryption_key: str = ""
     engine_cors_origins: str = "http://localhost:3000"
     log_level: str = "INFO"
 

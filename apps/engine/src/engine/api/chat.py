@@ -14,6 +14,7 @@ from engine.db.models import AuditLog, Conversation, Message, Repository
 from engine.db.session import session_scope
 from engine.indexing.retrieval import retrieve_chunks
 from engine.knowledge.recall import format_memories, recall_memories
+from engine.llm.keys import load_provider_keys, provider_keys_var
 from engine.llm.router import model_router
 
 router = APIRouter()
@@ -117,6 +118,9 @@ async def chat(
         preamble = "\n\n".join(part for part in (grounding, memory_block) if part)
         if preamble:
             history = [{"role": "system", "content": preamble}, *history]
+        # The caller's own provider keys, for the streamed model call below
+        # (PROVIDER_KEYS.md); no keys means the .env keys apply.
+        user_keys = await load_provider_keys(db, principal.user_id)
         await db.commit()
 
     structlog.contextvars.bind_contextvars(
@@ -124,6 +128,7 @@ async def chat(
     )
 
     async def event_stream() -> AsyncIterator[str]:
+        provider_keys_var.set(user_keys)  # inside the task that runs the stream
         parts: list[str] = []
         if citations is not None:
             yield _sse("citations", {"citations": citations})

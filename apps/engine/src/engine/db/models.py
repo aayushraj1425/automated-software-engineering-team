@@ -313,6 +313,27 @@ class WorkItem(Base, TimestampMixin):
     )
 
 
+# ── Identity & Keys (docs/architecture/PROVIDER_KEYS.md) ────────────────────
+
+
+class ProviderKey(Base, TimestampMixin):
+    """One user's encrypted LLM provider key (bring-your-own keys).
+
+    Only the AES-GCM ciphertext and the last four characters (for the settings
+    page) are stored — the plaintext key exists in memory only, decrypted at a
+    request or run's entry point and carried to the ModelRouter by a context
+    variable."""
+
+    __tablename__ = "provider_keys"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_provider_keys_user"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    provider: Mapped[str] = mapped_column(String(32))  # anthropic | openai | gemini
+    encrypted_key: Mapped[str] = mapped_column(Text)
+    last4: Mapped[str] = mapped_column(String(8))
+
+
 # ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────
 
 

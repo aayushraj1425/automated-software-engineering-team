@@ -11,6 +11,7 @@ from typing import Any, Literal
 import structlog
 
 from engine.config import EMBEDDING_DIM, get_settings
+from engine.llm.keys import api_key_for_model
 
 Tier = Literal["planner", "coder", "cheap"]
 
@@ -100,7 +101,9 @@ class ModelRouter:
         import litellm
 
         response = await _retry_rate_limits(
-            lambda: litellm.acompletion(model=model, messages=messages, stream=True)
+            lambda: litellm.acompletion(
+                model=model, messages=messages, stream=True, api_key=api_key_for_model(model)
+            )
         )
         chunks = 0
         async for chunk in response:  # type: ignore[union-attr]
@@ -124,8 +127,11 @@ class ModelRouter:
 
         import litellm
 
+        # The caller's own key wins over the server's .env key (PROVIDER_KEYS.md).
         response = await _retry_rate_limits(
-            lambda: litellm.acompletion(model=model, messages=messages)
+            lambda: litellm.acompletion(
+                model=model, messages=messages, api_key=api_key_for_model(model)
+            )
         )
         content = response.choices[0].message.content  # type: ignore[union-attr]
         usage = getattr(response, "usage", None)
@@ -155,7 +161,12 @@ class ModelRouter:
 
         started = time.monotonic()
         response = await _retry_rate_limits(
-            lambda: litellm.acompletion(model=model, messages=messages, tools=tools or None)
+            lambda: litellm.acompletion(
+                model=model,
+                messages=messages,
+                tools=tools or None,
+                api_key=api_key_for_model(model),
+            )
         )
         message = response.choices[0].message  # type: ignore[union-attr]
         calls: list[ToolCall] = []
@@ -199,7 +210,11 @@ class ModelRouter:
 
         started = time.monotonic()
         response = await _retry_rate_limits(
-            lambda: litellm.aembedding(model=settings.model_embedding, input=texts)
+            lambda: litellm.aembedding(
+                model=settings.model_embedding,
+                input=texts,
+                api_key=api_key_for_model(settings.model_embedding),
+            )
         )
         vectors = [item["embedding"] for item in response.data]  # type: ignore[union-attr]
         log.info(

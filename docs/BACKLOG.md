@@ -74,7 +74,7 @@ subset being built now.
 - [x] Run cost widget (token and cost totals in the run header)
 
 ### Workstream: Identity & Keys (planned)
-- [ ] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment)
+- [x] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment) — design note: [architecture/PROVIDER_KEYS.md](architecture/PROVIDER_KEYS.md)
 - [ ] GitHub OAuth sign-in enabled end to end (needs OAuth app credentials)
 - [ ] Organization switcher on top of the better-auth organization plugin
 
@@ -192,6 +192,19 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Done
 
+- 2026-07-12 · Identity & Keys — bring-your-own provider keys: each user can
+  store an Anthropic / OpenAI / Gemini key, AES-GCM-encrypted at rest
+  (`engine/security/crypto.py`; `ENGINE_ENCRYPTION_KEY`, dev fallback derived
+  from the service secret) in the `provider_keys` table (migration 0012,
+  up/down/up verified). The API (`/v1/provider-keys`) lists only provider +
+  last four characters — the key never leaves the engine. Resolution order:
+  the caller's key for the model's provider wins, the server's .env key is
+  the fallback; the keys ride a context variable set at the entry points
+  (chat, a run's planning and execution, roadmap generation), so the
+  ModelRouter stays the single litellm gateway with no signature plumbing.
+  The `/settings` page sets, replaces, and removes keys (masked to last
+  four), linked from every screen. Design note: architecture/PROVIDER_KEYS.md.
+  Engine 254 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-12 · Agent Runtime — background worker (the last blocking runtime
   item): a new dispatch seam (`engine/jobs.py`) sends "plan this run" /
   "execute this run" either inline (the default — today's behavior, untouched)

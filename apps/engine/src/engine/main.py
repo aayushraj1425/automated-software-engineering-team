@@ -11,6 +11,7 @@ from engine.api import (
     conversations,
     health,
     knowledge,
+    provider_keys,
     repositories,
     runs,
     webhooks,
@@ -67,3 +68,4 @@ app.include_router(repositories.router)
 app.include_router(webhooks.router)
 app.include_router(work_items.router)
 app.include_router(knowledge.router)
+app.include_router(provider_keys.router)

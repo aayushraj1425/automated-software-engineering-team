@@ -21,6 +21,7 @@ from engine.db.enums import Estimate, Priority, WorkItemKind, WorkItemStatus
 from engine.db.models import CodeChunk, Repository, WorkItem
 from engine.db.session import get_session
 from engine.knowledge.recall import format_memories, recall_memories
+from engine.llm.keys import load_provider_keys, provider_keys_var
 from engine.planning.insights import plan_insights
 
 router = APIRouter()
@@ -333,6 +334,8 @@ async def generate_repository_roadmap(
     await _owned_repository(db, repository_id, principal)
     context = await _repository_context(db, repository_id)
     memory = format_memories(await recall_memories(db, repository_id, body.goal))
+    # The caller's own provider keys for the roadmap call (PROVIDER_KEYS.md).
+    provider_keys_var.set(await load_provider_keys(db, principal.user_id))
     roadmap = await generate_roadmap(body.goal, context, memory)
     created = await persist_roadmap(db, repository_id, roadmap)
     return [_work_item_out(item) for item in created]

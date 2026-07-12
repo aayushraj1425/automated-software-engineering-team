@@ -28,6 +28,9 @@ export default async function PlanningPage() {
           </Link>{" "}
           <Link href="/chat" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             chat
+          </Link>{" "}
+          <Link href="/settings" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
+            settings
           </Link>
         </h1>
       </div>

@@ -1131,6 +1131,107 @@
           }
         }
       }
+    },
+    "/v1/provider-keys": {
+      "get": {
+        "summary": "List Provider Keys",
+        "operationId": "list_provider_keys_v1_provider_keys_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderKeyOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Provider Keys V1 Provider Keys Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider-keys/{provider}": {
+      "put": {
+        "summary": "Set Provider Key",
+        "operationId": "set_provider_key_v1_provider_keys__provider__put",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderKeyIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderKeyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Provider Key",
+        "operationId": "delete_provider_key_v1_provider_keys__provider__delete",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1621,6 +1722,45 @@
           "critical"
         ],
         "title": "Priority"
+      },
+      "ProviderKeyIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "ProviderKeyIn"
+      },
+      "ProviderKeyOut": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "last4": {
+            "type": "string",
+            "title": "Last4"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "last4",
+          "updated_at"
+        ],
+        "title": "ProviderKeyOut"
       },
       "ReorderIn": {
         "properties": {
