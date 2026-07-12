@@ -18,6 +18,7 @@ from engine.agents.runner import execute_tasks, plan_run
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask
 from engine.db.session import session_scope
+from engine.events.bus import publish_run_ping
 from engine.workspace.manager import remove_workspace
 
 log = structlog.get_logger()
@@ -94,4 +95,6 @@ async def _reset_interrupted_runs() -> tuple[list[uuid.UUID], list[uuid.UUID]]:
                 )
             )
         await session.commit()
+    for run_id in to_plan + to_execute:
+        await publish_run_ping(run_id)  # the run.recovered event is streamable too
     return to_plan, to_execute

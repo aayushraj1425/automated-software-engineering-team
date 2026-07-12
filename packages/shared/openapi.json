@@ -374,6 +374,55 @@
         }
       }
     },
+    "/v1/runs/{run_id}/events/stream": {
+      "get": {
+        "summary": "Stream Events",
+        "description": "Live timeline: push each event as it lands, close when the run ends.\nPostgres is the record, Redis only wakes the stream \u2014 a missed ping costs\none heartbeat of latency, never an event (RUN_EVENT_STREAMING.md).\n\nEach message carries its event id, so a reconnecting EventSource resumes\nfrom Last-Event-ID; the `after` query parameter seeds a fresh start.",
+        "operationId": "stream_events_v1_runs__run_id__events_stream_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/repositories": {
       "get": {
         "summary": "List Repositories",

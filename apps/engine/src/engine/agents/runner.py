@@ -29,6 +29,7 @@ from engine.config import get_settings
 from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
+from engine.events.bus import publish_run_ping
 from engine.github import open_pull_request, parse_github_repo
 from engine.knowledge.capture import capture_run_memory
 from engine.knowledge.recall import format_memories, recall_memories
@@ -62,6 +63,13 @@ def _emit(
     session.add(
         AgentEvent(run_id=run_id, task_id=task_id, agent=agent, type=type_, payload=payload or {})
     )
+
+
+async def _commit_and_ping(session: AsyncSession, run_id: uuid.UUID) -> None:
+    """Commit, then wake any open timeline stream (RUN_EVENT_STREAMING.md).
+    The ping never raises; with Redis down the stream's heartbeat covers it."""
+    await session.commit()
+    await publish_run_ping(run_id)
 
 
 def _set_run_status(session: AsyncSession, run: AgentRun, status: RunStatus) -> None:
@@ -124,7 +132,7 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
                 agent=agent,
                 task_id=task_id,
             )
-            await session.commit()
+            await _commit_and_ping(session, run_id)
 
     return _record
 
@@ -155,7 +163,7 @@ async def _guarded(work, run_id: uuid.UUID) -> None:
             run = await session.get(AgentRun, run_id)
             if run is not None:
                 _fail_run(session, run, str(exc)[:500] or "internal error while executing the run")
-                await session.commit()
+                await _commit_and_ping(session, run_id)
 
 
 async def _open_workspace(run_id: uuid.UUID, repo_url: str) -> Workspace:
@@ -179,7 +187,7 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
     memory = await _recall_for_planning(run_id, repository_id, request)
     ws = await _open_workspace(run_id, repo_url)
@@ -211,7 +219,7 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         _emit(session, run_id, "plan.created", run.plan, agent=AgentRole.PRODUCT_MANAGER)
         # Stop here: nothing executes until the human approves the plan.
         _set_run_status(session, run, RunStatus.AWAITING_APPROVAL)
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
 
 async def _recall_for_planning(run_id: uuid.UUID, repository_id: uuid.UUID, request: str) -> str:
@@ -235,7 +243,7 @@ async def _recall_for_planning(run_id: uuid.UUID, repository_id: uuid.UUID, requ
                     },
                     agent=AgentRole.PRODUCT_MANAGER,
                 )
-                await session.commit()
+                await _commit_and_ping(session, run_id)
             return format_memories(memories)
     except Exception:
         log.exception("memory.recall_failed", run_id=str(run_id))
@@ -298,10 +306,10 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
                 row.attempts = state["attempts"]
         if final["failure"] is not None:
             _fail_run(session, run, final["failure"])
-            await session.commit()
+            await _commit_and_ping(session, run_id)
             return
         _set_run_status(session, run, RunStatus.REVIEWING)
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
     verdict = await _review(run_id, request, plan_summary, ws)
     if verdict["verdict"] == REQUEST_CHANGES:
@@ -325,7 +333,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
                     {"role": role, "findings": len(issues), "summary": summary[:500]},
                     agent=role,
                 )
-                await session.commit()
+                await _commit_and_ping(session, run_id)
         verdict = await _review(run_id, request, plan_summary, ws)
 
     if verdict["verdict"] != APPROVE:
@@ -333,7 +341,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
             run = await session.get(AgentRun, run_id)
             assert run is not None
             _fail_run(session, run, "the reviewer did not approve the changes after one revision")
-            await session.commit()
+            await _commit_and_ping(session, run_id)
         return
 
     if not await _sandbox_gate(run_id, request, ws):
@@ -354,7 +362,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         _set_run_status(session, run, RunStatus.COMPLETED)
         run.finished_at = _now()
         _emit(session, run_id, "run.finished", {"status": run.status, "error": run.error})
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
 
 async def _review(run_id: uuid.UUID, request: str, plan_summary: str, ws: Workspace) -> dict:
@@ -376,7 +384,7 @@ async def _review(run_id: uuid.UUID, request: str, plan_summary: str, ws: Worksp
             },
             agent=AgentRole.REVIEWER,
         )
-        await session.commit()
+        await _commit_and_ping(session, run_id)
     return verdict
 
 
@@ -411,7 +419,7 @@ async def _publish(
             "branch.published",
             {"branch": ws.branch, "pr_url": pr_url},
         )
-        await session.commit()
+        await _commit_and_ping(session, run_id)
     return pr_url
 
 
@@ -446,7 +454,7 @@ async def _sandbox_gate(run_id: uuid.UUID, request: str, ws: Workspace) -> bool:
             run,
             f"sandbox tests still failing after {max_attempts} QA attempt(s): {result.reason}",
         )
-        await session.commit()
+        await _commit_and_ping(session, run_id)
     return False
 
 
@@ -468,7 +476,7 @@ async def _emit_sandbox_run(run_id: uuid.UUID, result: SandboxResult, attempt: i
                 "output": result.output[-2000:],
             },
         )
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
 
 async def _run_qa_fix(
@@ -490,7 +498,7 @@ async def _run_qa_fix(
             {"attempt": attempt, "summary": summary[:500]},
             agent=AgentRole.QA,
         )
-        await session.commit()
+        await _commit_and_ping(session, run_id)
 
 
 async def _security_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
@@ -523,7 +531,7 @@ async def _security_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
         if findings:
             summary = ", ".join(f"{f.rule} in {f.path}:{f.line}" for f in findings[:5])
             _fail_run(session, run, f"secret scan blocked the pull request: {summary}")
-        await session.commit()
+        await _commit_and_ping(session, run_id)
     return not findings
 
 
@@ -563,7 +571,7 @@ async def _dependency_gate(run_id: uuid.UUID, ws: Workspace) -> bool:
         if findings:
             summary = ", ".join(f"{f.package} {f.version} ({f.advisory_id})" for f in findings[:5])
             _fail_run(session, run, f"dependency scan blocked the pull request: {summary}")
-        await session.commit()
+        await _commit_and_ping(session, run_id)
     return not findings
 
 
@@ -603,7 +611,7 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
                 agent=task["role"],
                 task_id=task_id,
             )
-            await session.commit()
+            await _commit_and_ping(session, run_id)
 
         usage = LlmUsage()
         try:
@@ -629,7 +637,7 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
                     agent=task["role"],
                     task_id=task_id,
                 )
-                await session.commit()
+                await _commit_and_ping(session, run_id)
             raise
 
         async with session_scope() as session:
@@ -648,7 +656,7 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
                 agent=task["role"],
                 task_id=task_id,
             )
-            await session.commit()
+            await _commit_and_ping(session, run_id)
         return result
 
     return _execute

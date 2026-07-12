@@ -1,16 +1,20 @@
 """Runs API: start an agent run, list runs, watch one run's progress.
 
-The UI polls GET /v1/runs/{id} for the task board and
-GET /v1/runs/{id}/events?after=<last event id> for new timeline entries.
+The UI streams GET /v1/runs/{id}/events/stream for live timeline entries
+(design note: docs/architecture/RUN_EVENT_STREAMING.md) and polls
+GET /v1/runs/{id} for the task board; the plain events endpoint
+(?after=<last event id>) remains as the polling fallback.
 """
 
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +23,8 @@ from engine.agents.runner import execute_tasks, plan_run
 from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
-from engine.db.session import get_session
+from engine.db.session import get_session, session_scope
+from engine.events.bus import RunEventSubscription, publish_run_ping
 from engine.knowledge.capture import capture_plan_rejected
 from engine.workspace.manager import WorkspaceError, load_workspace, remove_workspace, run_git
 
@@ -196,6 +201,7 @@ async def decide_run(
         # capture never fails the request.
         await capture_plan_rejected(db, run, principal.user_id)
     await db.commit()
+    await publish_run_ping(run.id)  # wake any open timeline stream
 
     if body.approved:
         background.add_task(execute_tasks, run.id)
@@ -313,3 +319,80 @@ async def list_events(
         )
         for e in rows
     ]
+
+
+# The event stream ends with an `end` event once the run reaches one of these.
+# A run waiting for approval keeps its stream open: EventSource auto-reconnects
+# on close, so ending a merely-paused stream would loop reconnects instead.
+_TERMINAL_STATUSES = frozenset({RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED})
+_STREAM_BATCH = 500
+
+
+async def _drain_events(run_id: uuid.UUID, after: int) -> tuple[list[EventOut], str]:
+    """New timeline entries past the cursor, plus the run's current status.
+    One short-lived session per drain — the stream holds no connection while
+    it waits (see session_scope's docstring for why not a request session)."""
+    async with session_scope() as db:
+        run = await db.get(AgentRun, run_id)
+        rows = (
+            (
+                await db.execute(
+                    select(AgentEvent)
+                    .where(AgentEvent.run_id == run_id, AgentEvent.id > after)
+                    .order_by(AgentEvent.id)
+                    .limit(_STREAM_BATCH)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    events = [
+        EventOut(
+            id=e.id,
+            type=e.type,
+            agent=e.agent,
+            task_id=e.task_id,
+            payload=e.payload,
+            created_at=e.created_at,
+        )
+        for e in rows
+    ]
+    return events, run.status if run is not None else RunStatus.FAILED
+
+
+@router.get("/v1/runs/{run_id}/events/stream")
+async def stream_events(
+    run_id: uuid.UUID,
+    request: Request,
+    after: int = 0,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """Live timeline: push each event as it lands, close when the run ends.
+    Postgres is the record, Redis only wakes the stream — a missed ping costs
+    one heartbeat of latency, never an event (RUN_EVENT_STREAMING.md).
+
+    Each message carries its event id, so a reconnecting EventSource resumes
+    from Last-Event-ID; the `after` query parameter seeds a fresh start.
+    """
+    await _owned_run(db, run_id, principal)
+    last_event_id = request.headers.get("last-event-id", "")
+    cursor = max(after, int(last_event_id)) if last_event_id.isdigit() else after
+
+    async def event_stream(cursor: int) -> AsyncIterator[str]:
+        async with RunEventSubscription(run_id) as subscription:
+            while True:
+                events, status = await _drain_events(run_id, cursor)
+                for event in events:
+                    cursor = event.id
+                    yield f"id: {event.id}\ndata: {event.model_dump_json()}\n\n"
+                if len(events) < _STREAM_BATCH and status in _TERMINAL_STATUSES:
+                    yield f'event: end\ndata: {{"status": "{status}"}}\n\n'
+                    return
+                await subscription.wait()
+
+    return StreamingResponse(
+        event_stream(cursor),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

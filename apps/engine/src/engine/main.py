@@ -18,6 +18,7 @@ from engine.api import (
 )
 from engine.config import get_settings
 from engine.db.session import dispose_engine
+from engine.events.bus import dispose_bus
 from engine.logging import setup_logging
 
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         recovery.cancel()
         with suppress(asyncio.CancelledError):
             await recovery
+    await dispose_bus()
     await dispose_engine()
 
 

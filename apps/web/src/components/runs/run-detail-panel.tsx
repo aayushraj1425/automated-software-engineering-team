@@ -18,8 +18,9 @@ function diffLineClass(line: string): string {
   return "text-zinc-400";
 }
 
-/** Watches one run: polls the run (task board) and its events (timeline)
- * until the run finishes. */
+/** Watches one run live: events stream in over SSE (each one nudges a
+ * throttled task-board refresh); if the stream fails, falls back to the old
+ * polling loop. Design note: docs/architecture/RUN_EVENT_STREAMING.md. */
 export function RunDetailPanel({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
@@ -48,19 +49,57 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let source: EventSource | null = null;
+
+    async function fetchRun(): Promise<boolean> {
+      const res = await fetch(`/api/runs/${runId}`);
+      if (!res.ok || stopped) return false;
+      const detail: RunDetail = await res.json();
+      setRun(detail);
+      return FINISHED_STATUSES.has(detail.status);
+    }
+
+    // Events arrive in bursts; one board refresh shortly after the last one.
+    function scheduleRunRefresh() {
+      if (refreshTimer !== null) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void fetchRun();
+      }, 300);
+    }
+
+    function startStream() {
+      source = new EventSource(`/api/runs/${runId}/events/stream?after=${cursorRef.current}`);
+      source.onmessage = (e: MessageEvent<string>) => {
+        const event: RunEvent = JSON.parse(e.data);
+        if (event.id > cursorRef.current) {
+          // The id guard makes reconnect replays harmless.
+          cursorRef.current = event.id;
+          setEvents((prev) => [...prev, event]);
+        }
+        scheduleRunRefresh();
+      };
+      source.addEventListener("end", () => {
+        source?.close();
+        void fetchRun(); // the final status, PR link, and cost totals
+      });
+      source.onerror = () => {
+        // EventSource retries transient drops itself; a closed source means
+        // the stream is unreachable — fall back to polling.
+        if (source?.readyState === EventSource.CLOSED && !stopped) {
+          source = null;
+          void poll();
+        }
+      };
+    }
 
     async function poll() {
-      const [runRes, eventsRes] = await Promise.all([
-        fetch(`/api/runs/${runId}`),
+      const [finished, eventsRes] = await Promise.all([
+        fetchRun(),
         fetch(`/api/runs/${runId}/events?after=${cursorRef.current}`),
       ]);
       if (stopped) return;
-      let finished = false;
-      if (runRes.ok) {
-        const detail: RunDetail = await runRes.json();
-        setRun(detail);
-        finished = FINISHED_STATUSES.has(detail.status);
-      }
       if (eventsRes.ok) {
         const fresh: RunEvent[] = await eventsRes.json();
         if (fresh.length > 0) {
@@ -71,10 +110,13 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       if (!stopped && !finished) timer = setTimeout(() => void poll(), POLL_MS);
     }
 
-    void poll();
+    void fetchRun();
+    startStream();
     return () => {
       stopped = true;
       clearTimeout(timer);
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      source?.close();
     };
   }, [runId]);
 

@@ -40,7 +40,7 @@ subset being built now.
 - [x] Supervisor graph: route work by task dependencies, retries (max 2), failure states
 - [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
 - [x] Postgres checkpointing per run, with a resume-after-restart test — the `agent_tasks` board is the checkpoint; startup recovery resumes interrupted runs from it (design note: [architecture/RUN_RECOVERY.md](architecture/RUN_RECOVERY.md))
-- [ ] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events`
+- [x] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events/stream` (Postgres stays the record, Redis is the wake-up; design note: [architecture/RUN_EVENT_STREAMING.md](architecture/RUN_EVENT_STREAMING.md))
 - [x] Per-run budget guard (cost cap per ADR-0006 accounting); the run fails with a surfaced reason before the next task starts
 - [ ] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work
 
@@ -67,7 +67,7 @@ subset being built now.
 
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
-- [x] Run detail: agent timeline and task board (polling; Redis streaming and per-agent output panes come later)
+- [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback; per-agent output panes come later)
 - [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page (in-place plan editing still pending)
 - [x] Pull-request link on the run page
 - [x] Diff viewer: the run page shows everything the agents changed, colored by +/-
@@ -192,6 +192,18 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Done
 
+- 2026-07-11 · Agent Runtime — run event bus (live timeline streaming): the
+  runner pings a per-run Redis channel after every event commit
+  (`engine/events/bus.py`), and `GET /v1/runs/{id}/events/stream` pushes each
+  timeline entry over SSE the moment it lands — Postgres stays the record,
+  Redis is only the doorbell, and a 2-second heartbeat covers a missing Redis
+  entirely, so a lost ping costs latency, never an event. Streams resume from
+  `Last-Event-ID` (or `?after=`), end with an `end` event at a terminal
+  status, and stay open across the approval pause. The run page swapped its
+  1.5-second event polling for one `EventSource` (each pushed event nudges a
+  throttled task-board refresh) and falls back to polling if the stream is
+  unreachable. Design note: architecture/RUN_EVENT_STREAMING.md. Engine 240
+  passed, 1 skipped; web 13 passed.
 - 2026-07-11 · Agent Runtime — run recovery (resume after restart): the
   `agent_tasks` board in Postgres already checkpoints every status change, so
   `engine/agents/recovery.py` closes the gap — at engine startup, runs frozen

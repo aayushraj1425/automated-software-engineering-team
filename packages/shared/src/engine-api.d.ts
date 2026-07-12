@@ -164,6 +164,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Events
+         * @description Live timeline: push each event as it lands, close when the run ends.
+         *     Postgres is the record, Redis only wakes the stream — a missed ping costs
+         *     one heartbeat of latency, never an event (RUN_EVENT_STREAMING.md).
+         *
+         *     Each message carries its event id, so a reconnecting EventSource resumes
+         *     from Last-Event-ID; the `after` query parameter seeds a fresh start.
+         */
+        get: operations["stream_events_v1_runs__run_id__events_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories": {
         parameters: {
             query?: never;
@@ -1117,6 +1142,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_events_v1_runs__run_id__events_stream_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
