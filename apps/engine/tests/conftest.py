@@ -11,6 +11,9 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://asep:asep@localhost:
 # Tests must never reach the real Docker daemon; sandbox tests opt back in
 # with a monkeypatched settings object and a fake docker call.
 os.environ["SANDBOX_ENABLED"] = "0"
+# Integration adapters must never reach a real Slack workspace; dry-run makes
+# them report success without the network (EXTERNAL_INTEGRATIONS.md).
+os.environ["INTEGRATIONS_DRY_RUN"] = "1"
 # Startup recovery would resume runs other tests deliberately left mid-state;
 # the recovery tests call recover_interrupted_runs() directly instead.
 os.environ["RUN_RECOVERY_ENABLED"] = "0"

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     qa_max_attempts: int = 2  # QA fix-and-retry cycles before a red sandbox fails the run
     github_token: str = ""  # pushes the run branch and opens the pull request
     github_webhook_secret: str = ""  # verifies GitHub webhooks; empty rejects all webhook calls
+    # Integration adapters skip the network and report success (tests, offline
+    # dev) — the run→notify path still runs (EXTERNAL_INTEGRATIONS.md).
+    integrations_dry_run: bool = False
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"

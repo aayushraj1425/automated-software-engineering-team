@@ -195,8 +195,9 @@ panels and external integrations remain and are not yet scheduled.
 - [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
 
 ### Workstream: External Integrations (planned)
-- [ ] Issue trackers: push work items to Jira / Linear
-- [ ] Chat: post run outcomes to Slack
+- [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md)
+- [x] Chat: post run outcomes to Slack — a terminal run notifies the owner's Slack webhook and records an `integration.notified` timeline event; the settings page connects, tests, and removes the webhook
+- [ ] Issue trackers: push work items to Jira / Linear (reuse the connection store + adapter layer)
 - [ ] Source hosts: clone / push / open merge requests on GitLab and Bitbucket behind a git-host provider interface
 
 ## Beyond Phase 3 (headlines only)
@@ -217,6 +218,23 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-12 · External integrations foundation + outbound Slack: a new
+  `integration_connections` table (migration 0014, up/down/up verified) holds
+  one encrypted connection per (user, kind), AES-GCM at rest like the provider
+  keys — only the ciphertext and a non-secret label are stored. An adapter layer
+  (`engine/integrations/`) does the outward work: `slack.post_message` posts to
+  an incoming webhook, and `INTEGRATIONS_DRY_RUN=1` (tests, offline dev) makes
+  every adapter skip the network and report success. When a run reaches a
+  terminal state, `notify_run_outcome` runs beside the memory capture — it loads
+  the owner's enabled Slack connection, posts the outcome (pull-request link or
+  failure reason), and records an `integration.notified` timeline event; like
+  capture it never breaks a run, and a run with no connection notifies nothing.
+  The API (list / set / delete / test under `/v1/integrations`) and the
+  Integrations section on `/settings` connect, test, and remove a Slack webhook;
+  `IntegrationKind` names Jira/Linear/GitLab/Bitbucket too, but the API only
+  accepts the active kinds (this slice: slack). Design note:
+  architecture/EXTERNAL_INTEGRATIONS.md. Engine 272 passed, 1 skipped; web 13
+  passed, build clean.
 - 2026-07-12 · Phase 6 opens — documentation generation suite: a new
   Technical Writer agent role (read-only, planner tier;
   `engine/agents/prompts/technical_writer.md`) turns the repository index into a

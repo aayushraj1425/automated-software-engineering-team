@@ -103,3 +103,17 @@ class DocumentKind(StrEnum):
     API_REFERENCE = "api_reference"  # the endpoints / functions the code exposes
     CHANGELOG = "changelog"  # human summary of what the codebase does, by area
     ARCHITECTURE = "architecture"  # how the modules fit together
+
+
+# ── External Integrations (docs/architecture/EXTERNAL_INTEGRATIONS.md) ──────
+# One connection links a user to an external service. The enum names every
+# planned service so the model stays forward-looking; the API activates them
+# one adapter at a time (this slice: slack).
+
+
+class IntegrationKind(StrEnum):
+    SLACK = "slack"  # post run outcomes to a Slack incoming webhook
+    JIRA = "jira"  # push work items as issues (later slice)
+    LINEAR = "linear"  # push work items as issues (later slice)
+    GITLAB = "gitlab"  # clone / push / open merge requests (later slice)
+    BITBUCKET = "bitbucket"  # clone / push / open pull requests (later slice)

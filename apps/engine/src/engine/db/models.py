@@ -6,6 +6,7 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Computed,
     DateTime,
     ForeignKey,
@@ -24,6 +25,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from engine.config import EMBEDDING_DIM
 from engine.db.enums import (
     DocumentKind,
+    IntegrationKind,
     KnowledgeKind,
     Priority,
     RunStatus,
@@ -333,6 +335,27 @@ class ProviderKey(Base, TimestampMixin):
     provider: Mapped[str] = mapped_column(String(32))  # anthropic | openai | gemini
     encrypted_key: Mapped[str] = mapped_column(Text)
     last4: Mapped[str] = mapped_column(String(8))
+
+
+# ── External Integrations (docs/architecture/EXTERNAL_INTEGRATIONS.md) ──────
+
+
+class IntegrationConnection(Base, TimestampMixin):
+    """One user's link to an external service (Slack first). The secret config
+    is AES-GCM ciphertext of a small JSON blob (for Slack, the incoming-webhook
+    URL); only that ciphertext and a non-secret label are stored, decrypted only
+    when a message is about to be sent."""
+
+    __tablename__ = "integration_connections"
+    __table_args__ = (UniqueConstraint("user_id", "kind", name="uq_integration_connections_user"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(32), default=IntegrationKind.SLACK)
+    encrypted_config: Mapped[str] = mapped_column(Text)
+    # A non-secret hint for the settings page, e.g. "hooks.slack.com · ending 1a2b".
+    label: Mapped[str] = mapped_column(String(256), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 # ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────

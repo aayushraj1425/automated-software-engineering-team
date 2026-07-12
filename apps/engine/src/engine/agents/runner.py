@@ -31,6 +31,7 @@ from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.events.bus import publish_run_ping
 from engine.github import open_pull_request, parse_github_repo
+from engine.integrations.notify import notify_run_outcome
 from engine.knowledge.capture import capture_run_memory
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
@@ -144,6 +145,7 @@ async def plan_run(run_id: uuid.UUID) -> None:
     # A run that failed during planning still leaves memory behind; a run
     # waiting for approval is not terminal, so capture does nothing.
     await capture_run_memory(run_id)
+    await notify_run_outcome(run_id)
 
 
 async def execute_tasks(run_id: uuid.UUID) -> None:
@@ -152,6 +154,7 @@ async def execute_tasks(run_id: uuid.UUID) -> None:
     # The run is terminal either way now — remember what happened
     # (KNOWLEDGE_AND_MEMORY.md); capture never raises.
     await capture_run_memory(run_id)
+    await notify_run_outcome(run_id)
 
 
 async def _guarded(work, run_id: uuid.UUID) -> None:
