@@ -11,6 +11,9 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://asep:asep@localhost:
 # Tests must never reach the real Docker daemon; sandbox tests opt back in
 # with a monkeypatched settings object and a fake docker call.
 os.environ["SANDBOX_ENABLED"] = "0"
+# Startup recovery would resume runs other tests deliberately left mid-state;
+# the recovery tests call recover_interrupted_runs() directly instead.
+os.environ["RUN_RECOVERY_ENABLED"] = "0"
 
 # psycopg async cannot run on Windows' default ProactorEventLoop.
 if sys.platform == "win32":

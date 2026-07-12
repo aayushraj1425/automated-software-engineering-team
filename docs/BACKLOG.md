@@ -39,7 +39,7 @@ subset being built now.
 - [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/AGENT_RUNTIME.md](architecture/AGENT_RUNTIME.md)
 - [x] Supervisor graph: route work by task dependencies, retries (max 2), failure states
 - [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
-- [ ] Postgres checkpointing per run, with a resume-after-restart test
+- [x] Postgres checkpointing per run, with a resume-after-restart test — the `agent_tasks` board is the checkpoint; startup recovery resumes interrupted runs from it (design note: [architecture/RUN_RECOVERY.md](architecture/RUN_RECOVERY.md))
 - [ ] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events`
 - [x] Per-run budget guard (cost cap per ADR-0006 accounting); the run fails with a surfaced reason before the next task starts
 - [ ] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work
@@ -192,6 +192,23 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Done
 
+- 2026-07-11 · Agent Runtime — run recovery (resume after restart): the
+  `agent_tasks` board in Postgres already checkpoints every status change, so
+  `engine/agents/recovery.py` closes the gap — at engine startup, runs frozen
+  in `queued`/`planning` are re-planned from scratch (the half-made plan and
+  workspace are discarded) and runs frozen in `executing`/`reviewing` resume
+  from their board: done tasks keep their commits, the interrupted task
+  repeats, and reviewing runs fall straight through to review. Every recovered
+  run carries a `run.recovered` timeline event; runs awaiting approval and
+  terminal runs are untouched. Gated by `RUN_RECOVERY_ENABLED` (on by default,
+  off in tests, which call recovery directly). Design note:
+  architecture/RUN_RECOVERY.md. Engine 234 passed, 1 skipped.
+- 2026-07-11 · Grounded chat reads the team memory (Phase 5 complete, stretch
+  item shipped): chat about a connected repository recalls the memories most
+  relevant to the question into its system context next to the code excerpts,
+  streams a `memory` SSE event naming them (the citations pattern), and the
+  chat UI shows a "Remembered" list under the answer. Engine 229 passed; web
+  13 passed.
 - 2026-07-11 · Phase 5 core — Knowledge & Memory (both exit criteria met): the
   `knowledge_items` table (migration 0011, up/down/up verified) holds durable,
   repository-scoped memories — decisions, run outcomes, preferences, notes —

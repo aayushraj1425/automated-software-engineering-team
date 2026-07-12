@@ -1,9 +1,11 @@
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from engine.agents.recovery import recover_interrupted_runs
 from engine.api import (
     chat,
     conversations,
@@ -22,7 +24,17 @@ from engine.logging import setup_logging
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
+    # Resume runs the last process left behind (docs/architecture/RUN_RECOVERY.md).
+    # Runs in the background so startup never blocks on an interrupted run; a
+    # shutdown mid-recovery just leaves the runs for the next startup.
+    recovery: asyncio.Task | None = None
+    if get_settings().run_recovery_enabled:
+        recovery = asyncio.create_task(recover_interrupted_runs())
     yield
+    if recovery is not None and not recovery.done():
+        recovery.cancel()
+        with suppress(asyncio.CancelledError):
+            await recovery
     await dispose_engine()
 
 

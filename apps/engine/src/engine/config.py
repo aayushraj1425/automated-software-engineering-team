@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     llm_fake: bool = False
     workspaces_dir: str = ".workspaces"
+    run_recovery_enabled: bool = True  # resume interrupted runs at startup (RUN_RECOVERY.md)
     sandbox_enabled: bool = True  # run the workspace's tests in Docker before the PR
     sandbox_required: bool = False  # fail the run (instead of skipping) when Docker is down
     sandbox_timeout_seconds: int = 300  # per phase: dependency install, then tests
