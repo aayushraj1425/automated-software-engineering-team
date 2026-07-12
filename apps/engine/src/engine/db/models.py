@@ -23,6 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from engine.config import EMBEDDING_DIM
 from engine.db.enums import (
+    DocumentKind,
     KnowledgeKind,
     Priority,
     RunStatus,
@@ -372,6 +373,30 @@ class KnowledgeItem(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# ── Documentation Suite (docs/architecture/DOCUMENTATION_SUITE.md) ──────────
+
+
+class GeneratedDocument(Base, TimestampMixin):
+    """One human-facing Markdown document — a README, API reference, changelog,
+    or architecture overview — written by the Technical Writer from the
+    repository index. Durable and repository-scoped; a snapshot of the code as
+    the index saw it, kept until deleted so a history can build up. Unlike a
+    knowledge item it is written for people, so it is neither embedded nor fed
+    back into agent context."""
+
+    __tablename__ = "generated_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), default=DocumentKind.README, index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    content: Mapped[str] = mapped_column(Text)  # the document body, Markdown
+    # better-auth user id of whoever generated it; null if ever auto-generated.
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class AuditLog(Base):

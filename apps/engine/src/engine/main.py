@@ -9,6 +9,7 @@ from engine.agents.recovery import recover_interrupted_runs
 from engine.api import (
     chat,
     conversations,
+    documents,
     health,
     knowledge,
     provider_keys,
@@ -68,4 +69,5 @@ app.include_router(repositories.router)
 app.include_router(webhooks.router)
 app.include_router(work_items.router)
 app.include_router(knowledge.router)
+app.include_router(documents.router)
 app.include_router(provider_keys.router)

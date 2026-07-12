@@ -98,6 +98,14 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             tools=_READ_TOOLS,
             prompt_file="scrum_master.md",
         ),
+        AgentSpec(
+            role=AgentRole.TECHNICAL_WRITER,
+            model_tier="planner",
+            # Documentation is read-only: the Technical Writer reads the index
+            # for context and returns prose; it never edits the workspace.
+            tools=_READ_TOOLS,
+            prompt_file="technical_writer.md",
+        ),
     )
 }
 

@@ -163,6 +163,12 @@ export function ChatPanel({ userName }: { userName: string }) {
           Agent runs →
         </Link>
         <Link
+          href="/docs"
+          className="mx-3 rounded-md px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-900"
+        >
+          Docs →
+        </Link>
+        <Link
           href="/settings"
           className="mx-3 rounded-md px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-900"
         >

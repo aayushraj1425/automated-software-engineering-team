@@ -37,6 +37,7 @@ class AgentRole(StrEnum):
     REVIEWER = "reviewer"
     QA = "qa"
     SCRUM_MASTER = "scrum_master"
+    TECHNICAL_WRITER = "technical_writer"
 
 
 # ── Planning Suite (docs/architecture/PLANNING_SUITE.md) ────────────────────
@@ -90,3 +91,15 @@ class ArtifactKind(StrEnum):
     DIFF = "diff"
     PULL_REQUEST = "pull_request"
     LOG = "log"
+
+
+# ── Documentation Suite (docs/architecture/DOCUMENTATION_SUITE.md) ──────────
+# A generated document is a human-facing Markdown artifact written by the
+# Technical Writer from the repository index — durable and repository-scoped.
+
+
+class DocumentKind(StrEnum):
+    README = "readme"  # project overview: what it is, setup, usage
+    API_REFERENCE = "api_reference"  # the endpoints / functions the code exposes
+    CHANGELOG = "changelog"  # human summary of what the codebase does, by area
+    ARCHITECTURE = "architecture"  # how the modules fit together

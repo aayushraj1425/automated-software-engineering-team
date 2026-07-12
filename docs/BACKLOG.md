@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-11
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-12
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -174,6 +174,31 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 ### Workstream: Grounded Chat Reads Memory (stretch)
 - [x] Repository chat blends recalled memories into its context next to code citations (`memory` SSE event; a "Remembered" list under the answer)
 
+## Phase 6 — Workspace & Integrations
+
+Design note (documentation slice): [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md).
+Started 2026-07-12 with the documentation generation suite (self-contained: no
+external credentials, runs fully offline in fake-model mode). The workspace
+panels and external integrations remain and are not yet scheduled.
+
+### Workstream: Documentation Generation Suite (blocking)
+- [x] Technical Writer agent role: registry entry (prompt + read-only tool policy + model tier)
+- [x] `generated_documents` model and its Alembic migration (repository-scoped; kind = readme / api_reference / changelog / architecture; Markdown body; migration 0013, up/down/up verified)
+- [x] Generator grounded in the index: file map + kind-seeded retrieved code + recalled memory → Markdown document; deterministic offline document under `LLM_FAKE`
+- [x] Documents API: generate / list / delete under `/v1/repositories/{id}/documents`
+- [x] Docs page (`/docs`): pick a document kind, generate it, browse / read / delete the results
+- [ ] Git-history changelog (generate from real commit history, not the current snapshot)
+- [ ] In-place editing of a generated document
+
+### Workstream: Workspace Panels (planned)
+- [ ] Editor / file-tree / git panels on the run page
+- [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
+
+### Workstream: External Integrations (planned)
+- [ ] Issue trackers: push work items to Jira / Linear
+- [ ] Chat: post run outcomes to Slack
+- [ ] Source hosts: clone / push / open merge requests on GitLab and Bitbucket behind a git-host provider interface
+
 ## Beyond Phase 3 (headlines only)
 
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
@@ -192,6 +217,22 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Done
 
+- 2026-07-12 · Phase 6 opens — documentation generation suite: a new
+  Technical Writer agent role (read-only, planner tier;
+  `engine/agents/prompts/technical_writer.md`) turns the repository index into a
+  human-facing Markdown document. `engine/docs/generator.py` grounds the writer
+  the way the Scrum Master is grounded — the repository's file map plus the code
+  hybrid-retrieved for a kind-specific seed query, with recalled team memory
+  riding along as context — and produces one of four kinds: `readme`,
+  `api_reference`, `changelog`, or `architecture`. Documents persist in
+  `generated_documents` (migration 0013, up/down/up verified), repository-scoped
+  and durable; unlike a knowledge item they are written for people, so they are
+  neither embedded nor fed back into agent context. The API (generate / list /
+  delete under `/v1/repositories/{id}/documents`) and the `/docs` page (pick a
+  kind, generate, read, delete) make it usable. Under `LLM_FAKE=1` the generator
+  returns a deterministic document listing the repository's real files, so the
+  whole path runs offline. Design note: architecture/DOCUMENTATION_SUITE.md.
+  Engine 261 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-12 · Identity & Keys — bring-your-own provider keys: each user can
   store an Anthropic / OpenAI / Gemini key, AES-GCM-encrypted at rest
   (`engine/security/crypto.py`; `ENGINE_ENCRYPTION_KEY`, dev fallback derived

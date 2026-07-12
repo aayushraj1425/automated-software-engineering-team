@@ -29,6 +29,9 @@ export default async function SettingsPage() {
           <Link href="/knowledge" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             knowledge
           </Link>{" "}
+          <Link href="/docs" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
+            docs
+          </Link>{" "}
           <Link href="/chat" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
             chat
           </Link>
