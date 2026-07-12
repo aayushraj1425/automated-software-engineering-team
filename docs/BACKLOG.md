@@ -42,7 +42,7 @@ subset being built now.
 - [x] Postgres checkpointing per run, with a resume-after-restart test — the `agent_tasks` board is the checkpoint; startup recovery resumes interrupted runs from it (design note: [architecture/RUN_RECOVERY.md](architecture/RUN_RECOVERY.md))
 - [x] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events/stream` (Postgres stays the record, Redis is the wake-up; design note: [architecture/RUN_EVENT_STREAMING.md](architecture/RUN_EVENT_STREAMING.md))
 - [x] Per-run budget guard (cost cap per ADR-0006 accounting); the run fails with a surfaced reason before the next task starts
-- [ ] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work
+- [x] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work (`RUN_QUEUE=arq` + `uv run arq engine.worker.WorkerSettings`; design note: [architecture/BACKGROUND_WORKER.md](architecture/BACKGROUND_WORKER.md))
 
 ### Workstream: Repository Connection & Workspaces (blocking)
 - [ ] GitHub connection: personal access token first (encrypted at rest), OAuth app flow next
@@ -192,6 +192,20 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Done
 
+- 2026-07-12 · Agent Runtime — background worker (the last blocking runtime
+  item): a new dispatch seam (`engine/jobs.py`) sends "plan this run" /
+  "execute this run" either inline (the default — today's behavior, untouched)
+  or onto a Redis queue for the arq worker process (`engine/worker.py`,
+  `RUN_QUEUE=arq`). Both job functions are re-entrant: before running they
+  reset an interrupted run the way startup recovery does, so the graceful
+  shutdown story holds end to end — cancelling a run mid-task leaves the
+  Postgres checkpoint intact (proven by a test that cancels mid-execution and
+  asserts the run froze, not failed) and the re-delivered job finishes it. A
+  dead queue degrades to inline with a warning, never parking a run; API
+  startup recovery is gated to inline mode so it can't fight a healthy
+  worker. Live arq round trip (enqueue → burst worker → plan → approve →
+  execute → completed) runs against the dev Redis. Design note:
+  architecture/BACKGROUND_WORKER.md. Engine 245 passed, 1 skipped.
 - 2026-07-11 · Agent Runtime — run event bus (live timeline streaming): the
   runner pings a per-run Redis channel after every event commit
   (`engine/events/bus.py`), and `GET /v1/runs/{id}/events/stream` pushes each

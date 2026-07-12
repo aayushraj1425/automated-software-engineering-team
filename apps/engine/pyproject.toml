@@ -19,6 +19,7 @@ dependencies = [
     "tree-sitter>=0.26.0",
     "tree-sitter-language-pack>=1.12.5",
     "redis>=5.2",
+    "arq>=0.26",
 ]
 
 [dependency-groups]

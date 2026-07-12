@@ -19,12 +19,12 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from engine.agents.runner import execute_tasks, plan_run
 from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session, session_scope
 from engine.events.bus import RunEventSubscription, publish_run_ping
+from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
 from engine.workspace.manager import WorkspaceError, load_workspace, remove_workspace, run_git
 
@@ -143,7 +143,7 @@ async def create_run(
     db.add(run)
     await db.commit()
 
-    background.add_task(plan_run, run.id)
+    background.add_task(dispatch_plan, run.id)
     return _run_out(run, url)
 
 
@@ -204,7 +204,7 @@ async def decide_run(
     await publish_run_ping(run.id)  # wake any open timeline stream
 
     if body.approved:
-        background.add_task(execute_tasks, run.id)
+        background.add_task(dispatch_execute, run.id)
     else:
         # The workspace was cloned during planning; a rejected run won't use it.
         await asyncio.to_thread(remove_workspace, run.id)

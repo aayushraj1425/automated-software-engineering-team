@@ -19,6 +19,7 @@ from engine.api import (
 from engine.config import get_settings
 from engine.db.session import dispose_engine
 from engine.events.bus import dispose_bus
+from engine.jobs import dispose_jobs
 from engine.logging import setup_logging
 
 
@@ -27,15 +28,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
     # Resume runs the last process left behind (docs/architecture/RUN_RECOVERY.md).
     # Runs in the background so startup never blocks on an interrupted run; a
-    # shutdown mid-recovery just leaves the runs for the next startup.
+    # shutdown mid-recovery just leaves the runs for the next startup. Inline
+    # mode only: in queue mode the worker owns runs, and the API must not
+    # resume one a healthy worker may still be executing (BACKGROUND_WORKER.md).
     recovery: asyncio.Task | None = None
-    if get_settings().run_recovery_enabled:
+    if get_settings().run_recovery_enabled and get_settings().run_queue == "inline":
         recovery = asyncio.create_task(recover_interrupted_runs())
     yield
     if recovery is not None and not recovery.done():
         recovery.cancel()
         with suppress(asyncio.CancelledError):
             await recovery
+    await dispose_jobs()
     await dispose_bus()
     await dispose_engine()
 
