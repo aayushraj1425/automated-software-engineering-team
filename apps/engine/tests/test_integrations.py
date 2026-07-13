@@ -73,9 +73,9 @@ async def test_a_bad_webhook_is_rejected(client):
 
 async def test_inactive_kind_is_refused(client):
     headers = _headers()
-    # gitlab has no adapter yet, so the API refuses the connection outright.
+    # bitbucket has no adapter yet, so the API refuses the connection outright.
     resp = await client.put(
-        "/v1/integrations/gitlab", json={"config": {"token": "x"}}, headers=headers
+        "/v1/integrations/bitbucket", json={"config": {"token": "x"}}, headers=headers
     )
     assert resp.status_code == 400
 
@@ -153,6 +153,61 @@ async def test_connect_jira_requires_https(client):
         headers=headers,
     )
     assert resp.status_code == 422
+
+
+async def test_connect_gitlab_stores_token_and_defaults_base_url(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/gitlab",
+        json={"config": {"token": "glpat-secret-token"}},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["kind"] == "gitlab"
+    assert "gitlab.com" in body["label"]  # default base URL host
+    assert "glpat-secret-token" not in body["label"]
+
+
+async def test_connect_gitlab_needs_a_token(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/gitlab",
+        json={"config": {"base_url": "https://gitlab.com"}},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_gitlab_is_not_an_issue_tracker(client):
+    """GitLab is a git host, not a work-item push target."""
+    from engine.integrations.issues import ISSUE_TRACKER_KINDS
+
+    assert "gitlab" not in ISSUE_TRACKER_KINDS
+
+
+def test_parse_gitlab_repo_recognizes_nested_paths():
+    from engine.integrations.gitlab import parse_gitlab_repo
+
+    assert parse_gitlab_repo("https://gitlab.com/acme/demo") == "acme/demo"
+    assert parse_gitlab_repo("https://gitlab.com/acme/team/demo.git") == "acme/team/demo"
+    assert parse_gitlab_repo("git@gitlab.com:acme/demo.git") == "acme/demo"
+    assert parse_gitlab_repo("https://github.com/acme/demo") is None
+    assert parse_gitlab_repo("C:/tmp/fixture-repo") is None
+
+
+async def test_open_merge_request_is_dry_run_offline():
+    from engine.integrations.gitlab import open_merge_request
+
+    url = await open_merge_request(
+        {"token": "x", "base_url": "https://gitlab.com"},
+        "https://gitlab.com/acme/demo",
+        "asep/run-1",
+        "main",
+        "Add a thing",
+        "body",
+    )
+    assert url == "https://gitlab.com/acme/demo/-/merge_requests/dry-run"
 
 
 async def test_connections_are_owner_scoped(client):

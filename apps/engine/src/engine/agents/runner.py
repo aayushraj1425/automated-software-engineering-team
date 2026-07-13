@@ -26,11 +26,13 @@ from engine.agents.qa import fix_failing_tests
 from engine.agents.reviewer import APPROVE, REQUEST_CHANGES, review_run
 from engine.agents.supervisor import TaskState, build_supervisor_graph
 from engine.config import get_settings
-from engine.db.enums import AgentRole, RunStatus, TaskStatus
+from engine.db.enums import AgentRole, IntegrationKind, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.events.bus import publish_run_ping
 from engine.github import open_pull_request, parse_github_repo
+from engine.integrations import gitlab
+from engine.integrations.connections import load_config
 from engine.integrations.notify import notify_run_outcome
 from engine.knowledge.capture import capture_run_memory
 from engine.knowledge.recall import format_memories, recall_memories
@@ -405,20 +407,36 @@ async def _publish(
     plan_summary: str,
     ws: Workspace,
 ) -> str | None:
-    """Push the run branch; open the pull request when the repo is on GitHub
-    and a token is configured. Scratch workspaces have nothing to push to."""
-    pushed = await push_branch(ws)
+    """Push the run branch and open the host's request: a GitHub pull request
+    (env token) or a GitLab merge request (the owner's connection token). A repo
+    on neither host — or a scratch workspace — just pushes. Design note:
+    docs/architecture/SOURCE_HOSTS.md."""
+    title = request.strip().splitlines()[0][:72]
+    body = (
+        f"{plan_summary}\n\n"
+        f"Opened by the ASEP agent team (run {run_id}).\n"
+        "Review checklist: correctness, scope, security, consistency."
+    )
+
+    # A GitLab repo publishes with the run owner's encrypted GitLab connection.
+    gitlab_config: dict | None = None
+    if gitlab.parse_gitlab_repo(repo_url) is not None:
+        async with session_scope() as session:
+            run = await session.get(AgentRun, run_id)
+            if run is not None:
+                gitlab_config = await load_config(session, run.user_id, IntegrationKind.GITLAB)
+
+    credential = ("oauth2", gitlab_config["token"]) if gitlab_config else None
+    pushed = await push_branch(ws, credential)
     if not pushed:
         return None
 
     pr_url: str | None = None
-    if parse_github_repo(repo_url) is not None and get_settings().github_token:
-        title = request.strip().splitlines()[0][:72]
-        body = (
-            f"{plan_summary}\n\n"
-            f"Opened by the ASEP agent team (run {run_id}).\n"
-            "Review checklist: correctness, scope, security, consistency."
+    if gitlab_config is not None:
+        pr_url = await gitlab.open_merge_request(
+            gitlab_config, repo_url, ws.branch, default_branch, title, body
         )
+    elif parse_github_repo(repo_url) is not None and get_settings().github_token:
         pr_url = await open_pull_request(repo_url, ws.branch, default_branch, title, body)
 
     async with session_scope() as session:

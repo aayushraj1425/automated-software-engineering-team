@@ -199,7 +199,8 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Chat: post run outcomes to Slack — a terminal run notifies the owner's Slack webhook and records an `integration.notified` timeline event; the settings page connects, tests, and removes the webhook
 - [x] Issue trackers: push a work item to Linear (`issueCreate`) from the planning board, storing the issue link on the item, behind a tracker-agnostic dispatch (`engine/integrations/issues.py`) so Jira reuses it
 - [x] Issue trackers: add Jira as a second tracker behind the same dispatch (REST `/rest/api/3/issue`, HTTP-Basic auth, ADF description); the planning board pushes to each connected tracker
-- [ ] Source hosts: clone / push / open merge requests on GitLab and Bitbucket behind a git-host provider interface
+- [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
+- [ ] Source hosts: add Bitbucket (and self-hosted GitLab) behind the same host-aware publish seam
 
 ## Beyond Phase 3 (headlines only)
 
@@ -219,6 +220,21 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Source hosts — GitLab merge requests: the run publish step is now
+  host-aware. `engine/integrations/gitlab.py` recognizes `gitlab.com` URLs
+  (`parse_gitlab_repo`, nested project paths) and opens a merge request via
+  `POST /api/v4/projects/{path}/merge_requests` with a `PRIVATE-TOKEN` header,
+  returning the MR's web URL; `INTEGRATIONS_DRY_RUN=1` returns a placeholder so
+  the piece is testable offline. `gitlab` is a connection kind (`{token,
+  base_url}`, default `https://gitlab.com`, encrypted at rest) but not an issue
+  tracker. `push_branch` gained an optional credential — the default keeps its
+  GitHub-env behavior byte-for-byte, and `_publish` passes an `("oauth2", token)`
+  credential for a GitLab repo and opens the MR with the run owner's connection.
+  A repo on neither host publishes the branch only, exactly as before, so the
+  GitHub golden path is unchanged (all run-pipeline tests green). The settings
+  page connects GitLab (token + optional base URL). Design note:
+  architecture/SOURCE_HOSTS.md. Engine 288 passed, 1 skipped; web 13 passed,
+  build clean.
 - 2026-07-13 · Jira as a second issue tracker: the shared "an issue was created"
   contract (`IssueResult`) moved into the dispatcher (`engine/integrations/issues.py`),
   and a new Jira adapter (`engine/integrations/jira.py`) POSTs to Jira Cloud's

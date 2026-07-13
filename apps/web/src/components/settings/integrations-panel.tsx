@@ -33,6 +33,9 @@ export function IntegrationsPanel() {
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraToken, setJiraToken] = useState("");
   const [jiraProject, setJiraProject] = useState("");
+  // GitLab draft
+  const [gitlabToken, setGitlabToken] = useState("");
+  const [gitlabUrl, setGitlabUrl] = useState("");
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/integrations");
@@ -66,6 +69,8 @@ export function IntegrationsPanel() {
       setJiraEmail("");
       setJiraToken("");
       setJiraProject("");
+      setGitlabToken("");
+      setGitlabUrl("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -108,6 +113,7 @@ export function IntegrationsPanel() {
   const slack = connections.slack;
   const linear = connections.linear;
   const jira = connections.jira;
+  const gitlab = connections.gitlab;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 pt-0">
@@ -325,6 +331,72 @@ export function IntegrationsPanel() {
               type="button"
               onClick={() => void remove("jira")}
               disabled={busy === "jira"}
+              className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* GitLab */}
+      <section className="space-y-2 rounded-md border border-zinc-800 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-200">GitLab</p>
+          {gitlab ? (
+            <span className="text-xs text-emerald-400">
+              {gitlab.label} · {new Date(gitlab.updated_at).toLocaleDateString()}
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">not connected</span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500">
+          Connect a GitLab{" "}
+          <a
+            href="https://gitlab.com/-/user_settings/personal_access_tokens"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-zinc-300"
+          >
+            personal access token
+          </a>{" "}
+          (scope <code className="text-zinc-400">api</code>) and a run on a GitLab repository
+          opens a merge request when it finishes.
+        </p>
+        <div className="flex gap-3">
+          <input
+            type="password"
+            value={gitlabToken}
+            onChange={(e) => setGitlabToken(e.target.value)}
+            placeholder={gitlab ? "Replace the token (glpat-…)" : "Personal access token (glpat-…)"}
+            autoComplete="off"
+            className={inputClasses}
+          />
+          <input
+            value={gitlabUrl}
+            onChange={(e) => setGitlabUrl(e.target.value)}
+            placeholder="Base URL (optional, defaults to https://gitlab.com)"
+            className={inputClasses}
+          />
+          <button
+            type="button"
+            onClick={() =>
+              void save("gitlab", {
+                token: gitlabToken.trim(),
+                ...(gitlabUrl.trim() ? { base_url: gitlabUrl.trim() } : {}),
+              })
+            }
+            disabled={busy === "gitlab" || !gitlabToken.trim()}
+            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+          >
+            {busy === "gitlab" ? "Saving…" : gitlab ? "Replace" : "Save"}
+          </button>
+          {gitlab && (
+            <button
+              type="button"
+              onClick={() => void remove("gitlab")}
+              disabled={busy === "gitlab"}
               className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
             >
               Remove

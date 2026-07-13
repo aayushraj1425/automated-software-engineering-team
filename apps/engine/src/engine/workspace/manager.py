@@ -115,17 +115,28 @@ async def create_scratch_workspace(run_id: uuid.UUID) -> Workspace:
     return Workspace(run_id=run_id, path=path, branch=branch, base_sha=base_sha)
 
 
-async def push_branch(ws: Workspace) -> bool:
+async def push_branch(ws: Workspace, credential: tuple[str, str] | None = None) -> bool:
     """Push the run branch to origin; False when there is no origin (scratch
-    workspaces). GitHub pushes authenticate with GITHUB_TOKEN."""
+    workspaces).
+
+    With no credential (the default) a GitHub https remote authenticates with
+    GITHUB_TOKEN, exactly as before. A caller may pass `(userinfo, token)` — e.g.
+    ("oauth2", gitlab_token) — to authenticate any other https remote; the token
+    is redacted from any error either way. Design note: docs/architecture/SOURCE_HOSTS.md.
+    """
     remotes = await run_git(ws.path, "remote")
     if "origin" not in remotes.split():
         return False
     target = "origin"
     url = await run_git(ws.path, "remote", "get-url", "origin")
-    token = get_settings().github_token
-    if token and url.startswith("https://github.com/"):
-        target = url.replace("https://", f"https://x-access-token:{token}@", 1)
+    token: str | None = None
+    if credential is not None and url.startswith("https://"):
+        userinfo, token = credential
+        target = url.replace("https://", f"https://{userinfo}:{token}@", 1)
+    elif credential is None:
+        token = get_settings().github_token
+        if token and url.startswith("https://github.com/"):
+            target = url.replace("https://", f"https://x-access-token:{token}@", 1)
     try:
         await run_git(ws.path, "push", target, ws.branch)
     except WorkspaceError as exc:

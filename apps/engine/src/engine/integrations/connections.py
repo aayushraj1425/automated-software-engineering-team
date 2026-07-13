@@ -15,16 +15,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.db.enums import IntegrationKind
 from engine.db.models import IntegrationConnection
-from engine.integrations import slack
+from engine.integrations import gitlab, slack
 from engine.security.crypto import DecryptionError, decrypt, encrypt
 
 log = structlog.get_logger()
 
 # The kinds whose adapter exists and the API will accept. Grows one at a time.
+# (GitLab is a git host, not an issue tracker — see issues.ISSUE_TRACKER_KINDS.)
 ACTIVE_KINDS: tuple[str, ...] = (
     IntegrationKind.SLACK,
     IntegrationKind.LINEAR,
     IntegrationKind.JIRA,
+    IntegrationKind.GITLAB,
 )
 
 
@@ -70,6 +72,16 @@ def build_config(kind: str, raw: dict[str, Any]) -> tuple[str, str]:
             ),
             label,
         )
+    if kind == IntegrationKind.GITLAB:
+        token = str(raw.get("token", "")).strip()
+        base_url = str(raw.get("base_url", "")).strip().rstrip("/") or gitlab.DEFAULT_BASE_URL
+        if not token:
+            raise ConfigError("GitLab needs a personal access token")
+        if not base_url.startswith("https://"):
+            raise ConfigError("The GitLab base URL must be https")
+        host = base_url.split("://", 1)[1]
+        label = f"GitLab · {host}"
+        return json.dumps({"token": token, "base_url": base_url}), label
     raise ConfigError(f"{kind} is not yet supported")
 
 
