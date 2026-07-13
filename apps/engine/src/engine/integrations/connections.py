@@ -21,7 +21,11 @@ from engine.security.crypto import DecryptionError, decrypt, encrypt
 log = structlog.get_logger()
 
 # The kinds whose adapter exists and the API will accept. Grows one at a time.
-ACTIVE_KINDS: tuple[str, ...] = (IntegrationKind.SLACK, IntegrationKind.LINEAR)
+ACTIVE_KINDS: tuple[str, ...] = (
+    IntegrationKind.SLACK,
+    IntegrationKind.LINEAR,
+    IntegrationKind.JIRA,
+)
 
 
 class ConfigError(ValueError):
@@ -46,6 +50,26 @@ def build_config(kind: str, raw: dict[str, Any]) -> tuple[str, str]:
             raise ConfigError("Linear needs both an API key and a team id")
         label = f"Linear · team …{team_id[-6:]}"
         return json.dumps({"api_key": api_key, "team_id": team_id}), label
+    if kind == IntegrationKind.JIRA:
+        base_url = str(raw.get("base_url", "")).strip().rstrip("/")
+        email = str(raw.get("email", "")).strip()
+        api_token = str(raw.get("api_token", "")).strip()
+        project_key = str(raw.get("project_key", "")).strip()
+        if not (base_url.startswith("https://") and email and api_token and project_key):
+            raise ConfigError("Jira needs a https base URL, email, API token, and project key")
+        host = base_url.split("://", 1)[1]
+        label = f"Jira · {project_key} @ {host}"
+        return (
+            json.dumps(
+                {
+                    "base_url": base_url,
+                    "email": email,
+                    "api_token": api_token,
+                    "project_key": project_key,
+                }
+            ),
+            label,
+        )
     raise ConfigError(f"{kind} is not yet supported")
 
 

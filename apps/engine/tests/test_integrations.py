@@ -73,8 +73,9 @@ async def test_a_bad_webhook_is_rejected(client):
 
 async def test_inactive_kind_is_refused(client):
     headers = _headers()
+    # gitlab has no adapter yet, so the API refuses the connection outright.
     resp = await client.put(
-        "/v1/integrations/jira", json={"config": {"token": "x"}}, headers=headers
+        "/v1/integrations/gitlab", json={"config": {"token": "x"}}, headers=headers
     )
     assert resp.status_code == 400
 
@@ -112,6 +113,46 @@ async def test_linear_has_no_test_message(client):
     )
     resp = await client.post("/v1/integrations/linear/test", headers=headers)
     assert resp.status_code == 400  # test messages are Slack-only
+
+
+_JIRA_CONFIG = {
+    "base_url": "https://acme.atlassian.net",
+    "email": "dev@acme.test",
+    "api_token": "jira_secret_token",
+    "project_key": "ENG",
+}
+
+
+async def test_connect_jira_labels_without_leaking_the_token(client):
+    headers = _headers()
+    resp = await client.put("/v1/integrations/jira", json={"config": _JIRA_CONFIG}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["kind"] == "jira"
+    # the label carries the project key and host, never the token
+    assert "ENG" in body["label"]
+    assert "acme.atlassian.net" in body["label"]
+    assert "jira_secret_token" not in body["label"]
+
+
+async def test_connect_jira_needs_all_fields(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/jira",
+        json={"config": {"base_url": "https://acme.atlassian.net", "email": "dev@acme.test"}},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_connect_jira_requires_https(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/jira",
+        json={"config": {**_JIRA_CONFIG, "base_url": "http://acme.atlassian.net"}},
+        headers=headers,
+    )
+    assert resp.status_code == 422
 
 
 async def test_connections_are_owner_scoped(client):

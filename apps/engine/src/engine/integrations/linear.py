@@ -7,11 +7,10 @@ without a real Linear workspace. Design note:
 docs/architecture/EXTERNAL_INTEGRATIONS.md.
 """
 
-from dataclasses import dataclass
-
 import httpx
 
 from engine.config import get_settings
+from engine.integrations.issues import IssueResult
 
 GRAPHQL_URL = "https://api.linear.app/graphql"
 _TIMEOUT_SECONDS = 15
@@ -24,13 +23,6 @@ mutation IssueCreate($teamId: String!, $title: String!, $description: String) {
   }
 }
 """
-
-
-@dataclass(frozen=True)
-class IssueResult:
-    url: str
-    identifier: str  # Linear's human key, e.g. "ENG-42"
-    dry_run: bool
 
 
 class LinearError(Exception):

@@ -38,7 +38,17 @@ export function PlanningBoard() {
   const [goal, setGoal] = useState("");
   const [generating, setGenerating] = useState(false);
   const [insights, setInsights] = useState<PlanInsights | null>(null);
+  const [trackers, setTrackers] = useState<string[]>([]);
   const draggingId = useRef<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/integrations");
+      if (!res.ok) return;
+      const rows: { kind: string }[] = await res.json();
+      setTrackers(rows.map((r) => r.kind).filter((k) => k === "linear" || k === "jira"));
+    })();
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -122,17 +132,17 @@ export function PlanningBoard() {
     await refresh();
   }
 
-  async function push(id: string) {
+  async function push(id: string, kind: string) {
     if (!repositoryId) return;
     setError(null);
     const res = await fetch(`/api/repositories/${repositoryId}/work-items/${id}/push`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "linear" }),
+      body: JSON.stringify({ kind }),
     });
     if (!res.ok) {
       const detail = await res.json().catch(() => null);
-      setError(detail?.detail ?? `Could not push to Linear (${res.status})`);
+      setError(detail?.detail ?? `Could not push to ${kind} (${res.status})`);
       return;
     }
     await refresh();
@@ -383,14 +393,21 @@ export function PlanningBoard() {
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
-                onClick={() => void push(item.id)}
-                className="ml-auto text-xs text-zinc-500 hover:text-violet-300"
-                title="Create a Linear issue from this work item"
-              >
-                {item.external_issue_url ? "re-push to Linear" : "push to Linear"}
-              </button>
+              {trackers.length > 0 && (
+                <span className="ml-auto flex items-center gap-3">
+                  {trackers.map((tracker) => (
+                    <button
+                      key={tracker}
+                      type="button"
+                      onClick={() => void push(item.id, tracker)}
+                      className="text-xs text-zinc-500 hover:text-violet-300"
+                      title={`Create a ${tracker} issue from this work item`}
+                    >
+                      {item.external_issue_url ? "re-push" : "push"} to {tracker}
+                    </button>
+                  ))}
+                </span>
+              )}
             </div>
           </div>
         ))}

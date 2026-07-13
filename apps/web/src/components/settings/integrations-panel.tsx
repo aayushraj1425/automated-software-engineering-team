@@ -28,6 +28,11 @@ export function IntegrationsPanel() {
   // Linear draft
   const [apiKey, setApiKey] = useState("");
   const [teamId, setTeamId] = useState("");
+  // Jira draft
+  const [jiraUrl, setJiraUrl] = useState("");
+  const [jiraEmail, setJiraEmail] = useState("");
+  const [jiraToken, setJiraToken] = useState("");
+  const [jiraProject, setJiraProject] = useState("");
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/integrations");
@@ -57,6 +62,10 @@ export function IntegrationsPanel() {
       setWebhook("");
       setApiKey("");
       setTeamId("");
+      setJiraUrl("");
+      setJiraEmail("");
+      setJiraToken("");
+      setJiraProject("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -98,6 +107,7 @@ export function IntegrationsPanel() {
 
   const slack = connections.slack;
   const linear = connections.linear;
+  const jira = connections.jira;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 pt-0">
@@ -232,6 +242,94 @@ export function IntegrationsPanel() {
               </button>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* Jira */}
+      <section className="space-y-2 rounded-md border border-zinc-800 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-200">Jira</p>
+          {jira ? (
+            <span className="text-xs text-emerald-400">
+              {jira.label} · {new Date(jira.updated_at).toLocaleDateString()}
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">not connected</span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500">
+          Connect Jira Cloud with your site URL, an{" "}
+          <a
+            href="https://id.atlassian.com/manage-profile/security/api-tokens"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-zinc-300"
+          >
+            API token
+          </a>{" "}
+          and email, and the project key to create issues in.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            value={jiraUrl}
+            onChange={(e) => setJiraUrl(e.target.value)}
+            placeholder="https://your-site.atlassian.net"
+            className={inputClasses}
+          />
+          <input
+            value={jiraProject}
+            onChange={(e) => setJiraProject(e.target.value)}
+            placeholder="Project key (e.g. ENG)"
+            className={inputClasses}
+          />
+          <input
+            value={jiraEmail}
+            onChange={(e) => setJiraEmail(e.target.value)}
+            placeholder="Email"
+            autoComplete="off"
+            className={inputClasses}
+          />
+          <input
+            type="password"
+            value={jiraToken}
+            onChange={(e) => setJiraToken(e.target.value)}
+            placeholder={jira ? "Replace the API token" : "API token"}
+            autoComplete="off"
+            className={inputClasses}
+          />
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              void save("jira", {
+                base_url: jiraUrl.trim(),
+                email: jiraEmail.trim(),
+                api_token: jiraToken.trim(),
+                project_key: jiraProject.trim(),
+              })
+            }
+            disabled={
+              busy === "jira" ||
+              !jiraUrl.trim() ||
+              !jiraEmail.trim() ||
+              !jiraToken.trim() ||
+              !jiraProject.trim()
+            }
+            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+          >
+            {busy === "jira" ? "Saving…" : jira ? "Replace" : "Save"}
+          </button>
+          {jira && (
+            <button
+              type="button"
+              onClick={() => void remove("jira")}
+              disabled={busy === "jira"}
+              className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
         </div>
       </section>
 

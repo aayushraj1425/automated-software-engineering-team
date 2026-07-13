@@ -198,7 +198,7 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md)
 - [x] Chat: post run outcomes to Slack — a terminal run notifies the owner's Slack webhook and records an `integration.notified` timeline event; the settings page connects, tests, and removes the webhook
 - [x] Issue trackers: push a work item to Linear (`issueCreate`) from the planning board, storing the issue link on the item, behind a tracker-agnostic dispatch (`engine/integrations/issues.py`) so Jira reuses it
-- [ ] Issue trackers: add Jira as a second tracker behind the same dispatch
+- [x] Issue trackers: add Jira as a second tracker behind the same dispatch (REST `/rest/api/3/issue`, HTTP-Basic auth, ADF description); the planning board pushes to each connected tracker
 - [ ] Source hosts: clone / push / open merge requests on GitLab and Bitbucket behind a git-host provider interface
 
 ## Beyond Phase 3 (headlines only)
@@ -219,6 +219,18 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Jira as a second issue tracker: the shared "an issue was created"
+  contract (`IssueResult`) moved into the dispatcher (`engine/integrations/issues.py`),
+  and a new Jira adapter (`engine/integrations/jira.py`) POSTs to Jira Cloud's
+  `/rest/api/3/issue` with HTTP-Basic auth (email + API token) and an Atlassian
+  Document Format description, returning the issue's browse URL and key.
+  `INTEGRATIONS_DRY_RUN=1` returns a deterministic placeholder so the path runs
+  offline. The same `POST …/work-items/{id}/push` endpoint now accepts `jira`,
+  the settings page connects Jira (site URL, email, token, project key —
+  encrypted at rest), and the planning board offers a push action per connected
+  tracker. A differently-shaped API behind the unchanged dispatch is the proof
+  the abstraction holds. Design note: architecture/EXTERNAL_INTEGRATIONS.md.
+  Engine 283 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Issue-tracker push (Linear) on the integrations foundation: a
   work item can now be pushed to Linear as an issue from the planning board.
   A new Linear adapter (`engine/integrations/linear.py`) calls the `issueCreate`

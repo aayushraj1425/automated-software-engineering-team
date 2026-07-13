@@ -75,23 +75,31 @@ Owner-scoped, mirroring the provider-keys API:
 `IntegrationKind` names all the planned services — `slack`, `jira`, `linear`,
 `gitlab`, `bitbucket` — so the model and enum are forward-looking, but the API
 only accepts the **active** ones. A `PUT` to an inactive kind is refused with
-"not yet supported" until its adapter lands. Active so far: `slack`, `linear`.
+"not yet supported" until its adapter lands. Active so far: `slack`, `linear`,
+`jira`.
 
-## Issue-tracker push (Linear)
+## Issue-tracker push (Linear, Jira)
 
 The second slice proves the foundation generalizes past notifications: **push a
-work item to an issue tracker**. Linear is the first tracker (a single GraphQL
-endpoint, API-key auth); Jira reuses everything behind it.
+work item to an issue tracker**. Linear came first (a single GraphQL endpoint,
+API-key auth); Jira followed as a differently-shaped second tracker (REST,
+HTTP-Basic auth, project keys) behind the same dispatch — the proof the
+abstraction holds.
 
-- **Connection** — a Linear connection stores `{api_key, team_id}`, encrypted
-  like the Slack webhook. The label is a non-secret hint (`Linear · team …abcdef`).
-- **Adapter** (`engine/integrations/linear.py`) — `create_issue(config, title,
-  description)` calls Linear's `issueCreate` mutation and returns the new issue's
-  URL and identifier (e.g. `ENG-42`). Dry-run returns a deterministic
-  placeholder, so the whole push path runs offline.
-- **Dispatch** (`engine/integrations/issues.py`) — maps an issue-tracker kind to
-  its adapter, so the push endpoint never names a specific tracker and Jira
-  slots in as one more entry.
+- **Connection** — a Linear connection stores `{api_key, team_id}`; a Jira
+  connection stores `{base_url, email, api_token, project_key}`. Both are
+  encrypted like the Slack webhook, with a non-secret label (`Linear · team
+  …abcdef`, `Jira · ENG @ acme.atlassian.net`).
+- **Adapters** — `engine/integrations/linear.py` calls Linear's `issueCreate`
+  mutation; `engine/integrations/jira.py` POSTs to `/rest/api/3/issue` (the v3
+  description is wrapped as an Atlassian Document Format node). Each returns the
+  new issue's URL and human key (`ENG-42`, `PROJ-7`) and, under dry-run, a
+  deterministic placeholder so the whole push path runs offline.
+- **Dispatch and contract** (`engine/integrations/issues.py`) — owns the shared
+  `IssueResult` and maps an issue-tracker kind to its adapter, so the push
+  endpoint never names a specific tracker and the next tracker is one more
+  branch. (Adapters are imported inside the dispatch function so the dispatcher
+  can own `IssueResult` without an import cycle.)
 - **The link lives on the work item** — a work item gains `external_issue_url`
   and `external_issue_key`; pushing stores them, and the task board shows the
   item's tracker link. Pushing again re-creates and overwrites (no dedupe yet).
@@ -112,9 +120,11 @@ webhook, which is how it is tested.
 
 ## Boundaries
 
-- Outbound only: Slack notifications and Linear issue push. Jira reuses the
-  issue-tracker path; GitLab/Bitbucket merge requests are a separate git-host
-  slice.
+- Outbound only: Slack notifications and Linear/Jira issue push.
+  GitLab/Bitbucket merge requests are a separate git-host slice.
+- Issue creation only — a fixed issue type (`Task` on Jira) and no field mapping
+  beyond title and description. Custom fields, labels, and assignees are later
+  refinements.
 - Pushing a work item **re-creates** the issue every time — no dedupe against an
   already-pushed item, and no two-way sync (a change in Linear does not flow
   back). Both are later refinements.

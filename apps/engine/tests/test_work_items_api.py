@@ -338,3 +338,36 @@ async def test_push_is_owner_scoped(client):
         headers=intruder,
     )
     assert resp.status_code == 404
+
+
+async def _connect_jira(client, headers) -> None:
+    resp = await client.put(
+        "/v1/integrations/jira",
+        json={
+            "config": {
+                "base_url": "https://acme.atlassian.net",
+                "email": "dev@acme.test",
+                "api_token": "jira_token",
+                "project_key": "ENG",
+            }
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_push_to_jira_stores_a_browse_link(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    item = await _create_item(client, headers, repo_id, title="Add password reset")
+    await _connect_jira(client, headers)
+
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items/{item['id']}/push",
+        json={"kind": "jira"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    pushed = resp.json()
+    assert pushed["external_issue_key"] == "DRY-1"  # dry-run placeholder
+    assert pushed["external_issue_url"] == "https://acme.atlassian.net/browse/DRY-1"
