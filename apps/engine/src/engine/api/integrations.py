@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
+from engine.db.enums import IntegrationKind
 from engine.db.models import IntegrationConnection
 from engine.db.session import get_session
 from engine.integrations import slack
@@ -139,8 +140,12 @@ async def test_integration(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> TestResult:
-    """Send a test message now, so the settings page can prove it works."""
-    kind = _active_kind(kind)
+    """Send a test message now, so the settings page can prove it works.
+
+    Slack only — a tracker's "test" would create a junk issue, so pushing a real
+    work item is its own proof instead (EXTERNAL_INTEGRATIONS.md)."""
+    if kind != IntegrationKind.SLACK:
+        raise HTTPException(status_code=400, detail="Test messages are only available for Slack")
     config = await load_config(db, principal.user_id, kind)
     if config is None:
         raise HTTPException(status_code=404, detail="No connection for that integration")

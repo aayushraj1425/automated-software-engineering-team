@@ -74,8 +74,34 @@ Owner-scoped, mirroring the provider-keys API:
 
 `IntegrationKind` names all the planned services — `slack`, `jira`, `linear`,
 `gitlab`, `bitbucket` — so the model and enum are forward-looking, but the API
-only accepts the **active** ones. This slice activates `slack`; a `PUT` to an
-inactive kind is refused with "not yet supported" until its adapter lands.
+only accepts the **active** ones. A `PUT` to an inactive kind is refused with
+"not yet supported" until its adapter lands. Active so far: `slack`, `linear`.
+
+## Issue-tracker push (Linear)
+
+The second slice proves the foundation generalizes past notifications: **push a
+work item to an issue tracker**. Linear is the first tracker (a single GraphQL
+endpoint, API-key auth); Jira reuses everything behind it.
+
+- **Connection** — a Linear connection stores `{api_key, team_id}`, encrypted
+  like the Slack webhook. The label is a non-secret hint (`Linear · team …abcdef`).
+- **Adapter** (`engine/integrations/linear.py`) — `create_issue(config, title,
+  description)` calls Linear's `issueCreate` mutation and returns the new issue's
+  URL and identifier (e.g. `ENG-42`). Dry-run returns a deterministic
+  placeholder, so the whole push path runs offline.
+- **Dispatch** (`engine/integrations/issues.py`) — maps an issue-tracker kind to
+  its adapter, so the push endpoint never names a specific tracker and Jira
+  slots in as one more entry.
+- **The link lives on the work item** — a work item gains `external_issue_url`
+  and `external_issue_key`; pushing stores them, and the task board shows the
+  item's tracker link. Pushing again re-creates and overwrites (no dedupe yet).
+- **Endpoint** — `POST /v1/repositories/{id}/work-items/{item_id}/push` with
+  `{kind}` creates the issue from the item's title and description, stores the
+  link, and returns the updated work item; `404` when the tracker is not
+  connected.
+
+The Slack `test` endpoint stays Slack-only — a tracker's "test" would create a
+junk issue, so pushing a real work item is its own proof instead.
 
 ## Exit criterion (this slice)
 
@@ -84,14 +110,18 @@ state posts its outcome to Slack and records an `integration.notified` event on
 the run timeline. In dry-run mode the same path runs end to end without a real
 webhook, which is how it is tested.
 
-## Boundaries (kept out of this slice)
+## Boundaries
 
-- Only **outbound** Slack notifications. Jira/Linear issue push and
-  GitLab/Bitbucket merge requests reuse this foundation in later slices.
+- Outbound only: Slack notifications and Linear issue push. Jira reuses the
+  issue-tracker path; GitLab/Bitbucket merge requests are a separate git-host
+  slice.
+- Pushing a work item **re-creates** the issue every time — no dedupe against an
+  already-pushed item, and no two-way sync (a change in Linear does not flow
+  back). Both are later refinements.
 - Connections are per **user**, not per organization (same call as the provider
   keys) — organization-shared connections can come with the organization
   switcher.
 - No inbound webhooks from these services here (the GitHub PR-review webhook is
   separate, [WEBHOOK_REVIEWER.md](WEBHOOK_REVIEWER.md)).
-- No retry queue: a failed notification is logged, not retried — the run's own
-  record and memory are unaffected.
+- No retry queue: a failed notification or push is surfaced, not retried — the
+  run's own record and the work item are unaffected.

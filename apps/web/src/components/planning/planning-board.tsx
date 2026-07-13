@@ -122,6 +122,22 @@ export function PlanningBoard() {
     await refresh();
   }
 
+  async function push(id: string) {
+    if (!repositoryId) return;
+    setError(null);
+    const res = await fetch(`/api/repositories/${repositoryId}/work-items/${id}/push`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "linear" }),
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => null);
+      setError(detail?.detail ?? `Could not push to Linear (${res.status})`);
+      return;
+    }
+    await refresh();
+  }
+
   async function persistOrder(ordered: WorkItem[]) {
     if (!repositoryId) return;
     await fetch(`/api/repositories/${repositoryId}/work-items/reorder`, {
@@ -320,6 +336,16 @@ export function PlanningBoard() {
                   {item.depends_on.length} dependenc{item.depends_on.length === 1 ? "y" : "ies"}
                 </Badge>
               )}
+              {item.external_issue_url && (
+                <a
+                  href={item.external_issue_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block rounded-full bg-violet-950 px-2 py-0.5 font-medium text-violet-300 hover:text-violet-200"
+                >
+                  {item.external_issue_key ?? "Linear"} ↗
+                </a>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <label className="text-xs text-zinc-500">
@@ -357,6 +383,14 @@ export function PlanningBoard() {
                   ))}
                 </select>
               </label>
+              <button
+                type="button"
+                onClick={() => void push(item.id)}
+                className="ml-auto text-xs text-zinc-500 hover:text-violet-300"
+                title="Create a Linear issue from this work item"
+              >
+                {item.external_issue_url ? "re-push to Linear" : "push to Linear"}
+              </button>
             </div>
           </div>
         ))}

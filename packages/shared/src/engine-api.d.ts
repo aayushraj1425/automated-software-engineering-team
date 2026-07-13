@@ -310,6 +310,27 @@ export interface paths {
         patch: operations["update_work_item_v1_repositories__repository_id__work_items__item_id__patch"];
         trace?: never;
     };
+    "/v1/repositories/{repository_id}/work-items/{item_id}/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push Work Item
+         * @description Create an issue in a connected tracker from this work item and store the
+         *     link. 404 when the tracker is not connected.
+         */
+        post: operations["push_work_item_v1_repositories__repository_id__work_items__item_id__push_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{repository_id}/work-items/reorder": {
         parameters: {
             query?: never;
@@ -534,6 +555,9 @@ export interface paths {
         /**
          * Test Integration
          * @description Send a test message now, so the settings page can prove it works.
+         *
+         *     Slack only — a tracker's "test" would create a junk issue, so pushing a real
+         *     work item is its own proof instead (EXTERNAL_INTEGRATIONS.md).
          */
         post: operations["test_integration_v1_integrations__kind__test_post"];
         delete?: never;
@@ -716,6 +740,11 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * IntegrationKind
+         * @enum {string}
+         */
+        IntegrationKind: "slack" | "jira" | "linear" | "gitlab" | "bitbucket";
+        /**
          * KnowledgeItemIn
          * @description A hand-written memory. Decisions and outcomes are captured automatically
          *     by runs; the page adds notes and preferences (and corrections as notes).
@@ -813,6 +842,14 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * PushIn
+         * @description Which connected issue tracker to push the work item to.
+         */
+        PushIn: {
+            /** @default linear */
+            kind: components["schemas"]["IntegrationKind"];
         };
         /** ReorderIn */
         ReorderIn: {
@@ -1038,6 +1075,10 @@ export interface components {
             position: number;
             /** Implemented By Run Id */
             implemented_by_run_id: string | null;
+            /** External Issue Url */
+            external_issue_url: string | null;
+            /** External Issue Key */
+            external_issue_key: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1668,6 +1709,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WorkItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_work_item_v1_repositories__repository_id__work_items__item_id__push_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushIn"];
             };
         };
         responses: {

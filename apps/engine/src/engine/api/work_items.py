@@ -17,9 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.agents.scrum_master import generate_roadmap, persist_roadmap
 from engine.auth import Principal, require_service_auth
-from engine.db.enums import Estimate, Priority, WorkItemKind, WorkItemStatus
+from engine.db.enums import Estimate, IntegrationKind, Priority, WorkItemKind, WorkItemStatus
 from engine.db.models import CodeChunk, Repository, WorkItem
 from engine.db.session import get_session
+from engine.integrations.connections import load_config
+from engine.integrations.issues import ISSUE_TRACKER_KINDS, IssueError, create_issue
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
 from engine.planning.insights import plan_insights
@@ -78,6 +80,12 @@ class RoadmapIn(BaseModel):
     goal: str = Field(min_length=3, max_length=2000)
 
 
+class PushIn(BaseModel):
+    """Which connected issue tracker to push the work item to."""
+
+    kind: IntegrationKind = IntegrationKind.LINEAR
+
+
 class WorkItemOut(BaseModel):
     id: uuid.UUID
     repository_id: uuid.UUID
@@ -92,6 +100,8 @@ class WorkItemOut(BaseModel):
     rationale: str | None
     position: int
     implemented_by_run_id: uuid.UUID | None
+    external_issue_url: str | None
+    external_issue_key: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -122,6 +132,8 @@ def _work_item_out(item: WorkItem) -> WorkItemOut:
         rationale=item.rationale,
         position=item.position,
         implemented_by_run_id=item.implemented_by_run_id,
+        external_issue_url=item.external_issue_url,
+        external_issue_key=item.external_issue_key,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -264,6 +276,36 @@ async def update_work_item(
         )
     for field, value in changes.items():
         setattr(item, field, value)
+    await db.commit()
+    await db.refresh(item)
+    return _work_item_out(item)
+
+
+@router.post("/v1/repositories/{repository_id}/work-items/{item_id}/push")
+async def push_work_item(
+    repository_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: PushIn,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> WorkItemOut:
+    """Create an issue in a connected tracker from this work item and store the
+    link. 404 when the tracker is not connected."""
+    kind = str(body.kind)
+    if kind not in ISSUE_TRACKER_KINDS:
+        raise HTTPException(status_code=400, detail=f"{kind} is not an issue tracker")
+    item = await _owned_work_item(db, repository_id, item_id, principal)
+    config = await load_config(db, principal.user_id, kind)
+    if config is None:
+        raise HTTPException(
+            status_code=404, detail=f"No {kind} connection — connect it in settings"
+        )
+    try:
+        issue = await create_issue(kind, config, item.title, item.description)
+    except IssueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    item.external_issue_url = issue.url
+    item.external_issue_key = issue.identifier
     await db.commit()
     await db.refresh(item)
     return _work_item_out(item)

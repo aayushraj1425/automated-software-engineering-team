@@ -314,6 +314,10 @@ class WorkItem(Base, TimestampMixin):
     implemented_by_run_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
     )
+    # Link to the external issue this item was pushed to (Linear first); the
+    # human key (e.g. "ENG-42") is shown on the board (EXTERNAL_INTEGRATIONS.md).
+    external_issue_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    external_issue_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 # ── Identity & Keys (docs/architecture/PROVIDER_KEYS.md) ────────────────────

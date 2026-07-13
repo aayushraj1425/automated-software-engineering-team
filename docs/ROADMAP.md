@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** Living document · **Last updated:** 2026-07-12
+**Status:** Living document · **Last updated:** 2026-07-13
 Effort is relative (small / medium / large). Every phase ships the full engineering
 loop: architecture note → API spec → schema migration → UI/UX → implementation →
 unit + integration tests → docs → performance/security pass (enforced by the PR
@@ -14,7 +14,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **3** | **Execution & QA** *(complete 2026-07-10)* | medium | Docker sandbox (no-egress build/test runs), QA agent with self-correction loops, PR-review agent via GitHub webhooks, secrets detection + dependency scanning | code review; testing & security |
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
-| **6** | **Workspace & Integrations** *(documentation generation suite and outbound Slack notifications shipped 2026-07-12; editor/terminal/git panels, issue-tracker/source-host integrations remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
+| **6** | **Workspace & Integrations** *(documentation suite, outbound Slack, and Linear issue push shipped; editor/terminal/git panels, Jira, and source-host integrations remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
 | **7** | **Production Hardening** | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
@@ -54,8 +54,11 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   a run reaching a terminal state posts its outcome to the owner's Slack webhook
   (encrypted at rest) and records an `integration.notified` timeline event; the
   whole path runs in dry-run mode for tests and offline dev. ✅ *Slack slice met
-  2026-07-12.* Design note: [EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md).
-  The editor/terminal/git panels and the remaining integrations (Jira, Linear,
+  2026-07-12.* The issue-tracker slice followed: a work item pushes to Linear
+  (`issueCreate`) from the planning board, storing the issue link on the item,
+  behind a tracker-agnostic dispatch so Jira slots in next. ✅ *Linear slice met
+  2026-07-13.* Design note: [EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md).
+  The editor/terminal/git panels and the remaining integrations (Jira,
   GitLab, Bitbucket) remain.
 
 ## Standing tracks (every phase)

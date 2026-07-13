@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-12
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-13
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -197,7 +197,8 @@ panels and external integrations remain and are not yet scheduled.
 ### Workstream: External Integrations (planned)
 - [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md)
 - [x] Chat: post run outcomes to Slack — a terminal run notifies the owner's Slack webhook and records an `integration.notified` timeline event; the settings page connects, tests, and removes the webhook
-- [ ] Issue trackers: push work items to Jira / Linear (reuse the connection store + adapter layer)
+- [x] Issue trackers: push a work item to Linear (`issueCreate`) from the planning board, storing the issue link on the item, behind a tracker-agnostic dispatch (`engine/integrations/issues.py`) so Jira reuses it
+- [ ] Issue trackers: add Jira as a second tracker behind the same dispatch
 - [ ] Source hosts: clone / push / open merge requests on GitLab and Bitbucket behind a git-host provider interface
 
 ## Beyond Phase 3 (headlines only)
@@ -218,6 +219,23 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Issue-tracker push (Linear) on the integrations foundation: a
+  work item can now be pushed to Linear as an issue from the planning board.
+  A new Linear adapter (`engine/integrations/linear.py`) calls the `issueCreate`
+  GraphQL mutation and returns the issue's URL and human key (e.g. `ENG-42`);
+  `INTEGRATIONS_DRY_RUN=1` returns a deterministic placeholder so the whole push
+  path runs offline. A tracker-agnostic dispatch (`engine/integrations/issues.py`)
+  maps a tracker kind to its adapter, so the push endpoint never names a specific
+  tracker and Jira slots in as one more entry. Work items gained
+  `external_issue_url` / `external_issue_key` (migration 0015, up/down/up
+  verified); `POST …/work-items/{id}/push` creates the issue from the item's
+  title and description, stores the link, and returns the updated item (404 when
+  the tracker is not connected). The planning board shows the linked issue key
+  and a push / re-push action; the settings page connects Linear (API key + team
+  id, encrypted at rest). The Slack `test` endpoint stays Slack-only — a
+  tracker's "test" would create a junk issue. Design note:
+  architecture/EXTERNAL_INTEGRATIONS.md. Engine 279 passed, 1 skipped; web 13
+  passed, build clean.
 - 2026-07-12 · External integrations foundation + outbound Slack: a new
   `integration_connections` table (migration 0014, up/down/up verified) holds
   one encrypted connection per (user, kind), AES-GCM at rest like the provider

@@ -11,101 +11,111 @@ type Connection = {
 
 type TestResult = { ok: boolean; dry_run: boolean; detail: string };
 
-/** Outbound integrations. Slack is the first: save an incoming-webhook URL and
- * a run's outcome is posted there when it finishes. The webhook is encrypted at
- * rest and never returned — only a non-secret label comes back. */
+const inputClasses =
+  "w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500";
+
+/** Outbound integrations, each encrypted at rest and never returned — only a
+ * non-secret label comes back. Slack posts run outcomes; Linear turns a work
+ * item into an issue from the planning board. */
 export function IntegrationsPanel() {
-  const [connection, setConnection] = useState<Connection | null>(null);
-  const [webhook, setWebhook] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [connections, setConnections] = useState<Record<string, Connection>>({});
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  // Slack draft
+  const [webhook, setWebhook] = useState("");
+  // Linear draft
+  const [apiKey, setApiKey] = useState("");
+  const [teamId, setTeamId] = useState("");
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/integrations");
     if (!res.ok) return;
     const rows: Connection[] = await res.json();
-    setConnection(rows.find((r) => r.kind === "slack") ?? null);
+    setConnections(Object.fromEntries(rows.map((r) => [r.kind, r])));
   }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  async function save() {
-    const url = webhook.trim();
-    if (!url) return;
-    setBusy(true);
+  async function save(kind: string, config: Record<string, string>) {
+    setBusy(kind);
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch("/api/integrations/slack", {
+      const res = await fetch(`/api/integrations/${kind}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ config: { webhook_url: url } }),
+        body: JSON.stringify({ config }),
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);
-        throw new Error(detail?.detail ?? `Could not save the webhook (${res.status})`);
+        throw new Error(detail?.detail ?? `Could not save (${res.status})`);
       }
       setWebhook("");
+      setApiKey("");
+      setTeamId("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  async function remove() {
-    setBusy(true);
+  async function remove(kind: string) {
+    setBusy(kind);
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch("/api/integrations/slack", { method: "DELETE" });
-      if (!res.ok && res.status !== 204) {
-        throw new Error(`Could not disconnect (${res.status})`);
-      }
+      const res = await fetch(`/api/integrations/${kind}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error(`Could not disconnect (${res.status})`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  async function sendTest() {
-    setBusy(true);
+  async function sendTest(kind: string) {
+    setBusy(kind);
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch("/api/integrations/slack/test", { method: "POST" });
+      const res = await fetch(`/api/integrations/${kind}/test`, { method: "POST" });
       const result: TestResult = await res.json();
       if (!res.ok) throw new Error(`Test failed (${res.status})`);
       setStatus(result.detail);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
+
+  const slack = connections.slack;
+  const linear = connections.linear;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 pt-0">
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Integrations</h2>
         <p className="text-xs text-zinc-500">
-          Connect an outbound service and the platform tells it when a run finishes. Secrets
-          are encrypted at rest and never shown again.
+          Connect an outbound service and the platform reaches it from your work. Secrets are
+          encrypted at rest and never shown again.
         </p>
       </section>
 
+      {/* Slack */}
       <section className="space-y-2 rounded-md border border-zinc-800 p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-200">Slack</p>
-          {connection ? (
+          {slack ? (
             <span className="text-xs text-emerald-400">
-              {connection.label} · {new Date(connection.updated_at).toLocaleDateString()}
+              {slack.label} · {new Date(slack.updated_at).toLocaleDateString()}
             </span>
           ) : (
             <span className="text-xs text-zinc-600">not connected</span>
@@ -128,34 +138,32 @@ export function IntegrationsPanel() {
             type="password"
             value={webhook}
             onChange={(e) => setWebhook(e.target.value)}
-            placeholder={
-              connection ? "Replace the webhook (https://hooks.slack.com/…)" : "https://hooks.slack.com/…"
-            }
+            placeholder={slack ? "Replace the webhook (https://hooks.slack.com/…)" : "https://hooks.slack.com/…"}
             autoComplete="off"
-            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+            className={inputClasses}
           />
           <button
             type="button"
-            onClick={() => void save()}
-            disabled={busy || !webhook.trim()}
+            onClick={() => void save("slack", { webhook_url: webhook.trim() })}
+            disabled={busy === "slack" || !webhook.trim()}
             className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
           >
-            {busy ? "Saving…" : connection ? "Replace" : "Save"}
+            {busy === "slack" ? "Saving…" : slack ? "Replace" : "Save"}
           </button>
-          {connection && (
+          {slack && (
             <>
               <button
                 type="button"
-                onClick={() => void sendTest()}
-                disabled={busy}
+                onClick={() => void sendTest("slack")}
+                disabled={busy === "slack"}
                 className="shrink-0 rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 disabled:opacity-50"
               >
                 Send test
               </button>
               <button
                 type="button"
-                onClick={() => void remove()}
-                disabled={busy}
+                onClick={() => void remove("slack")}
+                disabled={busy === "slack"}
                 className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
               >
                 Remove
@@ -163,9 +171,72 @@ export function IntegrationsPanel() {
             </>
           )}
         </div>
-        {status && <p className="text-sm text-emerald-400">{status}</p>}
-        {error && <p className="text-sm text-red-400">{error}</p>}
       </section>
+
+      {/* Linear */}
+      <section className="space-y-2 rounded-md border border-zinc-800 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-200">Linear</p>
+          {linear ? (
+            <span className="text-xs text-emerald-400">
+              {linear.label} · {new Date(linear.updated_at).toLocaleDateString()}
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">not connected</span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500">
+          Paste a Linear{" "}
+          <a
+            href="https://linear.app/settings/api"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-zinc-300"
+          >
+            personal API key
+          </a>{" "}
+          and the team id to create issues in. Push a work item to Linear from the planning board.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={linear ? "Replace the API key (lin_api_…)" : "API key (lin_api_…)"}
+            autoComplete="off"
+            className={inputClasses}
+          />
+          <div className="flex w-full gap-3">
+            <input
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              placeholder="Team id"
+              className={inputClasses}
+            />
+            <button
+              type="button"
+              onClick={() => void save("linear", { api_key: apiKey.trim(), team_id: teamId.trim() })}
+              disabled={busy === "linear" || !apiKey.trim() || !teamId.trim()}
+              className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+            >
+              {busy === "linear" ? "Saving…" : linear ? "Replace" : "Save"}
+            </button>
+            {linear && (
+              <button
+                type="button"
+                onClick={() => void remove("linear")}
+                disabled={busy === "linear"}
+                className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {status && <p className="text-sm text-emerald-400">{status}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
     </div>
   );
 }

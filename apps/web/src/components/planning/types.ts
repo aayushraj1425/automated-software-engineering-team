@@ -18,6 +18,8 @@ export type WorkItem = {
   rationale: string | null;
   position: number;
   implemented_by_run_id: string | null;
+  external_issue_url: string | null;
+  external_issue_key: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -828,6 +828,67 @@
         }
       }
     },
+    "/v1/repositories/{repository_id}/work-items/{item_id}/push": {
+      "post": {
+        "summary": "Push Work Item",
+        "description": "Create an issue in a connected tracker from this work item and store the\nlink. 404 when the tracker is not connected.",
+        "operationId": "push_work_item_v1_repositories__repository_id__work_items__item_id__push_post",
+        "parameters": [
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkItemOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/repositories/{repository_id}/work-items/reorder": {
       "post": {
         "summary": "Reorder Work Items",
@@ -1474,7 +1535,7 @@
     "/v1/integrations/{kind}/test": {
       "post": {
         "summary": "Test Integration",
-        "description": "Send a test message now, so the settings page can prove it works.",
+        "description": "Send a test message now, so the settings page can prove it works.\n\nSlack only \u2014 a tracker's \"test\" would create a junk issue, so pushing a real\nwork item is its own proof instead (EXTERNAL_INTEGRATIONS.md).",
         "operationId": "test_integration_v1_integrations__kind__test_post",
         "parameters": [
           {
@@ -1916,6 +1977,17 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "IntegrationKind": {
+        "type": "string",
+        "enum": [
+          "slack",
+          "jira",
+          "linear",
+          "gitlab",
+          "bitbucket"
+        ],
+        "title": "IntegrationKind"
+      },
       "KnowledgeItemIn": {
         "properties": {
           "kind": {
@@ -2163,6 +2235,17 @@
           "updated_at"
         ],
         "title": "ProviderKeyOut"
+      },
+      "PushIn": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/IntegrationKind",
+            "default": "linear"
+          }
+        },
+        "type": "object",
+        "title": "PushIn",
+        "description": "Which connected issue tracker to push the work item to."
       },
       "ReorderIn": {
         "properties": {
@@ -2844,6 +2927,28 @@
             ],
             "title": "Implemented By Run Id"
           },
+          "external_issue_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Issue Url"
+          },
+          "external_issue_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Issue Key"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2870,6 +2975,8 @@
           "rationale",
           "position",
           "implemented_by_run_id",
+          "external_issue_url",
+          "external_issue_key",
           "created_at",
           "updated_at"
         ],

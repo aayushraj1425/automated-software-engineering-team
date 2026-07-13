@@ -79,6 +79,41 @@ async def test_inactive_kind_is_refused(client):
     assert resp.status_code == 400
 
 
+async def test_connect_linear_needs_both_fields(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/linear",
+        json={"config": {"api_key": "lin_api_x"}},  # missing team_id
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_connect_linear_labels_without_leaking_the_key(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/linear",
+        json={"config": {"api_key": "lin_api_secret_value", "team_id": "TEAM-abcdef"}},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["kind"] == "linear"
+    assert "Linear" in body["label"]
+    assert "lin_api_secret_value" not in body["label"]
+
+
+async def test_linear_has_no_test_message(client):
+    headers = _headers()
+    await client.put(
+        "/v1/integrations/linear",
+        json={"config": {"api_key": "lin_api_x", "team_id": "T-1"}},
+        headers=headers,
+    )
+    resp = await client.post("/v1/integrations/linear/test", headers=headers)
+    assert resp.status_code == 400  # test messages are Slack-only
+
+
 async def test_connections_are_owner_scoped(client):
     owner = _headers()
     await _connect_slack(client, owner)

@@ -266,3 +266,75 @@ async def test_insights_are_owner_scoped(client):
     repo_id = await _create_repo(client, owner)
     resp = await client.get(f"/v1/repositories/{repo_id}/work-items/insights", headers=intruder)
     assert resp.status_code == 404
+
+
+# ── Push to an issue tracker (Linear) ───────────────────────────────────────
+
+
+async def _connect_linear(client, headers) -> None:
+    resp = await client.put(
+        "/v1/integrations/linear",
+        json={"config": {"api_key": "lin_api_test", "team_id": "T-123"}},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_push_stores_the_issue_link(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    item = await _create_item(client, headers, repo_id, title="Add password reset")
+    await _connect_linear(client, headers)
+
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items/{item['id']}/push",
+        json={"kind": "linear"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    pushed = resp.json()
+    # dry-run in tests returns a deterministic placeholder issue
+    assert pushed["external_issue_key"] == "DRY-1"
+    assert pushed["external_issue_url"].startswith("https://linear.app/")
+
+    # the link persists on the listed item
+    listed = (await client.get(f"/v1/repositories/{repo_id}/work-items", headers=headers)).json()
+    assert listed[0]["external_issue_key"] == "DRY-1"
+
+
+async def test_push_without_a_connection_is_404(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    item = await _create_item(client, headers, repo_id)
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items/{item['id']}/push",
+        json={"kind": "linear"},
+        headers=headers,
+    )
+    assert resp.status_code == 404
+
+
+async def test_push_rejects_a_non_tracker_kind(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    item = await _create_item(client, headers, repo_id)
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items/{item['id']}/push",
+        json={"kind": "slack"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+async def test_push_is_owner_scoped(client):
+    owner = _headers()
+    repo_id = await _create_repo(client, owner)
+    item = await _create_item(client, owner, repo_id)
+    intruder = _headers()
+    await _connect_linear(client, intruder)
+    resp = await client.post(
+        f"/v1/repositories/{repo_id}/work-items/{item['id']}/push",
+        json={"kind": "linear"},
+        headers=intruder,
+    )
+    assert resp.status_code == 404

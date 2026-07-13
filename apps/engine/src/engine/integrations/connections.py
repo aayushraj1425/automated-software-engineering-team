@@ -21,7 +21,7 @@ from engine.security.crypto import DecryptionError, decrypt, encrypt
 log = structlog.get_logger()
 
 # The kinds whose adapter exists and the API will accept. Grows one at a time.
-ACTIVE_KINDS: tuple[str, ...] = (IntegrationKind.SLACK,)
+ACTIVE_KINDS: tuple[str, ...] = (IntegrationKind.SLACK, IntegrationKind.LINEAR)
 
 
 class ConfigError(ValueError):
@@ -39,6 +39,13 @@ def build_config(kind: str, raw: dict[str, Any]) -> tuple[str, str]:
             raise ConfigError("A Slack webhook must be a https://hooks.slack.com/… URL")
         label = f"hooks.slack.com · ending {url[-4:]}"
         return json.dumps({"webhook_url": url}), label
+    if kind == IntegrationKind.LINEAR:
+        api_key = str(raw.get("api_key", "")).strip()
+        team_id = str(raw.get("team_id", "")).strip()
+        if not api_key or not team_id:
+            raise ConfigError("Linear needs both an API key and a team id")
+        label = f"Linear · team …{team_id[-6:]}"
+        return json.dumps({"api_key": api_key, "team_id": team_id}), label
     raise ConfigError(f"{kind} is not yet supported")
 
 
