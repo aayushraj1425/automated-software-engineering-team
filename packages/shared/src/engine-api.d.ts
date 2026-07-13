@@ -147,6 +147,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Run Files
+         * @description The run workspace's files, for the run page's file browser.
+         */
+        get: operations["list_run_files_v1_runs__run_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/files/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run File
+         * @description One workspace file's text, jailed and size-capped.
+         */
+        get: operations["get_run_file_v1_runs__run_id__files_content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}/events": {
         parameters: {
             query?: never;
@@ -716,6 +756,15 @@ export interface components {
              */
             created_at: string;
         };
+        /** FileContentOut */
+        FileContentOut: {
+            /** Path */
+            path: string;
+            /** Content */
+            content: string;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** GraphEdge */
         GraphEdge: {
             /** Source */
@@ -1117,6 +1166,20 @@ export interface components {
             /** Position */
             position?: number | null;
         };
+        /** WorkspaceFile */
+        WorkspaceFile: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+        };
+        /** WorkspaceFilesOut */
+        WorkspaceFilesOut: {
+            /** Files */
+            files: components["schemas"]["WorkspaceFile"][];
+            /** Truncated */
+            truncated: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -1369,6 +1432,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_run_files_v1_runs__run_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFilesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_file_v1_runs__run_id__files_content_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileContentOut"];
                 };
             };
             /** @description Validation Error */

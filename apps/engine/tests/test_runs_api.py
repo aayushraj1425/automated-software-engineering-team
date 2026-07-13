@@ -228,3 +228,78 @@ async def test_create_run_rejects_bad_input(client):
         "/v1/runs", json={"request": "hi", "repository_url": "x"}, headers=headers
     )
     assert bad_url.status_code == 422
+
+
+# ── Workspace file browser (docs/architecture/WORKSPACE_PANELS.md) ──────────
+
+
+async def _completed_run(client, headers) -> str:
+    created = await _create_run(client, headers)
+    resp = await _decide(client, headers, created["id"], True)
+    assert resp.status_code == 200, resp.text
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    assert detail["status"] == "completed"
+    return created["id"]
+
+
+async def test_files_lists_the_workspace(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    body = (await client.get(f"/v1/runs/{run_id}/files", headers=headers)).json()
+    paths = [f["path"] for f in body["files"]]
+    assert ".asep/task-1.md" in paths  # a file the offline engineers wrote
+    assert body["truncated"] is False
+    assert all(f["size"] >= 0 for f in body["files"])
+    assert not any(p.startswith(".git/") for p in paths)  # .git is hidden
+
+
+async def test_file_content_reads_a_file(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    resp = await client.get(
+        f"/v1/runs/{run_id}/files/content", params={"path": ".asep/task-1.md"}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["path"] == ".asep/task-1.md"
+    assert body["content"].strip()
+    assert body["truncated"] is False
+
+
+async def test_file_content_rejects_a_jail_escape(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    resp = await client.get(
+        f"/v1/runs/{run_id}/files/content",
+        params={"path": "../../../../etc/passwd"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+async def test_file_content_missing_file_is_404(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    resp = await client.get(
+        f"/v1/runs/{run_id}/files/content", params={"path": "does/not/exist.txt"}, headers=headers
+    )
+    assert resp.status_code == 404
+
+
+async def test_files_404_when_the_workspace_is_gone(client):
+    headers = _headers()
+    created = await _create_run(client, headers)
+    await _decide(client, headers, created["id"], False)  # rejecting deletes the workspace
+
+    assert (await client.get(f"/v1/runs/{created['id']}/files", headers=headers)).status_code == 404
+
+
+async def test_files_are_owner_scoped(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    intruder = _headers()
+    assert (await client.get(f"/v1/runs/{run_id}/files", headers=intruder)).status_code == 404

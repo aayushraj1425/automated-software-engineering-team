@@ -11,9 +11,10 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, cast
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import CursorResult, select, update
@@ -26,7 +27,18 @@ from engine.db.session import get_session, session_scope
 from engine.events.bus import RunEventSubscription, publish_run_ping
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
-from engine.workspace.manager import WorkspaceError, load_workspace, remove_workspace, run_git
+from engine.workspace.jail import JailViolation, resolve_inside
+from engine.workspace.manager import (
+    Workspace,
+    WorkspaceError,
+    load_workspace,
+    remove_workspace,
+    run_git,
+)
+
+# The file browser reads the run's persisted workspace (WORKSPACE_PANELS.md).
+MAX_WORKSPACE_FILES = 2000
+MAX_VIEW_BYTES = 200_000
 
 router = APIRouter()
 
@@ -80,6 +92,22 @@ class RunDetailOut(RunOut):
 
 class DiffOut(BaseModel):
     diff: str
+
+
+class WorkspaceFile(BaseModel):
+    path: str  # relative to the workspace root, posix separators
+    size: int
+
+
+class WorkspaceFilesOut(BaseModel):
+    files: list[WorkspaceFile]
+    truncated: bool  # more files than the cap; the list is the first MAX_WORKSPACE_FILES
+
+
+class FileContentOut(BaseModel):
+    path: str
+    content: str
+    truncated: bool  # the file was larger than the view cap
 
 
 class EventOut(BaseModel):
@@ -270,6 +298,17 @@ async def get_run(
     )
 
 
+def _load_run_workspace(run: AgentRun) -> Workspace:
+    """The run's on-disk workspace, or a 404 explaining why it is unavailable.
+    A run before planning has none; a rejected/recovered run's is gone."""
+    if not run.base_sha:
+        raise HTTPException(status_code=404, detail="This run has no workspace yet")
+    try:
+        return load_workspace(run.id, run.branch_name or "", run.base_sha)
+    except WorkspaceError:
+        raise HTTPException(status_code=404, detail="This run's workspace is gone") from None
+
+
 @router.get("/v1/runs/{run_id}/diff")
 async def get_run_diff(
     run_id: uuid.UUID,
@@ -278,14 +317,67 @@ async def get_run_diff(
 ) -> DiffOut:
     """Everything the agents changed in the run's workspace since its base commit."""
     run = await _owned_run(db, run_id, principal)
-    if not run.base_sha:
-        raise HTTPException(status_code=404, detail="This run has no workspace yet")
+    ws = _load_run_workspace(run)
     try:
-        ws = load_workspace(run.id, run.branch_name or "", run.base_sha)
-        diff = await run_git(ws.path, "diff", run.base_sha)
+        diff = await run_git(ws.path, "diff", ws.base_sha)
     except WorkspaceError:
         raise HTTPException(status_code=404, detail="This run's workspace is gone") from None
     return DiffOut(diff=diff)
+
+
+def _walk_workspace(root: Path) -> tuple[list[WorkspaceFile], bool]:
+    """Every file in the workspace (not .git), sorted, capped. Runs in a thread."""
+    found = [
+        entry
+        for entry in root.rglob("*")
+        if entry.is_file() and ".git" not in entry.relative_to(root).parts
+    ]
+    found.sort(key=lambda entry: entry.relative_to(root).as_posix())
+    truncated = len(found) > MAX_WORKSPACE_FILES
+    files = [
+        WorkspaceFile(path=entry.relative_to(root).as_posix(), size=entry.stat().st_size)
+        for entry in found[:MAX_WORKSPACE_FILES]
+    ]
+    return files, truncated
+
+
+@router.get("/v1/runs/{run_id}/files")
+async def list_run_files(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> WorkspaceFilesOut:
+    """The run workspace's files, for the run page's file browser."""
+    run = await _owned_run(db, run_id, principal)
+    ws = _load_run_workspace(run)
+    files, truncated = await asyncio.to_thread(_walk_workspace, ws.path)
+    return WorkspaceFilesOut(files=files, truncated=truncated)
+
+
+@router.get("/v1/runs/{run_id}/files/content")
+async def get_run_file(
+    run_id: uuid.UUID,
+    path: str = Query(min_length=1, max_length=1024),
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> FileContentOut:
+    """One workspace file's text, jailed and size-capped."""
+    run = await _owned_run(db, run_id, principal)
+    ws = _load_run_workspace(run)
+    try:
+        target = resolve_inside(ws.path, path)
+    except JailViolation as exc:
+        raise HTTPException(status_code=400, detail=f"path not allowed: {exc}") from None
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+
+    def _read() -> tuple[str, bool]:
+        size = target.stat().st_size
+        raw = target.read_bytes()[:MAX_VIEW_BYTES]
+        return raw.decode("utf-8", errors="replace"), size > MAX_VIEW_BYTES
+
+    content, truncated = await asyncio.to_thread(_read)
+    return FileContentOut(path=path, content=content, truncated=truncated)
 
 
 @router.get("/v1/runs/{run_id}/events")

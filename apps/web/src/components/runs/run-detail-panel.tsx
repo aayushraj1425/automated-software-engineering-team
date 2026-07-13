@@ -4,12 +4,25 @@ import { useEffect, useRef, useState } from "react";
 
 import { agentName, describeEvent } from "./event-text";
 import { StatusChip } from "./status-chip";
-import { FINISHED_STATUSES, type RunDetail, type RunEvent } from "./types";
+import {
+  FINISHED_STATUSES,
+  type RunDetail,
+  type RunEvent,
+  type WorkspaceFile,
+} from "./types";
 
 const POLL_MS = 1500;
 
 // The diff exists once the engineers have worked (and the workspace remains).
 const DIFF_STATUSES = new Set(["reviewing", "completed", "failed"]);
+// The workspace exists from planning onward (until a rejected run deletes it).
+const FILE_STATUSES = new Set([
+  "awaiting_approval",
+  "executing",
+  "reviewing",
+  "completed",
+  "failed",
+]);
 
 function diffLineClass(line: string): string {
   if (line.startsWith("+")) return "text-emerald-400";
@@ -26,8 +39,26 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [deciding, setDeciding] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
+  const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
+  const [filesTruncated, setFilesTruncated] = useState(false);
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const [fileBody, setFileBody] = useState<{ content: string; truncated: boolean } | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
+  const filesRequestedRef = useRef(false);
+
+  async function openFile(path: string) {
+    setOpenPath(path);
+    setFileBody(null);
+    setFileError(null);
+    const res = await fetch(`/api/runs/${runId}/files/content?path=${encodeURIComponent(path)}`);
+    if (res.ok) {
+      setFileBody(await res.json());
+    } else {
+      setFileError(`Could not open ${path} (${res.status})`);
+    }
+  }
 
   async function decide(approved: boolean) {
     setDeciding(true);
@@ -129,6 +160,18 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     })();
   }, [run, runId]);
 
+  useEffect(() => {
+    if (!run || filesRequestedRef.current || !FILE_STATUSES.has(run.status)) return;
+    filesRequestedRef.current = true;
+    void (async () => {
+      const res = await fetch(`/api/runs/${runId}/files`);
+      if (!res.ok) return;
+      const body = (await res.json()) as { files: WorkspaceFile[]; truncated: boolean };
+      setFiles(body.files);
+      setFilesTruncated(body.truncated);
+    })();
+  }, [run, runId]);
+
   if (!run) {
     return <p className="p-6 text-sm text-zinc-500">Loading run…</p>;
   }
@@ -217,6 +260,62 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               </div>
             ))}
           </pre>
+        </section>
+      )}
+
+      {files && files.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-zinc-300">
+            Files{" "}
+            <span className="font-normal text-zinc-500">— the run&apos;s workspace</span>
+          </h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md border border-zinc-800 p-2 text-xs md:col-span-1">
+              {files.map((file) => (
+                <li key={file.path}>
+                  <button
+                    type="button"
+                    onClick={() => void openFile(file.path)}
+                    className={`block w-full truncate rounded px-2 py-1 text-left ${
+                      openPath === file.path
+                        ? "bg-zinc-800 text-zinc-100"
+                        : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                    }`}
+                    title={file.path}
+                  >
+                    {file.path}
+                  </button>
+                </li>
+              ))}
+              {filesTruncated && (
+                <li className="px-2 py-1 text-zinc-600">… more files not shown</li>
+              )}
+            </ul>
+            <div className="md:col-span-2">
+              {!openPath && (
+                <p className="rounded-md border border-zinc-800 p-4 text-xs text-zinc-500">
+                  Select a file to read it.
+                </p>
+              )}
+              {fileError && <p className="text-sm text-red-400">{fileError}</p>}
+              {openPath && !fileBody && !fileError && (
+                <p className="rounded-md border border-zinc-800 p-4 text-xs text-zinc-500">
+                  Loading {openPath}…
+                </p>
+              )}
+              {fileBody && (
+                <div className="space-y-1">
+                  <p className="truncate font-mono text-xs text-zinc-500">{openPath}</p>
+                  <pre className="max-h-96 overflow-auto rounded-md border border-zinc-800 p-4 text-xs leading-5 text-zinc-300">
+                    {fileBody.content || "(empty file)"}
+                  </pre>
+                  {fileBody.truncated && (
+                    <p className="text-xs text-zinc-600">… file truncated at the view limit</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       )}
 

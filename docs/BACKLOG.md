@@ -191,7 +191,8 @@ panels and external integrations remain and are not yet scheduled.
 - [ ] In-place editing of a generated document
 
 ### Workstream: Workspace Panels (planned)
-- [ ] Editor / file-tree / git panels on the run page
+- [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
+- [ ] In-browser editor + git staging/commit panel (writes to the workspace — needs its own care)
 - [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
 
 ### Workstream: External Integrations (planned)
@@ -220,6 +221,20 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Workspace Panels open — a read-only file browser on the run page:
+  a completed run's workspace persists on disk (only a rejected/recovered run
+  deletes it), so two new owner-scoped endpoints read it live —
+  `GET /v1/runs/{id}/files` (the workspace's files as a sorted, capped list of
+  `{path, size}`, `.git` hidden) and `GET /v1/runs/{id}/files/content?path=…`
+  (one file's text, size-capped, `truncated` flag). Every path goes through the
+  same `resolve_inside` jail the agent tools use, so a `..`/absolute/symlink/UNC
+  path is a `400` and can never read outside the workspace; a missing workspace
+  is a graceful `404` like the diff. The run page gained a Files section — the
+  file list beside a read-only viewer — next to the existing diff and timeline.
+  The shared `_load_run_workspace` helper also de-duplicated the diff endpoint.
+  Editing, git staging, and a terminal (the ADR-0008 arbitrary-shell boundary)
+  are deliberately deferred. Design note: architecture/WORKSPACE_PANELS.md.
+  Engine 294 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Source hosts — GitLab merge requests: the run publish step is now
   host-aware. `engine/integrations/gitlab.py` recognizes `gitlab.com` URLs
   (`parse_gitlab_repo`, nested project paths) and opens a merge request via

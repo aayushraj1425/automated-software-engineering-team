@@ -40,3 +40,8 @@ export type RunEvent = {
 };
 
 export const FINISHED_STATUSES = new Set(["completed", "failed", "cancelled"]);
+
+export type WorkspaceFile = {
+  path: string;
+  size: number;
+};
