@@ -77,9 +77,12 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   one chat request produces a request span (route + status) and an LLM span
   (tier, model, tokens) plus a request-counter increment, proven offline by
   in-memory exporters in the test suite; disabled (the default) is a no-op.
-  ✅ *Observability slice met 2026-07-13.* Phase plan and remaining workstreams
-  (rate limiting, backups/DR, RBAC/RLS, K8s + Helm, benchmarks + audit):
-  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+  ✅ *Observability slice met 2026-07-13.* Rate limiting followed — a
+  per-caller token bucket in front of the API (429 + `Retry-After`, off by
+  default), retiring the oldest debt-register entry. ✅ *Rate-limiting slice met
+  2026-07-13* ([RATE_LIMITING.md](architecture/RATE_LIMITING.md)). Phase plan
+  and remaining workstreams (backups/DR, RBAC/RLS, K8s + Helm, benchmarks +
+  audit): [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)
 

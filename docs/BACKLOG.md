@@ -217,7 +217,8 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [ ] Alerting rules (error rate, p95 latency, token spend) once real traffic calibrates them
 
 ### Workstream: Hardening the Seams (planned)
-- [ ] Rate limiting on the engine API (debt register)
+- [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
+- [ ] Redis-backed shared rate window once replica counts grow (the bucket is per replica)
 - [ ] BFF→engine trust: mutual TLS or network policy (ADR-0002 debt)
 
 ### Workstream: Backups & Disaster Recovery (planned)
@@ -245,12 +246,26 @@ phase (alerting, benchmarks, K8s probes) leans on.
 |---|---|---|
 | pnpm hoisted linker (phantom dependencies possible) | OneDrive junction safety (ADR-0001) | if the checkout leaves OneDrive |
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
-| No rate limiting on the BFF or engine | single-user development phase | Identity & Keys workstream / Phase 7 |
+| Rate limiting is per engine replica (in-process buckets), and the BFF itself is unlimited | engine ceiling covers BFF-proxied traffic; single-replica deployments | Deploy workstream (Redis-backed shared window) |
 | Playwright smoke not in CI (needs the compose stack) | CI time budget | Phase 1 |
 | Deleting a repository cascades away its run history (`agent_runs` FK) | development-phase simplicity | retention/audit policy before any hosted deployment |
 
 ## Done
 
+- 2026-07-13 · Rate limiting on the engine API (the oldest debt-register entry,
+  parked for Phase 7 since Phase 0): `engine/ratelimit.py` puts a per-caller
+  token bucket in front of the API — `RATE_LIMIT_BURST` tokens refilling at
+  `RATE_LIMIT_PER_MINUTE/60` per second, so bursts pass and sustained floods
+  get a 429 with a `Retry-After` header. Callers are keyed by the *verified*
+  JWT subject (one user cannot starve another); missing/invalid tokens fall to
+  a per-IP bucket, so an unauthenticated flood is contained without fabricated
+  subjects minting fresh buckets. Off by default (`RATE_LIMIT_PER_MINUTE=0`),
+  so dev and tests are unaffected; `/healthz` is never throttled; stale buckets
+  are pruned. The middleware is pure ASGI (SSE-safe) and sits inside the
+  tracing span, so 429s land in the request metrics for free. Boundary: the
+  bucket is per replica — a Redis-backed shared window is the Deploy-workstream
+  follow-up, and the debt register now says exactly that. Design note:
+  architecture/RATE_LIMITING.md. Engine 312 passed, 1 skipped; web untouched.
 - 2026-07-13 · Phase 7 opens — OpenTelemetry traces + metrics (ADR-0010's
   planned revisit): `engine/observability.py` holds the SDK switch —
   instrumentation goes through the OTel *API* unconditionally, so spans and

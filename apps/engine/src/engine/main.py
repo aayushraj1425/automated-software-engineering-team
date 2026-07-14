@@ -25,6 +25,7 @@ from engine.events.bus import dispose_bus
 from engine.jobs import dispose_jobs
 from engine.logging import setup_logging
 from engine.observability import TracingMiddleware, configure_telemetry
+from engine.ratelimit import RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -58,6 +59,11 @@ app = FastAPI(
     description="AI engine for the ASEP platform: chat, agents, repository intelligence.",
     lifespan=lifespan,
 )
+
+# Added first, so it sits innermost — inside the tracing span, making 429s
+# visible in the request metrics. Off until RATE_LIMIT_PER_MINUTE is set
+# (docs/architecture/RATE_LIMITING.md).
+app.add_middleware(RateLimitMiddleware)
 
 # Added before CORS, so CORS wraps it: real API work gets a span, CORS
 # preflights don't. Pure ASGI, SSE-safe.

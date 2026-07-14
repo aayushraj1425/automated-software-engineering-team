@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = ""
     otel_service_name: str = "asep-engine"
+    # Per-caller token bucket (RATE_LIMITING.md): 0 disables; the bucket holds
+    # `burst` tokens and refills at per_minute/60 per second.
+    rate_limit_per_minute: int = 0
+    rate_limit_burst: int = 30
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"
