@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +51,9 @@ from engine.workspace.manager import (
 )
 
 log = structlog.get_logger()
+
+# No-op until the SDK is configured (OTEL_ENABLED — see engine/observability.py).
+_tracer = trace.get_tracer("engine.runs")
 
 
 def _now() -> datetime:
@@ -143,7 +147,9 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
 
 async def plan_run(run_id: uuid.UUID) -> None:
     """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
-    await _guarded(_plan_run, run_id)
+    # The span ties every LLM call in the phase to the run (ADR-0010 post-mortems).
+    with _tracer.start_as_current_span("run.plan", attributes={"asep.run_id": str(run_id)}):
+        await _guarded(_plan_run, run_id)
     # A run that failed during planning still leaves memory behind; a run
     # waiting for approval is not terminal, so capture does nothing.
     await capture_run_memory(run_id)
@@ -152,7 +158,8 @@ async def plan_run(run_id: uuid.UUID) -> None:
 
 async def execute_tasks(run_id: uuid.UUID) -> None:
     """Background entrypoint after the human approves the plan."""
-    await _guarded(_execute_tasks, run_id)
+    with _tracer.start_as_current_span("run.execute", attributes={"asep.run_id": str(run_id)}):
+        await _guarded(_execute_tasks, run_id)
     # The run is terminal either way now — remember what happened
     # (KNOWLEDGE_AND_MEMORY.md); capture never raises.
     await capture_run_memory(run_id)

@@ -15,7 +15,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and run-workspace file browser + editor + git-commit panel shipped; the terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
-| **7** | **Production Hardening** | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **7** | **Production Hardening** *(started 2026-07-13 — OpenTelemetry traces + metrics shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
 
@@ -72,6 +72,14 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   loop). ✅ *File-browser + editor/commit slices met 2026-07-13.* Design note:
   [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md). The terminal (deferred
   by ADR-0008), pushing a manual commit, and Bitbucket remain.
+- **Phase 7 — Production Hardening** *(in progress)*: observability opened the
+  phase, wiring the OTel SDK the way ADR-0010 planned — with telemetry enabled,
+  one chat request produces a request span (route + status) and an LLM span
+  (tier, model, tokens) plus a request-counter increment, proven offline by
+  in-memory exporters in the test suite; disabled (the default) is a no-op.
+  ✅ *Observability slice met 2026-07-13.* Phase plan and remaining workstreams
+  (rate limiting, backups/DR, RBAC/RLS, K8s + Helm, benchmarks + audit):
+  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)
 

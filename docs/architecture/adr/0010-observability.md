@@ -35,3 +35,11 @@ standard; production telemetry (metrics, dashboards, alerting) is Phase 7 scope.
 - Langfuse joins compose in Phase 1; its absence must never break the engine (fire-and-forget
   exporter).
 - Phase 7 revisits this ADR to wire the OTel SDK and metrics/alerting.
+
+## Update — 2026-07-13 (Phase 7)
+
+The OTel SDK is wired as planned: instrumentation goes through the OTel API
+unconditionally (no-op unless `OTEL_ENABLED=1` configures the SDK), spans cover
+requests, ModelRouter calls, and run phases, and OTLP is the export path.
+Design note: [PRODUCTION_HARDENING.md](../PRODUCTION_HARDENING.md). Langfuse
+remains deferred; an exporter can ride the OTLP path later.

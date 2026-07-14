@@ -204,6 +204,35 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
 - [ ] Source hosts: add Bitbucket (and self-hosted GitLab) behind the same host-aware publish seam
 
+## Phase 7 — Production Hardening
+
+Phase plan: [architecture/PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+Started 2026-07-13 with observability — the workstream everything else in the
+phase (alerting, benchmarks, K8s probes) leans on.
+
+### Workstream: Observability (blocking)
+- [x] OpenTelemetry SDK wired per ADR-0010: instrumentation through the OTel API unconditionally (no-op by default), `OTEL_ENABLED=1` + `OTEL_EXPORTER_OTLP_ENDPOINT` install the SDK and export via OTLP/HTTP
+- [x] Request spans (route template + status, `/healthz` excluded) and request count/duration metrics from a pure-ASGI middleware
+- [x] LLM spans on every ModelRouter call (tier, model, tokens, cost) and `run.plan` / `run.execute` spans tying an agent run together
+- [ ] Alerting rules (error rate, p95 latency, token spend) once real traffic calibrates them
+
+### Workstream: Hardening the Seams (planned)
+- [ ] Rate limiting on the engine API (debt register)
+- [ ] BFF→engine trust: mutual TLS or network policy (ADR-0002 debt)
+
+### Workstream: Backups & Disaster Recovery (planned)
+- [ ] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook
+
+### Workstream: RBAC & Row-Level Security (planned)
+- [ ] Organization-aware authorization beyond owner-scoping, enforced in Postgres (RLS) as well as the API
+
+### Workstream: Deploy (planned)
+- [ ] K8s manifests + Helm chart; liveness/readiness on `/healthz`; resource limits from the benchmarks
+
+### Workstream: Benchmarks & Security Audit (planned)
+- [ ] Performance baselines for indexing, retrieval, and the run pipeline
+- [ ] Checklist audit of the security boundaries (jail, secrets, webhooks, JWTs)
+
 ## Beyond Phase 3 (headlines only)
 
 - Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
@@ -222,6 +251,22 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Phase 7 opens — OpenTelemetry traces + metrics (ADR-0010's
+  planned revisit): `engine/observability.py` holds the SDK switch —
+  instrumentation goes through the OTel *API* unconditionally, so spans and
+  metrics are no-ops until `OTEL_ENABLED=1` installs the SDK
+  (`configure_telemetry()`, OTLP/HTTP export to
+  `OTEL_EXPORTER_OTLP_ENDPOINT`; instrumented code carries no telemetry
+  branches). A pure-ASGI middleware (SSE-safe, `/healthz` excluded) emits one
+  server span per request named by its route template plus a request counter
+  and duration histogram; every ModelRouter call gets an `llm.*` span (tier,
+  model, tokens, cost — fake mode included, so traces exist offline); and
+  `run.plan` / `run.execute` spans tie a whole agent run together for
+  post-mortems. Tests inject in-memory exporters through the same seam and
+  read real spans offline. No collector in compose — the engine exports;
+  running the telemetry stack is the operator's side (Deploy workstream).
+  Phase plan + design note: architecture/PRODUCTION_HARDENING.md; ADR-0010
+  updated. Engine 306 passed, 1 skipped; web unchanged.
 - 2026-07-13 · Workspace editor + git-commit panel: the run-page file browser
   became a light editor. Three new owner-scoped, jailed endpoints —
   `PUT /v1/runs/{id}/files/content` (replace a file), `GET …/git-status`

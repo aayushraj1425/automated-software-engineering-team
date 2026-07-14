@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import structlog
+from opentelemetry import trace
 
 from engine.config import EMBEDDING_DIM, get_settings
 from engine.llm.keys import api_key_for_model
@@ -16,6 +17,9 @@ from engine.llm.keys import api_key_for_model
 Tier = Literal["planner", "coder", "cheap"]
 
 log = structlog.get_logger(__name__)
+
+# No-op until the SDK is configured (OTEL_ENABLED — see engine/observability.py).
+_tracer = trace.get_tracer("engine.llm")
 
 FAKE_REPLY = (
     "This is a canned reply from the ASEP walking skeleton (LLM_FAKE=1). "
@@ -91,58 +95,73 @@ class ModelRouter:
         settings = get_settings()
         model = self.resolve(tier)
         started = time.monotonic()
-
-        if settings.llm_fake:
-            for word in FAKE_REPLY.split(" "):
-                yield word + " "
-            log.info("llm.stream", tier=tier, model="fake", duration_ms=0)
-            return
-
-        import litellm
-
-        response = await _retry_rate_limits(
-            lambda: litellm.acompletion(
-                model=model, messages=messages, stream=True, api_key=api_key_for_model(model)
-            )
-        )
-        chunks = 0
-        async for chunk in response:  # type: ignore[union-attr]
-            delta = chunk.choices[0].delta.content  # type: ignore[union-attr]
-            if delta:
-                chunks += 1
-                yield delta
-        log.info(
+        # A manual span (not a context manager): a generator's body runs across
+        # many awaits, so the span is ended in `finally` when the stream closes.
+        span = _tracer.start_span(
             "llm.stream",
-            tier=tier,
-            model=model,
-            chunks=chunks,
-            duration_ms=int((time.monotonic() - started) * 1000),
+            attributes={"llm.tier": tier, "llm.model": "fake" if settings.llm_fake else model},
         )
+        try:
+            if settings.llm_fake:
+                for word in FAKE_REPLY.split(" "):
+                    yield word + " "
+                log.info("llm.stream", tier=tier, model="fake", duration_ms=0)
+                return
+
+            import litellm
+
+            response = await _retry_rate_limits(
+                lambda: litellm.acompletion(
+                    model=model, messages=messages, stream=True, api_key=api_key_for_model(model)
+                )
+            )
+            chunks = 0
+            async for chunk in response:  # type: ignore[union-attr]
+                delta = chunk.choices[0].delta.content  # type: ignore[union-attr]
+                if delta:
+                    chunks += 1
+                    yield delta
+            span.set_attribute("llm.chunks", chunks)
+            log.info(
+                "llm.stream",
+                tier=tier,
+                model=model,
+                chunks=chunks,
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
+        finally:
+            span.end()
 
     async def complete(self, tier: Tier, messages: list[dict[str, Any]]) -> str:
         settings = get_settings()
         model = self.resolve(tier)
-        if settings.llm_fake:
-            return FAKE_REPLY
-
-        import litellm
-
-        # The caller's own key wins over the server's .env key (PROVIDER_KEYS.md).
-        response = await _retry_rate_limits(
-            lambda: litellm.acompletion(
-                model=model, messages=messages, api_key=api_key_for_model(model)
-            )
-        )
-        content = response.choices[0].message.content  # type: ignore[union-attr]
-        usage = getattr(response, "usage", None)
-        log.info(
+        with _tracer.start_as_current_span(
             "llm.complete",
-            tier=tier,
-            model=model,
-            input_tokens=getattr(usage, "prompt_tokens", None),
-            output_tokens=getattr(usage, "completion_tokens", None),
-        )
-        return content or ""
+            attributes={"llm.tier": tier, "llm.model": "fake" if settings.llm_fake else model},
+        ) as span:
+            if settings.llm_fake:
+                return FAKE_REPLY
+
+            import litellm
+
+            # The caller's own key wins over the server's .env key (PROVIDER_KEYS.md).
+            response = await _retry_rate_limits(
+                lambda: litellm.acompletion(
+                    model=model, messages=messages, api_key=api_key_for_model(model)
+                )
+            )
+            content = response.choices[0].message.content  # type: ignore[union-attr]
+            usage = getattr(response, "usage", None)
+            span.set_attribute("llm.input_tokens", getattr(usage, "prompt_tokens", 0) or 0)
+            span.set_attribute("llm.output_tokens", getattr(usage, "completion_tokens", 0) or 0)
+            log.info(
+                "llm.complete",
+                tier=tier,
+                model=model,
+                input_tokens=getattr(usage, "prompt_tokens", None),
+                output_tokens=getattr(usage, "completion_tokens", None),
+            )
+            return content or ""
 
     async def complete_with_tools(
         self, tier: Tier, messages: list[dict[str, Any]], tools: list[dict] | None = None
@@ -150,46 +169,56 @@ class ModelRouter:
         """One agent turn: the model answers or asks to call tools."""
         settings = get_settings()
         model = self.resolve(tier)
-        if settings.llm_fake:
-            return AssistantTurn(
-                content=FAKE_REPLY,
-                tool_calls=(),
-                message={"role": "assistant", "content": FAKE_REPLY},
-            )
-
-        import litellm
-
-        started = time.monotonic()
-        response = await _retry_rate_limits(
-            lambda: litellm.acompletion(
-                model=model,
-                messages=messages,
-                tools=tools or None,
-                api_key=api_key_for_model(model),
-            )
-        )
-        message = response.choices[0].message  # type: ignore[union-attr]
-        calls: list[ToolCall] = []
-        for call in message.tool_calls or []:
-            try:
-                arguments = json.loads(call.function.arguments or "{}")
-            except json.JSONDecodeError:
-                arguments = {}
-            calls.append(ToolCall(id=call.id, name=call.function.name or "", arguments=arguments))
-        usage = getattr(response, "usage", None)
-        try:
-            cost = float(litellm.completion_cost(completion_response=response))
-        except Exception:  # cost tables lag behind new models; usage still counts
-            cost = 0.0
-        log.info(
+        with _tracer.start_as_current_span(
             "llm.tools",
-            tier=tier,
-            model=model,
-            tool_calls=[c.name for c in calls],
-            input_tokens=getattr(usage, "prompt_tokens", None),
-            output_tokens=getattr(usage, "completion_tokens", None),
-            duration_ms=int((time.monotonic() - started) * 1000),
-        )
+            attributes={"llm.tier": tier, "llm.model": "fake" if settings.llm_fake else model},
+        ) as span:
+            if settings.llm_fake:
+                return AssistantTurn(
+                    content=FAKE_REPLY,
+                    tool_calls=(),
+                    message={"role": "assistant", "content": FAKE_REPLY},
+                )
+
+            import litellm
+
+            started = time.monotonic()
+            response = await _retry_rate_limits(
+                lambda: litellm.acompletion(
+                    model=model,
+                    messages=messages,
+                    tools=tools or None,
+                    api_key=api_key_for_model(model),
+                )
+            )
+            message = response.choices[0].message  # type: ignore[union-attr]
+            calls: list[ToolCall] = []
+            for call in message.tool_calls or []:
+                try:
+                    arguments = json.loads(call.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    arguments = {}
+                calls.append(
+                    ToolCall(id=call.id, name=call.function.name or "", arguments=arguments)
+                )
+            usage = getattr(response, "usage", None)
+            try:
+                cost = float(litellm.completion_cost(completion_response=response))
+            except Exception:  # cost tables lag behind new models; usage still counts
+                cost = 0.0
+            span.set_attribute("llm.input_tokens", getattr(usage, "prompt_tokens", 0) or 0)
+            span.set_attribute("llm.output_tokens", getattr(usage, "completion_tokens", 0) or 0)
+            span.set_attribute("llm.cost_usd", cost)
+            span.set_attribute("llm.tool_calls", len(calls))
+            log.info(
+                "llm.tools",
+                tier=tier,
+                model=model,
+                tool_calls=[c.name for c in calls],
+                input_tokens=getattr(usage, "prompt_tokens", None),
+                output_tokens=getattr(usage, "completion_tokens", None),
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
         return AssistantTurn(
             content=message.content,
             tool_calls=tuple(calls),
@@ -203,9 +232,20 @@ class ModelRouter:
         """One EMBEDDING_DIM vector per text (MODEL_EMBEDDING; fake mode is
         deterministic so index/search tests run offline)."""
         settings = get_settings()
-        if settings.llm_fake:
-            return [_fake_embedding(text) for text in texts]
+        with _tracer.start_as_current_span(
+            "llm.embed",
+            attributes={
+                "llm.model": "fake" if settings.llm_fake else settings.model_embedding,
+                "llm.texts": len(texts),
+            },
+        ):
+            if settings.llm_fake:
+                return [_fake_embedding(text) for text in texts]
 
+            return await self._embed_real(texts)
+
+    async def _embed_real(self, texts: list[str]) -> list[list[float]]:
+        settings = get_settings()
         import litellm
 
         started = time.monotonic()

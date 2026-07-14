@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # Integration adapters skip the network and report success (tests, offline
     # dev) — the run→notify path still runs (EXTERNAL_INTEGRATIONS.md).
     integrations_dry_run: bool = False
+    # OpenTelemetry (ADR-0010, PRODUCTION_HARDENING.md): spans/metrics are
+    # no-ops until otel_enabled installs the SDK; the endpoint is an OTLP/HTTP
+    # collector (empty keeps telemetry in-process only).
+    otel_enabled: bool = False
+    otel_exporter_otlp_endpoint: str = ""
+    otel_service_name: str = "asep-engine"
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"

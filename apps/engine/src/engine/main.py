@@ -24,11 +24,16 @@ from engine.db.session import dispose_engine
 from engine.events.bus import dispose_bus
 from engine.jobs import dispose_jobs
 from engine.logging import setup_logging
+from engine.observability import TracingMiddleware, configure_telemetry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
+    # Spans/metrics are no-ops until this installs the SDK (ADR-0010,
+    # docs/architecture/PRODUCTION_HARDENING.md).
+    if get_settings().otel_enabled:
+        configure_telemetry()
     # Resume runs the last process left behind (docs/architecture/RUN_RECOVERY.md).
     # Runs in the background so startup never blocks on an interrupted run; a
     # shutdown mid-recovery just leaves the runs for the next startup. Inline
@@ -53,6 +58,10 @@ app = FastAPI(
     description="AI engine for the ASEP platform: chat, agents, repository intelligence.",
     lifespan=lifespan,
 )
+
+# Added before CORS, so CORS wraps it: real API work gets a span, CORS
+# preflights don't. Pure ASGI, SSE-safe.
+app.add_middleware(TracingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
