@@ -24,9 +24,11 @@ import uuid
 from typing import Any
 
 from arq.connections import RedisSettings
+from arq.cron import cron
 
 from engine.agents.recovery import reset_interrupted_execution, reset_interrupted_planning
 from engine.agents.runner import execute_tasks, plan_run
+from engine.backup import create_backup
 from engine.config import get_settings
 from engine.db.session import dispose_engine
 from engine.events.bus import dispose_bus
@@ -51,6 +53,14 @@ async def execute_tasks_job(ctx: dict[str, Any], run_id: str) -> None:
     await execute_tasks(run_uuid)
 
 
+async def backup_database_job(ctx: dict[str, Any]) -> None:
+    """Nightly Postgres dump (docs/architecture/BACKUPS_AND_RECOVERY.md).
+    pg_dump is a blocking subprocess, so it runs on a thread; a failure is
+    logged by arq and the next night simply tries again — pruning only runs
+    after a *successful* dump, so failures never eat existing backups."""
+    await asyncio.to_thread(create_backup)
+
+
 async def _on_startup(ctx: dict[str, Any]) -> None:
     setup_logging(get_settings().log_level)
 
@@ -64,6 +74,11 @@ class WorkerSettings:
     """arq entrypoint: `uv run arq engine.worker.WorkerSettings`."""
 
     functions = [plan_run_job, execute_tasks_job]
+    # Nightly at 03:00 on the worker's clock (UTC in containers), only when
+    # backups are switched on — the CLI path works either way.
+    cron_jobs = (
+        [cron(backup_database_job, hour=3, minute=0)] if get_settings().backup_enabled else []
+    )
     queue_name = QUEUE_NAME
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     on_startup = _on_startup

@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** Living document · **Last updated:** 2026-07-13
+**Status:** Living document · **Last updated:** 2026-07-14
 Effort is relative (small / medium / large). Every phase ships the full engineering
 loop: architecture note → API spec → schema migration → UI/UX → implementation →
 unit + integration tests → docs → performance/security pass (enforced by the PR
@@ -15,7 +15,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and run-workspace file browser + editor + git-commit panel shipped; the terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
-| **7** | **Production Hardening** *(started 2026-07-13 — OpenTelemetry traces + metrics shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, and backups/DR shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
 
@@ -80,9 +80,16 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   ✅ *Observability slice met 2026-07-13.* Rate limiting followed — a
   per-caller token bucket in front of the API (429 + `Retry-After`, off by
   default), retiring the oldest debt-register entry. ✅ *Rate-limiting slice met
-  2026-07-13* ([RATE_LIMITING.md](architecture/RATE_LIMITING.md)). Phase plan
-  and remaining workstreams (backups/DR, RBAC/RLS, K8s + Helm, benchmarks +
-  audit): [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+  2026-07-13* ([RATE_LIMITING.md](architecture/RATE_LIMITING.md)). Backups &
+  disaster recovery followed: verified nightly `pg_dump`s (arq cron, retention
+  pruning), a restore CLI whose target is always explicit, and a recovery
+  runbook — with the restore path proven in the test suite, which reads a row
+  back out of a database restored from a real dump on every push. ✅
+  *Backups/DR slice met 2026-07-14*
+  ([BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook:
+  [DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)). Phase plan and
+  remaining workstreams (RBAC/RLS, K8s + Helm, benchmarks + audit):
+  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)
 

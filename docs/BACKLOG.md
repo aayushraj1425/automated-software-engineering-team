@@ -221,8 +221,9 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [ ] Redis-backed shared rate window once replica counts grow (the bucket is per replica)
 - [ ] BFF→engine trust: mutual TLS or network policy (ADR-0002 debt)
 
-### Workstream: Backups & Disaster Recovery (planned)
-- [ ] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook
+### Workstream: Backups & Disaster Recovery
+- [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
+- [ ] Ship dumps off-host (S3/MinIO or a volume the K8s CronJob mounts) — a local backup directory burns down with the machine (Deploy workstream)
 
 ### Workstream: RBAC & Row-Level Security (planned)
 - [ ] Organization-aware authorization beyond owner-scoping, enforced in Postgres (RLS) as well as the API
@@ -252,6 +253,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-14 · Backups & disaster recovery: `engine/backup.py` drives the
+  standard `pg_dump`/`pg_restore` as subprocesses — custom-format dumps written
+  atomically (`.part`, renamed only after `pg_restore --list` proves the
+  archive readable), the newest `BACKUP_RETENTION` kept, and pruning only ever
+  running after a *successful* dump so a failure can never eat the good
+  backups before it. `BACKUP_ENABLED=1` adds a nightly cron to the arq worker;
+  the CLI (`python -m engine.backup create|verify|restore`) covers the rest,
+  and restore always takes an explicit `--database-url` because a destructive
+  command should never guess its target. The exit criterion is in the test
+  suite: a row written before the dump is read back from a database restored
+  *from* that dump, on every push — plus a narrow, documented tolerance for a
+  newer client's session settings against an older server (PG18 → PG16), with
+  anything else still failing the restore. Runbook a stressed human can follow:
+  runbooks/DISASTER_RECOVERY.md; design note: architecture/BACKUPS_AND_RECOVERY.md.
+  Boundary: the backup directory is a local disk — shipping dumps off-host is
+  the logged Deploy-workstream follow-up. Engine 319 passed, 1 skipped; web
+  untouched.
 - 2026-07-13 · Rate limiting on the engine API (the oldest debt-register entry,
   parked for Phase 7 since Phase 0): `engine/ratelimit.py` puts a per-caller
   token bucket in front of the API — `RATE_LIMIT_BURST` tokens refilling at

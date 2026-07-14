@@ -23,6 +23,9 @@ build/
 # Agent workspaces (repos cloned at runtime)
 .workspaces/
 
+# Postgres backups (dumps contain the whole database — never commit them)
+.backups/
+
 # Test artifacts
 coverage/
 playwright-report/

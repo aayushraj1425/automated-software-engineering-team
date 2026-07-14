@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     # `burst` tokens and refills at per_minute/60 per second.
     rate_limit_per_minute: int = 0
     rate_limit_burst: int = 30
+    # Postgres backups (BACKUPS_AND_RECOVERY.md): enabling adds a nightly
+    # pg_dump cron to the arq worker; the CLI (`python -m engine.backup`)
+    # works regardless. pg_bin_dir points at pg_dump/pg_restore when they
+    # are not on PATH (empty tries PATH, then the Windows install dir).
+    backup_enabled: bool = False
+    backup_dir: str = ".backups"
+    backup_retention: int = 14
+    pg_bin_dir: str = ""
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"
