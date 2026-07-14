@@ -14,7 +14,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **3** | **Execution & QA** *(complete 2026-07-10)* | medium | Docker sandbox (no-egress build/test runs), QA agent with self-correction loops, PR-review agent via GitHub webhooks, secrets detection + dependency scanning | code review; testing & security |
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
-| **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and a read-only run-workspace file browser shipped; the in-browser editor/terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
+| **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and run-workspace file browser + editor + git-commit panel shipped; the terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
 | **7** | **Production Hardening** | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
@@ -66,10 +66,12 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   met 2026-07-13.* Design note: [SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md).
   The Workspace Panels workstream opened with a read-only file browser on the run
   page: a run's persisted workspace is listed and any file opened read-only,
-  jailed by the same path guard the agents use. ✅ *File-browser slice met
-  2026-07-13.* Design note: [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md).
-  The in-browser editor / git-staging / terminal panels (the terminal deferred
-  by ADR-0008) and Bitbucket remain.
+  jailed by the same path guard the agents use, then became a light editor: on a
+  *finished* run a file can be edited and the change committed from a git panel
+  (editing an in-flight run is refused, so a human write never races the agent
+  loop). ✅ *File-browser + editor/commit slices met 2026-07-13.* Design note:
+  [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md). The terminal (deferred
+  by ADR-0008), pushing a manual commit, and Bitbucket remain.
 
 ## Standing tracks (every phase)
 

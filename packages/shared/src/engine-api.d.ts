@@ -179,8 +179,52 @@ export interface paths {
          * @description One workspace file's text, jailed and size-capped.
          */
         get: operations["get_run_file_v1_runs__run_id__files_content_get"];
+        /**
+         * Write Run File
+         * @description Replace one workspace file (finished runs only), jailed to the workspace.
+         */
+        put: operations["write_run_file_v1_runs__run_id__files_content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/git-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Git Status
+         * @description The run workspace's working-tree changes (git status --porcelain).
+         */
+        get: operations["run_git_status_v1_runs__run_id__git_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Run Workspace
+         * @description Stage everything and commit the workspace (finished runs only).
+         */
+        post: operations["commit_run_workspace_v1_runs__run_id__commit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -631,6 +675,18 @@ export interface components {
             /** Repository Id */
             repository_id?: string | null;
         };
+        /** CommitIn */
+        CommitIn: {
+            /** Message */
+            message: string;
+        };
+        /** CommitOut */
+        CommitOut: {
+            /** Sha */
+            sha: string;
+            /** Message */
+            message: string;
+        };
         /** ConnectionIn */
         ConnectionIn: {
             /** Config */
@@ -764,6 +820,32 @@ export interface components {
             content: string;
             /** Truncated */
             truncated: boolean;
+        };
+        /** FileWriteIn */
+        FileWriteIn: {
+            /** Path */
+            path: string;
+            /** Content */
+            content: string;
+        };
+        /** FileWriteOut */
+        FileWriteOut: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+        };
+        /** GitChange */
+        GitChange: {
+            /** Path */
+            path: string;
+            /** Code */
+            code: string;
+        };
+        /** GitStatusOut */
+        GitStatusOut: {
+            /** Changes */
+            changes: components["schemas"]["GitChange"][];
         };
         /** GraphEdge */
         GraphEdge: {
@@ -1496,6 +1578,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileContentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_run_file_v1_runs__run_id__files_content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileWriteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_git_status_v1_runs__run_id__git_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_run_workspace_v1_runs__run_id__commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitOut"];
                 };
             };
             /** @description Validation Error */

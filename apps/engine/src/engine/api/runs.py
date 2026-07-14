@@ -110,6 +110,41 @@ class FileContentOut(BaseModel):
     truncated: bool  # the file was larger than the view cap
 
 
+class FileWriteIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1024)
+    content: str = Field(max_length=1_000_000)
+
+
+class FileWriteOut(BaseModel):
+    path: str
+    size: int
+
+
+class GitChange(BaseModel):
+    path: str
+    code: str  # git porcelain status, e.g. " M", "??", "A "
+
+
+class GitStatusOut(BaseModel):
+    changes: list[GitChange]
+
+
+class CommitIn(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+
+    @field_validator("message")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("commit message must not be blank")
+        return value
+
+
+class CommitOut(BaseModel):
+    sha: str
+    message: str
+
+
 class EventOut(BaseModel):
     id: int
     type: str
@@ -378,6 +413,89 @@ async def get_run_file(
 
     content, truncated = await asyncio.to_thread(_read)
     return FileContentOut(path=path, content=content, truncated=truncated)
+
+
+# Editing is safe only when the agent loop no longer owns the workspace.
+_EDITABLE_STATUSES = frozenset({RunStatus.COMPLETED, RunStatus.FAILED})
+
+
+def _require_editable(run: AgentRun) -> None:
+    if run.status not in _EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="The workspace can only be edited after the run finishes",
+        )
+
+
+def _jailed_target(ws: Workspace, path: str) -> Path:
+    try:
+        return resolve_inside(ws.path, path)
+    except JailViolation as exc:
+        raise HTTPException(status_code=400, detail=f"path not allowed: {exc}") from None
+
+
+@router.put("/v1/runs/{run_id}/files/content")
+async def write_run_file(
+    run_id: uuid.UUID,
+    body: FileWriteIn,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> FileWriteOut:
+    """Replace one workspace file (finished runs only), jailed to the workspace."""
+    run = await _owned_run(db, run_id, principal)
+    _require_editable(run)
+    ws = _load_run_workspace(run)
+    target = _jailed_target(ws, body.path)
+
+    def _write() -> int:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body.content, encoding="utf-8", newline="\n")
+        return target.stat().st_size
+
+    size = await asyncio.to_thread(_write)
+    return FileWriteOut(path=body.path, size=size)
+
+
+@router.get("/v1/runs/{run_id}/git-status")
+async def run_git_status(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> GitStatusOut:
+    """The run workspace's working-tree changes (git status --porcelain)."""
+    run = await _owned_run(db, run_id, principal)
+    ws = _load_run_workspace(run)
+    try:
+        output = await run_git(ws.path, "status", "--porcelain")
+    except WorkspaceError:
+        raise HTTPException(status_code=404, detail="This run's workspace is gone") from None
+    changes = [
+        GitChange(code=line[:2], path=line[3:]) for line in output.splitlines() if len(line) > 3
+    ]
+    return GitStatusOut(changes=changes)
+
+
+@router.post("/v1/runs/{run_id}/commit")
+async def commit_run_workspace(
+    run_id: uuid.UUID,
+    body: CommitIn,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> CommitOut:
+    """Stage everything and commit the workspace (finished runs only)."""
+    run = await _owned_run(db, run_id, principal)
+    _require_editable(run)
+    ws = _load_run_workspace(run)
+    message = body.message.strip()
+    try:
+        await run_git(ws.path, "add", "-A")
+        if not (await run_git(ws.path, "status", "--porcelain")).strip():
+            raise HTTPException(status_code=400, detail="nothing to commit — no files changed")
+        await run_git(ws.path, "commit", "-m", message)
+        sha = await run_git(ws.path, "rev-parse", "--short", "HEAD")
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return CommitOut(sha=sha, message=message)
 
 
 @router.get("/v1/runs/{run_id}/events")

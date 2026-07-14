@@ -44,6 +44,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [fileBody, setFileBody] = useState<{ content: string; truncated: boolean } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [gitChanges, setGitChanges] = useState<{ path: string; code: string }[]>([]);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [committing, setCommitting] = useState(false);
+  const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
   const filesRequestedRef = useRef(false);
@@ -51,12 +57,66 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   async function openFile(path: string) {
     setOpenPath(path);
     setFileBody(null);
+    setDraft(null);
     setFileError(null);
     const res = await fetch(`/api/runs/${runId}/files/content?path=${encodeURIComponent(path)}`);
     if (res.ok) {
-      setFileBody(await res.json());
+      const body = (await res.json()) as { content: string; truncated: boolean };
+      setFileBody(body);
+      setDraft(body.content);
     } else {
       setFileError(`Could not open ${path} (${res.status})`);
+    }
+  }
+
+  async function refreshGitStatus() {
+    const res = await fetch(`/api/runs/${runId}/git-status`);
+    if (res.ok) setGitChanges(((await res.json()) as { changes: typeof gitChanges }).changes);
+  }
+
+  async function saveFile() {
+    if (openPath === null || draft === null) return;
+    setSaving(true);
+    setWorkspaceNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/files/content`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: openPath, content: draft }),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        throw new Error(detail?.detail ?? `Save failed (${res.status})`);
+      }
+      setFileBody((prev) => (prev ? { ...prev, content: draft } : prev));
+      await refreshGitStatus();
+      setWorkspaceNote("Saved.");
+    } catch (err) {
+      setWorkspaceNote(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function commitWorkspace() {
+    if (!commitMessage.trim()) return;
+    setCommitting(true);
+    setWorkspaceNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/commit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: commitMessage.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.detail ?? `Commit failed (${res.status})`);
+      setCommitMessage("");
+      setWorkspaceNote(`Committed ${body.sha}.`);
+      await refreshGitStatus();
+    } catch (err) {
+      setWorkspaceNote(err instanceof Error ? err.message : "Commit failed");
+    } finally {
+      setCommitting(false);
     }
   }
 
@@ -169,12 +229,22 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       const body = (await res.json()) as { files: WorkspaceFile[]; truncated: boolean };
       setFiles(body.files);
       setFilesTruncated(body.truncated);
+      // On a finished run the workspace is editable — show its working tree.
+      if (run.status === "completed" || run.status === "failed") {
+        const statusRes = await fetch(`/api/runs/${runId}/git-status`);
+        if (statusRes.ok) {
+          setGitChanges(((await statusRes.json()) as { changes: typeof gitChanges }).changes);
+        }
+      }
     })();
   }, [run, runId]);
 
   if (!run) {
     return <p className="p-6 text-sm text-zinc-500">Loading run…</p>;
   }
+
+  // A finished run's workspace is idle — safe for a human to edit and commit.
+  const editable = run.status === "completed" || run.status === "failed";
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
@@ -305,10 +375,31 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               )}
               {fileBody && (
                 <div className="space-y-1">
-                  <p className="truncate font-mono text-xs text-zinc-500">{openPath}</p>
-                  <pre className="max-h-96 overflow-auto rounded-md border border-zinc-800 p-4 text-xs leading-5 text-zinc-300">
-                    {fileBody.content || "(empty file)"}
-                  </pre>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-mono text-xs text-zinc-500">{openPath}</p>
+                    {editable && (
+                      <button
+                        type="button"
+                        onClick={() => void saveFile()}
+                        disabled={saving || draft === fileBody.content}
+                        className="shrink-0 rounded-md bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-900 disabled:opacity-50"
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                    )}
+                  </div>
+                  {editable ? (
+                    <textarea
+                      value={draft ?? ""}
+                      onChange={(e) => setDraft(e.target.value)}
+                      spellCheck={false}
+                      className="h-96 w-full rounded-md border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-300 outline-none focus:border-zinc-600"
+                    />
+                  ) : (
+                    <pre className="max-h-96 overflow-auto rounded-md border border-zinc-800 p-4 text-xs leading-5 text-zinc-300">
+                      {fileBody.content || "(empty file)"}
+                    </pre>
+                  )}
                   {fileBody.truncated && (
                     <p className="text-xs text-zinc-600">… file truncated at the view limit</p>
                   )}
@@ -316,6 +407,40 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               )}
             </div>
           </div>
+
+          {editable && (
+            <div className="space-y-2 rounded-md border border-zinc-800 p-4">
+              <h3 className="text-xs font-semibold text-zinc-400">Working tree</h3>
+              {gitChanges.length === 0 ? (
+                <p className="text-xs text-zinc-500">No uncommitted changes.</p>
+              ) : (
+                <ul className="space-y-0.5 font-mono text-xs">
+                  {gitChanges.map((change) => (
+                    <li key={change.path} className="text-amber-300">
+                      <span className="text-zinc-500">{change.code}</span> {change.path}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-2">
+                <input
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="Commit message"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs outline-none focus:border-zinc-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => void commitWorkspace()}
+                  disabled={committing || !commitMessage.trim() || gitChanges.length === 0}
+                  className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
+                >
+                  {committing ? "Committing…" : "Commit"}
+                </button>
+              </div>
+              {workspaceNote && <p className="text-xs text-zinc-500">{workspaceNote}</p>}
+            </div>
+          )}
         </section>
       )}
 

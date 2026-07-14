@@ -303,3 +303,93 @@ async def test_files_are_owner_scoped(client):
     run_id = await _completed_run(client, headers)
     intruder = _headers()
     assert (await client.get(f"/v1/runs/{run_id}/files", headers=intruder)).status_code == 404
+
+
+# ── Editing the workspace + committing (finished runs only) ─────────────────
+
+
+async def test_write_then_read_back_a_file(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    resp = await client.put(
+        f"/v1/runs/{run_id}/files/content",
+        json={"path": "notes.txt", "content": "hand-edited line\n"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["path"] == "notes.txt"
+
+    read = await client.get(
+        f"/v1/runs/{run_id}/files/content", params={"path": "notes.txt"}, headers=headers
+    )
+    assert read.json()["content"] == "hand-edited line\n"
+
+
+async def test_write_is_jailed(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    resp = await client.put(
+        f"/v1/runs/{run_id}/files/content",
+        json={"path": "../escape.txt", "content": "nope"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+async def test_write_is_refused_before_the_run_finishes(client):
+    headers = _headers()
+    created = await _create_run(client, headers)  # left at awaiting_approval
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    assert detail["status"] == "awaiting_approval"
+
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/files/content",
+        json={"path": "notes.txt", "content": "x"},
+        headers=headers,
+    )
+    assert resp.status_code == 409  # the agent loop still owns the workspace
+
+
+async def test_git_status_and_commit(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    await client.put(
+        f"/v1/runs/{run_id}/files/content",
+        json={"path": "notes.txt", "content": "a manual note\n"},
+        headers=headers,
+    )
+
+    status = (await client.get(f"/v1/runs/{run_id}/git-status", headers=headers)).json()
+    assert any(c["path"] == "notes.txt" for c in status["changes"])
+
+    commit = await client.post(
+        f"/v1/runs/{run_id}/commit", json={"message": "Add a manual note"}, headers=headers
+    )
+    assert commit.status_code == 200, commit.text
+    assert commit.json()["sha"]
+
+    # the tree is clean again after committing
+    after = (await client.get(f"/v1/runs/{run_id}/git-status", headers=headers)).json()
+    assert after["changes"] == []
+
+
+async def test_commit_with_nothing_to_commit_is_400(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    resp = await client.post(
+        f"/v1/runs/{run_id}/commit", json={"message": "Nothing changed"}, headers=headers
+    )
+    assert resp.status_code == 400
+
+
+async def test_write_is_owner_scoped(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    intruder = _headers()
+    resp = await client.put(
+        f"/v1/runs/{run_id}/files/content",
+        json={"path": "notes.txt", "content": "x"},
+        headers=intruder,
+    )
+    assert resp.status_code == 404

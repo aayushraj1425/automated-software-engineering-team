@@ -192,7 +192,8 @@ panels and external integrations remain and are not yet scheduled.
 
 ### Workstream: Workspace Panels (planned)
 - [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
-- [ ] In-browser editor + git staging/commit panel (writes to the workspace — needs its own care)
+- [x] In-browser editor + git status/commit panel: on a *finished* run (completed/failed) a file can be edited (jailed write) and the working tree committed; editing an in-flight run is a `409` so a human write never races the agent loop
+- [ ] Push a manual workspace commit back to the host (re-publish after an edit)
 - [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
 
 ### Workstream: External Integrations (planned)
@@ -221,6 +222,18 @@ panels and external integrations remain and are not yet scheduled.
 
 ## Done
 
+- 2026-07-13 · Workspace editor + git-commit panel: the run-page file browser
+  became a light editor. Three new owner-scoped, jailed endpoints —
+  `PUT /v1/runs/{id}/files/content` (replace a file), `GET …/git-status`
+  (`git status --porcelain` → `{path, code}` list), and `POST …/commit`
+  (`git add -A` + commit, returns the short sha). Writes are refused with a `409`
+  unless the run is finished (`completed`/`failed`): while a run is queued /
+  planning / executing / reviewing the agent loop owns the workspace, so a human
+  write then would race it. The run page's viewer becomes a textarea with a Save
+  button on a finished run, and a Working-tree panel lists changes and commits
+  them. The commit stays local to the workspace — re-publishing it to the host is
+  a later item. Design note: architecture/WORKSPACE_PANELS.md. Engine 300 passed,
+  1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Workspace Panels open — a read-only file browser on the run page:
   a completed run's workspace persists on disk (only a rejected/recovered run
   deletes it), so two new owner-scoped endpoints read it live —

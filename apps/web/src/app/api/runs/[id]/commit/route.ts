@@ -4,25 +4,7 @@ import { signServiceToken } from "@/lib/service-token";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<Response> {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const { id } = await params;
-  const path = new URL(req.url).searchParams.get("path") ?? "";
-  const token = await signServiceToken(session.user.id);
-  const upstream = await fetch(
-    `${env.ENGINE_URL}/v1/runs/${encodeURIComponent(id)}/files/content?path=${encodeURIComponent(path)}`,
-    { headers: { authorization: `Bearer ${token}` }, cache: "no-store" },
-  );
-  return Response.json(await upstream.json(), { status: upstream.status });
-}
-
-export async function PUT(
+export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
@@ -41,9 +23,9 @@ export async function PUT(
   const { id } = await params;
   const token = await signServiceToken(session.user.id);
   const upstream = await fetch(
-    `${env.ENGINE_URL}/v1/runs/${encodeURIComponent(id)}/files/content`,
+    `${env.ENGINE_URL}/v1/runs/${encodeURIComponent(id)}/commit`,
     {
-      method: "PUT",
+      method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     },

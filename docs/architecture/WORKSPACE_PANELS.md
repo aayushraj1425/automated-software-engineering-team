@@ -11,9 +11,8 @@ the module they imported, the test they were fixing, the config they read. Today
 that means leaving the platform and opening the repository elsewhere.
 
 Workspace panels bring the run's actual files onto the run page: a **file tree**
-to browse the whole workspace and a **viewer** to read any file, as it stands in
-that run. This first slice is **read-only**; an in-browser editor, git staging,
-and a terminal are later work.
+to browse the whole workspace, a **viewer/editor** to read or change any file,
+and a **git panel** to see what changed and commit it. A terminal is later work.
 
 ```mermaid
 flowchart LR
@@ -48,17 +47,40 @@ Everything needed already exists; the panels are a thin read-only layer.
   file's content in a viewer. It loads once the run has a workspace and sits
   beside the existing diff and timeline.
 
-## Exit criterion (this slice)
+## Editing and committing (finished runs only)
+
+The read-only browser became a light editor once the run is done. Three write
+endpoints, all owner-scoped and jailed like the reads:
+
+- `PUT /v1/runs/{id}/files/content` — replace one file's content (parent folders
+  created, like the agents' `write_file`).
+- `GET /v1/runs/{id}/git-status` — the working tree's changes (`git status
+  --porcelain`, one `{path, code}` per line) so the panel shows what was edited.
+- `POST /v1/runs/{id}/commit` — stage everything and commit with a message
+  (`git add -A` then commit); an empty working tree is a `400`.
+
+The crucial guard: **writes are refused unless the run is finished**
+(`completed` or `failed`). While a run is queued, planning, executing, or
+reviewing, the agent loop owns the workspace — a human write then would race it —
+so those states get a `409`. A finished run's workspace is idle, so a human can
+safely make a manual fix and commit it. Pushing that commit is a separate,
+explicit step (a later item); this slice keeps the change local to the workspace.
+
+## Exit criterion
 
 On a run that has a workspace, the run page lists the workspace's files and opens
-any one of them read-only; a path that tries to escape the workspace is refused.
+any one; a path that tries to escape the workspace is refused. On a *finished*
+run, a file can be edited and the change committed; editing an in-flight run is
+refused.
 
-## Boundaries (kept out of this slice)
+## Boundaries (kept out)
 
-- **Read-only.** No in-browser editing, no git staging/commit panel, no file
-  create/rename/delete — those write to the workspace and need their own care.
 - **No terminal.** A terminal means running commands, which is the arbitrary-shell
   boundary ADR-0008 draws at the Phase 3 sandbox; it is deliberately deferred.
+- **No push of a manual commit.** A workspace commit stays local; re-publishing
+  it to the host is a later item.
+- **No file create/rename/delete** from the tree, and no writes to an in-flight
+  run (the agent loop owns it then).
 - Binary files are returned as best-effort decoded text (`errors="replace"`); a
   proper binary/image viewer is later polish.
 - The file list is capped; a very large workspace shows the first N files with a
