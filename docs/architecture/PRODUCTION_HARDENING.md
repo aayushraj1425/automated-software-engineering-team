@@ -29,7 +29,8 @@ deploys somewhere sturdier than one dev machine (K8s + Helm).
   [KUBERNETES_DEPLOY.md](KUBERNETES_DEPLOY.md).
 - **Benchmarks & security audit** — performance baselines for the hot paths
   (indexing, retrieval, run pipeline) and a checklist audit of the security
-  boundaries (jail, secrets, webhooks, JWTs).
+  boundaries (jail, secrets, webhooks, JWTs). Benchmarks design note:
+  [BENCHMARKS.md](BENCHMARKS.md).
 
 ## First slice: OpenTelemetry traces + metrics
 

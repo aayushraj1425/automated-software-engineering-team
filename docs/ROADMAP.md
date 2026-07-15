@@ -101,7 +101,13 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   ClusterIP-only behind the BFF — images build and answer locally, and CI
   lints and renders the chart on every push. ✅ *Kubernetes-deploy slice met
   2026-07-15* ([KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)).
-  Phase plan and remaining workstreams (benchmarks + security audit):
+  Benchmarks followed: `python -m engine.benchmark` measures the three hot
+  paths offline (indexing throughput, hybrid-retrieval p50/p95, one golden
+  task through the whole run pipeline with the fake model), and the first
+  baseline table is recorded in the design note — future regressions are a
+  number moving, not a feeling. ✅ *Benchmarks slice met 2026-07-15*
+  ([BENCHMARKS.md](architecture/BENCHMARKS.md)). Phase plan and the remaining
+  workstream (security-boundary audit):
   [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)

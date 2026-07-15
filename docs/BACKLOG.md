@@ -237,8 +237,8 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [ ] In-cluster QA sandbox (pods have no Docker daemon; needs DinD, Kata, or a remote builder — `SANDBOX_ENABLED=0` in chart defaults until then)
 - [ ] Persistent volume template for `BACKUP_DIR` when `BACKUP_ENABLED=1` on the worker (pairs with shipping dumps off-host)
 
-### Workstream: Benchmarks & Security Audit (planned)
-- [ ] Performance baselines for indexing, retrieval, and the run pipeline
+### Workstream: Benchmarks & Security Audit
+- [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/BENCHMARKS.md](architecture/BENCHMARKS.md)
 - [ ] Checklist audit of the security boundaries (jail, secrets, webhooks, JWTs)
 
 ## Beyond Phase 3 (headlines only)
@@ -259,6 +259,22 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-15 · Performance benchmarks: `engine/benchmark.py` measures the
+  three hot paths through the real code, offline (`LLM_FAKE=1`, fake
+  embeddings — provider latency measures them, not us). Indexing: a
+  synthetic 120-module corpus is git-committed, registered, and pushed
+  through `index_repository` (clone, tree-sitter chunking, embedding,
+  Postgres), then re-indexed unchanged to price the incremental no-op.
+  Retrieval: the golden questions repeated through hybrid `retrieve_chunks`
+  for p50/p95 per-query latency. Run pipeline: one golden task through
+  plan → approve → execute → review with the fake model — which still
+  includes a real Docker sandbox pass, so the number is honest about what a
+  run costs beyond the model. First baseline table (dev machine, dated) is
+  recorded in the design note; benchmarks tidy their synthetic corpora out
+  of the database afterwards. Deliberately a CLI, not pytest timing
+  assertions (those flake on slow runners) — the suite keeps a smoke test
+  that the harness runs at tiny sizes. Design note:
+  architecture/BENCHMARKS.md. Engine 328 passed, 1 skipped; web untouched.
 - 2026-07-15 · Kubernetes deploy: the platform is now something `helm install`
   can put on a cluster. Two production images — the engine
   (`infra/docker/engine.Dockerfile`: python-slim + uv, git and
