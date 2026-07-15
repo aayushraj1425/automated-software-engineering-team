@@ -11,9 +11,12 @@ import base64
 import hashlib
 import os
 
+import structlog
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from engine.config import get_settings
+
+log = structlog.get_logger(__name__)
 
 _NONCE_BYTES = 12  # the AES-GCM standard nonce size
 
@@ -31,6 +34,27 @@ def _key() -> bytes:
         return key
     # Dev fallback: deterministic from the service secret, no extra setup.
     return hashlib.sha256(get_settings().engine_service_secret.encode()).digest()
+
+
+def warn_if_derived_key() -> bool:
+    """Loudly flag the dev key fallback at startup (security-audit finding 2).
+
+    Deriving the encryption key from ENGINE_SERVICE_SECRET is right for the
+    dev loop and wrong for production: one leaked secret would compromise
+    both transport auth and every secret at rest. Returns True when it warned
+    so callers (and the test) can see the check fired.
+    """
+    if get_settings().engine_encryption_key:
+        return False
+    log.warning(
+        "crypto.derived_dev_key",
+        detail=(
+            "ENGINE_ENCRYPTION_KEY is not set — secrets at rest are encrypted "
+            "with a key derived from ENGINE_SERVICE_SECRET. Set a dedicated "
+            "32-byte base64 key in production (docs/security/SECURITY_AUDIT.md)."
+        ),
+    )
+    return True
 
 
 def encrypt(plaintext: str) -> str:

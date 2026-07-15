@@ -26,11 +26,13 @@ from engine.jobs import dispose_jobs
 from engine.logging import setup_logging
 from engine.observability import TracingMiddleware, configure_telemetry
 from engine.ratelimit import RateLimitMiddleware
+from engine.security.crypto import warn_if_derived_key
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
+    warn_if_derived_key()  # secrets-at-rest key fallback (security audit)
     # Spans/metrics are no-ops until this installs the SDK (ADR-0010,
     # docs/architecture/PRODUCTION_HARDENING.md).
     if get_settings().otel_enabled:

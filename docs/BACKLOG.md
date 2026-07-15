@@ -240,8 +240,8 @@ phase (alerting, benchmarks, K8s probes) leans on.
 ### Workstream: Benchmarks & Security Audit
 - [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/BENCHMARKS.md](architecture/BENCHMARKS.md)
 - [x] Checklist audit of the security boundaries — every boundary verified with code evidence, one finding fixed inline (the route-table auth sweep test), the rest logged: [security/SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)
-- [ ] Loud startup warning (or refusal outside dev) when `ENGINE_ENCRYPTION_KEY` is unset and secrets fall back to the key derived from `ENGINE_SERVICE_SECRET` (audit finding 2)
-- [ ] Webhook replay/dedupe guard — a GitHub redelivery currently re-reviews the same pull request (audit finding 3, minor)
+- [x] Loud startup warning when `ENGINE_ENCRYPTION_KEY` is unset and secrets fall back to the key derived from `ENGINE_SERVICE_SECRET` — API lifespan and worker both warn at boot (audit finding 2)
+- [x] Webhook replay/dedupe guard — queued `X-GitHub-Delivery` ids are remembered (bounded, in-process) and a redelivery is ignored instead of re-reviewed (audit finding 3)
 
 ## Beyond Phase 3 (headlines only)
 
@@ -261,6 +261,16 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-15 · Audit follow-ups (findings 2 and 3 closed the day they were
+  raised): both process startups — the API lifespan and the arq worker — now
+  call `warn_if_derived_key()`, which logs loudly when `ENGINE_ENCRYPTION_KEY`
+  is unset and secrets at rest fall back to the key derived from
+  `ENGINE_SERVICE_SECRET`; and the webhook receiver remembers queued
+  `X-GitHub-Delivery` ids (bounded, in-process), so a GitHub redelivery is
+  ignored instead of re-reviewing the same pull request. HMAC remains the
+  security boundary — the dedupe is hygiene, and a replica restart at worst
+  re-reviews once. Audit report updated in place. Engine 334 passed,
+  1 skipped; web untouched.
 - 2026-07-15 · Security-boundary audit (closing the planned Phase 7
   workstreams): every boundary the platform claims — service JWT, webhook
   HMAC, workspace path jail, clone/push URL hygiene, sandbox isolation,

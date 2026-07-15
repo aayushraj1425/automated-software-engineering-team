@@ -7,6 +7,7 @@ queue a background review, and return 202 well inside GitHub's delivery timeout.
 """
 
 import json
+from collections import OrderedDict
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
@@ -23,6 +24,26 @@ router = APIRouter()
 # commits pushed to it. Everything else (labels, assignments, closes) is ignored.
 _REVIEWABLE_ACTIONS = {"opened", "reopened", "synchronize"}
 
+# Redelivery guard (security-audit finding 3): GitHub retries carry the same
+# X-GitHub-Delivery id, and each retry used to trigger a fresh review — wasted
+# tokens and duplicate PR comments. Remember the ids we already queued.
+# In-process and bounded: a replica restart forgets, which at worst re-reviews
+# once — the HMAC signature remains the security boundary, this is hygiene.
+_MAX_REMEMBERED_DELIVERIES = 1024
+_queued_deliveries: OrderedDict[str, None] = OrderedDict()
+
+
+def _already_queued(delivery_id: str) -> bool:
+    """True when this delivery id was already queued; records it otherwise."""
+    if not delivery_id:
+        return False  # no id (e.g. hand-rolled call): nothing to dedupe on
+    if delivery_id in _queued_deliveries:
+        return True
+    _queued_deliveries[delivery_id] = None
+    while len(_queued_deliveries) > _MAX_REMEMBERED_DELIVERIES:
+        _queued_deliveries.popitem(last=False)
+    return False
+
 
 @router.post("/v1/webhooks/github", status_code=202)
 async def github_webhook(
@@ -30,6 +51,7 @@ async def github_webhook(
     background: BackgroundTasks,
     x_github_event: str = Header(default=""),
     x_hub_signature_256: str | None = Header(default=None),
+    x_github_delivery: str = Header(default=""),
 ) -> dict[str, str]:
     body = await request.body()
     secret = get_settings().github_webhook_secret
@@ -52,6 +74,10 @@ async def github_webhook(
     if coords is None:
         raise HTTPException(status_code=400, detail="Malformed pull_request payload")
     owner, repo, number = coords
+
+    if _already_queued(x_github_delivery):
+        log.info("webhook.duplicate_delivery", delivery=x_github_delivery)
+        return {"status": "ignored", "reason": f"delivery {x_github_delivery} already processed"}
 
     background.add_task(review_pull_request, owner, repo, number)
     log.info("webhook.queued", pr=f"{owner}/{repo}#{number}", action=action)

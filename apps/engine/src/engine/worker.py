@@ -34,6 +34,7 @@ from engine.db.session import dispose_engine
 from engine.events.bus import dispose_bus
 from engine.jobs import QUEUE_NAME
 from engine.logging import setup_logging
+from engine.security.crypto import warn_if_derived_key
 
 
 async def plan_run_job(ctx: dict[str, Any], run_id: str) -> None:
@@ -63,6 +64,7 @@ async def backup_database_job(ctx: dict[str, Any]) -> None:
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
     setup_logging(get_settings().log_level)
+    warn_if_derived_key()  # secrets-at-rest key fallback (security audit)
 
 
 async def _on_shutdown(ctx: dict[str, Any]) -> None:

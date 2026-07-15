@@ -22,6 +22,7 @@ _SECRET = "test-webhook-secret"
 @pytest.fixture(autouse=True)
 def configure_secret(monkeypatch):
     monkeypatch.setattr(get_settings(), "github_webhook_secret", _SECRET)
+    webhooks._queued_deliveries.clear()  # each test starts with no remembered ids
 
 
 def _sign(body: bytes) -> str:
@@ -49,10 +50,12 @@ def _capture_reviews(monkeypatch) -> list[tuple]:
     return calls
 
 
-async def _post(client, body: bytes, event="pull_request", signature=None):
+async def _post(client, body: bytes, event="pull_request", signature=None, delivery=""):
     headers = {"X-GitHub-Event": event}
     if signature is not None:
         headers["X-Hub-Signature-256"] = signature
+    if delivery:
+        headers["X-GitHub-Delivery"] = delivery
     return await client.post("/v1/webhooks/github", content=body, headers=headers)
 
 
@@ -117,6 +120,30 @@ async def test_a_malformed_pull_request_payload_is_400(client, monkeypatch):
     body = json.dumps({"action": "opened", "repository": {}}).encode()  # no pull_request
     resp = await _post(client, body, signature=_sign(body))
     assert resp.status_code == 400
+
+
+async def test_a_redelivered_delivery_id_is_not_reviewed_twice(client, monkeypatch):
+    """GitHub retries carry the same X-GitHub-Delivery id (audit finding 3)."""
+    calls = _capture_reviews(monkeypatch)
+    body = _pr_payload(number=42)
+
+    first = await _post(client, body, signature=_sign(body), delivery="dedupe-1")
+    second = await _post(client, body, signature=_sign(body), delivery="dedupe-1")
+
+    assert first.json()["status"] == "queued"
+    assert second.json()["status"] == "ignored"
+    assert calls == [("acme", "demo", 42)]  # exactly one review
+
+
+async def test_distinct_delivery_ids_each_get_a_review(client, monkeypatch):
+    """New pushes arrive as new deliveries and must still be reviewed."""
+    calls = _capture_reviews(monkeypatch)
+    body = _pr_payload(number=42, action="synchronize")
+
+    await _post(client, body, signature=_sign(body), delivery="push-1")
+    await _post(client, body, signature=_sign(body), delivery="push-2")
+
+    assert calls == [("acme", "demo", 42), ("acme", "demo", 42)]
 
 
 async def test_the_orchestrator_fetches_reviews_and_posts(monkeypatch):

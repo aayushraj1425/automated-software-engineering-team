@@ -44,16 +44,19 @@ flowchart LR
    `tests/test_route_auth_sweep.py` now walks the real route table and calls
    every endpoint unauthenticated; anything that fails to 401 fails the
    suite. The hole class is closed permanently, not just audited once.
-2. **The encryption key silently falls back to a derived dev key** *(open,
-   logged)*. With `ENGINE_ENCRYPTION_KEY` unset, secrets at rest are
+2. **The encryption key silently falls back to a derived dev key** *(fixed
+   2026-07-15)*. With `ENGINE_ENCRYPTION_KEY` unset, secrets at rest are
    encrypted with a key derived from `ENGINE_SERVICE_SECRET` — right for the
    dev loop, wrong for production, where one leaked secret would compromise
-   both transport auth *and* stored secrets. Follow-up: a loud startup
-   warning (or refusal outside dev) when the dedicated key is missing.
-3. **The webhook receiver has no replay/dedupe guard** *(open, minor,
-   logged)*. A GitHub redelivery re-reviews the same PR — wasted tokens, not
-   a breach; the signature check still gates every delivery. Follow-up
-   parked with the integrations backlog.
+   both transport auth *and* stored secrets. Both process startups (API
+   lifespan and worker) now call `warn_if_derived_key()`
+   (`engine/security/crypto.py`), which logs a loud warning naming the fix.
+3. **The webhook receiver had no replay/dedupe guard** *(fixed 2026-07-15)*.
+   A GitHub redelivery re-reviewed the same PR — wasted tokens and duplicate
+   comments, not a breach; the signature check still gates every delivery.
+   The receiver now remembers queued `X-GitHub-Delivery` ids (bounded,
+   in-process) and ignores a repeat. A replica restart forgets and at worst
+   re-reviews once — HMAC remains the security boundary, this is hygiene.
 
 ## Accepted boundaries (documented, not defects)
 
