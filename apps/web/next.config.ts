@@ -6,6 +6,10 @@ import type { NextConfig } from "next";
 // here are server-side only; NEXT_PUBLIC_ vars would need a different path.
 loadEnv({ path: path.resolve(process.cwd(), "../../.env") });
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // Production image (infra/docker/web.Dockerfile) runs the self-contained
+  // .next/standalone server instead of the whole monorepo.
+  output: "standalone",
+};
 
 export default nextConfig;

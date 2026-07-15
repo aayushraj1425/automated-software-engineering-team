@@ -1,0 +1,70 @@
+# ASEP Helm chart values. The chart deploys three workloads from two images;
+# Postgres (+pgvector), Redis, and S3/MinIO are operator-provided — point the
+# env values at them. Two Postgres requirements carry over from dev:
+#   1. The engine's role must be NOSUPERUSER — superusers bypass row-level
+#      security (docs/architecture/ROW_LEVEL_SECURITY.md).
+#   2. The pgvector extension must be available to that role (dev installs it
+#      into template1 so every database inherits it).
+# better-auth's identity tables are created once by the operator:
+#   pnpm --filter web auth:migrate   (engine tables migrate automatically via
+# the pre-install/pre-upgrade Job).
+
+images:
+  engine:
+    repository: asep-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  web:
+    repository: asep-web
+    tag: latest
+    pullPolicy: IfNotPresent
+
+web:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  ingress:
+    # The only workload that may face the internet. The engine service stays
+    # ClusterIP-only by design (ADR-0002: browsers never reach the engine).
+    enabled: false
+    className: ""
+    host: asep.example.com
+    annotations: {}
+    tls: []
+
+engine:
+  replicas: 1
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+worker:
+  # Runs agent jobs from the Redis queue (set RUN_QUEUE=arq) and the nightly
+  # backup cron (BACKUP_ENABLED=1 additionally needs a persistent volume for
+  # BACKUP_DIR — not templated yet, see the design note's boundaries).
+  enabled: true
+  replicas: 1
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+# Name of an operator-managed Secret holding the environment (same keys as
+# .env.example). Leave empty to render one from `env` below instead.
+existingSecret: ""
+
+# Rendered into a Secret consumed by every workload via envFrom — one env
+# surface, same names as .env.example, nothing to translate. Values here are
+# examples, not defaults: real installs set them with --set/-f or use
+# existingSecret. ENGINE_URL is wired to the engine Service automatically.
+env:
+  DATABASE_URL: postgresql+psycopg://asep:CHANGE_ME@postgres:5432/asep
+  REDIS_URL: redis://redis:6379/0
+  ENGINE_SERVICE_SECRET: CHANGE_ME
+  ENGINE_ENCRYPTION_KEY: ""
+  BETTER_AUTH_SECRET: CHANGE_ME
+  BETTER_AUTH_URL: https://asep.example.com
+  RUN_QUEUE: arq
+  # No Docker daemon inside pods — the QA sandbox stays off in-cluster.
+  SANDBOX_ENABLED: "0"
+  LOG_LEVEL: INFO

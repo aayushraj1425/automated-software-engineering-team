@@ -1,0 +1,33 @@
+{{- if .Values.worker.enabled }}
+# Same image as the engine, different command: the arq worker drains the run
+# queue (RUN_QUEUE=arq) and owns the nightly backup cron when enabled.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "asep.fullname" . }}-worker
+  labels:
+    {{- include "asep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "asep.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: "{{ .Values.images.engine.repository }}:{{ .Values.images.engine.tag }}"
+          imagePullPolicy: {{ .Values.images.engine.pullPolicy }}
+          command: ["arq", "engine.worker.WorkerSettings"]
+          envFrom:
+            - secretRef:
+                name: {{ include "asep.secretName" . }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+{{- end }}

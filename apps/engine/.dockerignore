@@ -1,0 +1,7 @@
+# engine.Dockerfile builds with apps/engine as its context.
+.venv
+__pycache__
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests

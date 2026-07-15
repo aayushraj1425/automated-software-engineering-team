@@ -25,7 +25,8 @@ deploys somewhere sturdier than one dev machine (K8s + Helm).
 - **RBAC depth & row-level security** — organization-aware authorization beyond
   owner-scoping, enforced in Postgres (RLS) as well as the API.
 - **Deploy** — K8s manifests + a Helm chart; liveness/readiness wired to
-  `/healthz`; resource limits informed by the benchmarks.
+  `/healthz`; resource limits informed by the benchmarks. Design note:
+  [KUBERNETES_DEPLOY.md](KUBERNETES_DEPLOY.md).
 - **Benchmarks & security audit** — performance baselines for the hot paths
   (indexing, retrieval, run pipeline) and a checklist audit of the security
   boundaries (jail, secrets, webhooks, JWTs).

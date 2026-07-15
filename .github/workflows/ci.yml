@@ -87,3 +87,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: docker compose -f infra/docker/docker-compose.dev.yml config -q
+
+  helm:
+    name: Helm chart (lint, template)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # helm is preinstalled on ubuntu-latest runners
+      - run: helm lint infra/helm/asep
+      - run: helm template asep infra/helm/asep --set web.ingress.enabled=true > /dev/null

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "asep.fullname" . }}-engine
+  labels:
+    {{- include "asep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  replicas: {{ .Values.engine.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: engine
+  template:
+    metadata:
+      labels:
+        {{- include "asep.labels" . | nindent 8 }}
+        app.kubernetes.io/component: engine
+    spec:
+      containers:
+        - name: engine
+          image: "{{ .Values.images.engine.repository }}:{{ .Values.images.engine.tag }}"
+          imagePullPolicy: {{ .Values.images.engine.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: {{ include "asep.secretName" . }}
+          # /healthz is public by design and excluded from traces and rate
+          # limiting, so probes cost nothing and never 429.
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.engine.resources | nindent 12 }}

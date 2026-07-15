@@ -1,0 +1,17 @@
+# ClusterIP only, no Ingress ever: browsers never reach the engine (ADR-0002).
+# Only the web BFF calls it, carrying the signed service JWT.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "asep.fullname" . }}-engine
+  labels:
+    {{- include "asep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: engine
+  ports:
+    - port: 8000
+      targetPort: 8000

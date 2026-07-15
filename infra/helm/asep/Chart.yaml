@@ -1,0 +1,9 @@
+apiVersion: v2
+name: asep
+description: >-
+  ASEP — AI Software Engineering Platform. Web (Next.js BFF), engine (FastAPI),
+  and worker (arq) workloads; Postgres/Redis/S3 are operator-provided.
+  Design note: docs/architecture/KUBERNETES_DEPLOY.md.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -231,8 +231,11 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [ ] True deny-by-default: a separate non-owner database role for the API and an explicit service context for internal paths (unset context is currently trusted)
 - [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
 
-### Workstream: Deploy (planned)
-- [ ] K8s manifests + Helm chart; liveness/readiness on `/healthz`; resource limits from the benchmarks
+### Workstream: Deploy
+- [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
+- [ ] Revisit the chart's placeholder resource limits once the benchmarks measure the hot paths
+- [ ] In-cluster QA sandbox (pods have no Docker daemon; needs DinD, Kata, or a remote builder — `SANDBOX_ENABLED=0` in chart defaults until then)
+- [ ] Persistent volume template for `BACKUP_DIR` when `BACKUP_ENABLED=1` on the worker (pairs with shipping dumps off-host)
 
 ### Workstream: Benchmarks & Security Audit (planned)
 - [ ] Performance baselines for indexing, retrieval, and the run pipeline
@@ -256,6 +259,29 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-15 · Kubernetes deploy: the platform is now something `helm install`
+  can put on a cluster. Two production images — the engine
+  (`infra/docker/engine.Dockerfile`: python-slim + uv, git and
+  postgresql-client for worktrees and backups, non-root) serves as API, arq
+  worker, and migration Job purely by command; the web app
+  (`infra/docker/web.Dockerfile`) builds Next.js `standalone` output so the
+  runtime stage carries only the built server. The Helm chart
+  (`infra/helm/asep`) deploys web/engine/worker with liveness+readiness on
+  `/healthz` (public, untraced, unratelimited — probes cost nothing), an
+  `alembic upgrade head` Job as a pre-install/pre-upgrade hook so code never
+  starts against an old schema, and one Secret mirroring `.env.example`
+  consumed via `envFrom` (or an operator-managed `existingSecret`). The
+  engine Service stays ClusterIP-only — ADR-0002's "browsers never reach the
+  engine" boundary, now enforced by cluster networking; only the web Service
+  can get an Ingress. Postgres/Redis/S3 are operator-provided, with the two
+  hard-won dev requirements documented in values.yaml: NOSUPERUSER engine
+  role and pgvector reachable by it. Verified: both images build; the engine
+  container answers `/healthz` 200 and the web container serves (307 to
+  sign-in — a probe pass); `helm lint` + `helm template` green locally and
+  now a CI job. Boundaries logged: sandbox off in-cluster, placeholder
+  resource limits until benchmarks, no NetworkPolicy/mTLS/autoscaling yet.
+  Design note: architecture/KUBERNETES_DEPLOY.md. Web 13 passed; engine
+  code untouched.
 - 2026-07-14 · Row-level security (defense in depth behind the API's
   owner-scoping): Postgres now refuses to hand a pinned session another
   user's rows, even when the query has no WHERE clause at all. Policies live
