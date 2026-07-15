@@ -42,13 +42,15 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: asep
-          POSTGRES_PASSWORD: asep
-          POSTGRES_DB: asep
+          # Bootstrap superuser only; the engine connects as the plain asep
+          # role created below — superusers bypass row-level security
+          # (docs/architecture/ROW_LEVEL_SECURITY.md)
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U asep -d asep"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
@@ -58,6 +60,16 @@ jobs:
       ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
     steps:
       - uses: actions/checkout@v7
+      # Mirrors infra/docker/postgres-init: a NOSUPERUSER engine role (RLS is
+      # bypassed by superusers) and pgvector in template1, so every database
+      # the suite creates inherits the extension
+      - name: Create the non-superuser engine role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE asep LOGIN PASSWORD 'asep' NOSUPERUSER CREATEDB"
+          psql -h localhost -U postgres -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h localhost -U postgres -c "CREATE DATABASE asep OWNER asep"
       # setup-uv publishes no floating major tag — pin the exact release
       - uses: astral-sh/setup-uv@v8.3.0
         with:

@@ -48,7 +48,7 @@ async def chat(
 ) -> StreamingResponse:
     # Persist the user message and load history before streaming starts —
     # streaming generators must not rely on request-scoped sessions.
-    async with session_scope() as db:
+    async with session_scope(user_id=principal.user_id) as db:
         if req.conversation_id is not None:
             conversation = await db.get(Conversation, req.conversation_id)
             if conversation is None or conversation.user_id != principal.user_id:
@@ -146,7 +146,7 @@ async def chat(
             yield _sse("error", {"message": "The model call failed. Check engine logs."})
             return
 
-        async with session_scope() as db:
+        async with session_scope(user_id=principal.user_id) as db:
             assistant = Message(
                 conversation_id=conversation_id,
                 role="assistant",

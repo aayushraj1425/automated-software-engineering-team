@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
 from engine.config import get_settings  # noqa: E402
 from engine.db.models import Base  # noqa: E402
+from engine.db.rls import apply_row_level_security  # noqa: E402
 
 
 def make_service_token(
@@ -63,6 +64,9 @@ async def prepared_db():
         await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+        # The whole suite runs under FORCE ROW LEVEL SECURITY, so every
+        # owner-scoped test exercises the policies (ROW_LEVEL_SECURITY.md).
+        await apply_row_level_security(conn)
     await engine.dispose()
     yield
 

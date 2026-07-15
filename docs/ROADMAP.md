@@ -15,7 +15,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and run-workspace file browser + editor + git-commit panel shipped; the terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
-| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, and backups/DR shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, backups/DR, and row-level security shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
 
@@ -87,8 +87,14 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   back out of a database restored from a real dump on every push. ✅
   *Backups/DR slice met 2026-07-14*
   ([BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook:
-  [DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)). Phase plan and
-  remaining workstreams (RBAC/RLS, K8s + Helm, benchmarks + audit):
+  [DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)). Row-level security
+  followed: Postgres itself now refuses a pinned API session another user's
+  rows — policies on the five ownership-carrying tables, sessions pinned
+  automatically to the verified JWT subject, the whole test suite running
+  under FORCE RLS, and the engine demoted to a non-superuser role (superusers
+  bypass RLS — the slice's hard-won lesson). ✅ *Row-level-security slice met
+  2026-07-14* ([ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)).
+  Phase plan and remaining workstreams (K8s + Helm, benchmarks + audit):
   [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)

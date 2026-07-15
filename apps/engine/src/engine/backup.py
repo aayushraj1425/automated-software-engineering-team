@@ -165,6 +165,10 @@ def restore_backup(dump_path: Path, database_url: str) -> None:
             "--if-exists",
             "--no-owner",
             "--no-privileges",
+            # COMMENT ON EXTENSION needs to *own* the extension — which the
+            # restoring role deliberately does not (vector is installed by the
+            # superuser via template1). Comments are noise in a recovery.
+            "--no-comments",
             *flags,
             "--dbname",
             dbname,
@@ -173,17 +177,22 @@ def restore_backup(dump_path: Path, database_url: str) -> None:
         env,
     )
     if result.returncode != 0:
-        # One narrow tolerance: a newer pg_restore opens its session with
-        # settings an older server does not know (PG18 client → PG16 server:
-        # `SET transaction_timeout`). Those SETs touch no restored data — the
-        # round-trip test reads the rows back to prove it. Any other error
-        # (a table that failed, a broken archive) still fails the restore.
+        # Two narrow tolerances, both artifacts of restoring as the
+        # non-superuser engine role (ROW_LEVEL_SECURITY.md) — neither touches
+        # restored data, and the round-trip test reads rows back to prove it:
+        #  - a newer pg_restore opens its session with settings an older
+        #    server does not know (PG18 client → PG16: SET transaction_timeout)
+        #  - DROP/ALTER on the vector extension, which is deliberately owned
+        #    by the superuser (installed via template1) and must stay put
+        # Any other error (a table that failed, a broken archive) still
+        # fails the restore.
         errors = [
             line for line in result.stderr.splitlines() if line.startswith("pg_restore: error:")
         ]
-        if not errors or any("unrecognized configuration parameter" not in e for e in errors):
+        harmless = ("unrecognized configuration parameter", "must be owner of extension")
+        if not errors or any(not any(h in e for h in harmless) for e in errors):
             raise BackupError(f"pg_restore failed: {result.stderr.strip()[:500]}")
-        log.warning("backup.restore_skipped_session_settings", count=len(errors))
+        log.warning("backup.restore_skipped_harmless_errors", count=len(errors))
     log.info("backup.restored", file=dump_path.name, database=dbname)
 
 

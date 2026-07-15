@@ -52,4 +52,8 @@ run before every push), `uv run pyright`, `uv run alembic upgrade head`.
   the repo sets `core.longpaths=true`. Don't switch pnpm back to symlink linking.
 - `uv` is at `~/.local/bin` — new shells may need `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"`.
 - Dev Postgres maps to host port **5433** (a local Windows PostgreSQL service owns 5432).
+- The `asep` DB role must be **NOSUPERUSER** (superusers bypass row-level security).
+  Fresh volumes get this from `infra/docker/postgres-init/`; older volumes need a
+  one-time rebuild: `python -m engine.backup create` → `docker compose down -v` →
+  `up -d` → `python -m engine.backup restore` (docs/runbooks/DISASTER_RECOVERY.md).
 - Engine tests need Postgres running (`pnpm db:up`); they create/drop an `asep_test` db.

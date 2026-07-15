@@ -90,8 +90,12 @@ in the same database), your session and organizations are back too.
   or set `PG_BIN_DIR` in `.env` (Windows dev:
   `C:\Program Files\PostgreSQL\18\bin`).
 - **`unrecognized configuration parameter` during restore** — a newer client
-  restoring into an older server; harmless session settings only, the restore
-  tolerates exactly this case and fails on anything else.
+  restoring into an older server; harmless session settings only.
+- **`must be owner of extension vector` during restore** — the pgvector
+  extension is deliberately owned by the superuser (installed via
+  `template1`), not by the `asep` role doing the restore; the extension stays
+  put, which is exactly right. These two are the only errors the restore
+  tolerates — anything else fails it.
 - **Decryption errors after restore** — the `ENGINE_ENCRYPTION_KEY` in `.env`
   is not the one the backup was taken under. Find the right key; the data is
   fine.

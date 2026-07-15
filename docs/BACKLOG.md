@@ -225,8 +225,11 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
 - [ ] Ship dumps off-host (S3/MinIO or a volume the K8s CronJob mounts) — a local backup directory burns down with the machine (Deploy workstream)
 
-### Workstream: RBAC & Row-Level Security (planned)
-- [ ] Organization-aware authorization beyond owner-scoping, enforced in Postgres (RLS) as well as the API
+### Workstream: RBAC & Row-Level Security
+- [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
+- [ ] Organization-aware sharing: `org_id` clauses in the same policies, better-auth membership reads — needs the organization switcher first
+- [ ] True deny-by-default: a separate non-owner database role for the API and an explicit service context for internal paths (unset context is currently trusted)
+- [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
 
 ### Workstream: Deploy (planned)
 - [ ] K8s manifests + Helm chart; liveness/readiness on `/healthz`; resource limits from the benchmarks
@@ -253,6 +256,28 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-14 · Row-level security (defense in depth behind the API's
+  owner-scoping): Postgres now refuses to hand a pinned session another
+  user's rows, even when the query has no WHERE clause at all. Policies live
+  on the five ownership-carrying tables (`repositories`, `conversations`,
+  `agent_runs`, `provider_keys`, `integration_connections`) with ENABLE +
+  FORCE row level security (migration 0016; `engine/db/rls.py` is the living
+  source the test suite applies, so the *entire* suite runs under FORCE RLS).
+  Pinning is automatic: `get_session` peeks at the same bearer token auth
+  verifies, and an `after_begin` hook re-applies the transaction-local
+  `app.user_id` on every transaction — a mid-request commit cannot drop it,
+  and nothing leaks into the connection pool. The hard-won lesson: superusers
+  bypass RLS entirely, and the compose bootstrap user cannot be demoted — so
+  the dev compose now bootstraps as `postgres` and creates `asep` as a plain
+  NOSUPERUSER role (init script; CI mirrors it), with pgvector installed into
+  `template1` because it is not a trusted extension. The dev volume was
+  rebuilt through the day-old backup path — dump, `down -v`, restore — which
+  exercised the disaster-recovery runbook for real and taught the restore two
+  documented tolerances. Boundaries logged as follow-ups: unset context is
+  trusted (deny-by-default needs a non-owner API role), child tables are
+  guarded through parents, org-aware sharing waits on the org switcher.
+  Design note: architecture/ROW_LEVEL_SECURITY.md. Engine 325 passed,
+  1 skipped; web untouched.
 - 2026-07-14 · Backups & disaster recovery: `engine/backup.py` drives the
   standard `pg_dump`/`pg_restore` as subprocesses — custom-format dumps written
   atomically (`.part`, renamed only after `pg_restore --list` proves the

@@ -14,18 +14,33 @@ class Principal:
     org_id: str | None = None
 
 
-def require_service_auth(request: Request) -> Principal:
+def _decode_bearer(request: Request) -> dict | None:
+    """The verified JWT payload, or None when absent/invalid. Never raises."""
     header = request.headers.get("authorization", "")
     if not header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-    token = header.removeprefix("Bearer ")
+        return None
     try:
-        payload = jwt.decode(
-            token,
+        return jwt.decode(
+            header.removeprefix("Bearer "),
             get_settings().engine_service_secret,
             algorithms=["HS256"],
             options={"require": ["exp", "sub"]},
         )
-    except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=401, detail="Invalid service token") from exc
+    except jwt.PyJWTError:
+        return None
+
+
+def require_service_auth(request: Request) -> Principal:
+    payload = _decode_bearer(request)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Missing or invalid service token")
     return Principal(user_id=str(payload["sub"]), org_id=payload.get("org"))
+
+
+def peek_user_id(request: Request) -> str | None:
+    """The verified caller, if any — used to pin the request's database
+    session to that user's rows (db/rls.py). Verification is the same as
+    require_service_auth; an invalid token pins nothing (and the route's
+    auth dependency will 401 before the session is ever used)."""
+    payload = _decode_bearer(request)
+    return None if payload is None else str(payload["sub"])

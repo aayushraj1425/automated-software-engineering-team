@@ -4,16 +4,21 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: asep
-      POSTGRES_PASSWORD: asep
-      POSTGRES_DB: asep
+      # The bootstrap user must stay a superuser (Postgres insists), so it is
+      # NOT the role the engine uses. The init script below creates `asep` as
+      # a plain NOSUPERUSER role — superusers bypass row-level security
+      # (docs/architecture/ROW_LEVEL_SECURITY.md).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       # Host port 5433: many dev machines run a local PostgreSQL on 5432
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # First boot only: creates the non-superuser asep role and its database
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U asep -d asep"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 3s
       retries: 20
