@@ -106,9 +106,17 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   task through the whole run pipeline with the fake model), and the first
   baseline table is recorded in the design note — future regressions are a
   number moving, not a feeling. ✅ *Benchmarks slice met 2026-07-15*
-  ([BENCHMARKS.md](architecture/BENCHMARKS.md)). Phase plan and the remaining
-  workstream (security-boundary audit):
-  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+  ([BENCHMARKS.md](architecture/BENCHMARKS.md)). The security-boundary audit
+  closed the planned workstreams: every claimed boundary (service JWT,
+  webhook HMAC, path jail, clone-URL hygiene, sandbox isolation, secrets at
+  rest, RLS, rate limiting, PR gates, CORS) verified against the code with a
+  recorded verdict; one finding fixed inline — a sweep test now calls every
+  route unauthenticated and fails the suite on anything that doesn't 401, so
+  per-route auth is a structural guarantee, not a convention — and two
+  findings logged. ✅ *Security-audit slice met 2026-07-15*
+  ([SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)). What remains in the
+  phase needs real traffic or a real cluster (alerting rules, mTLS, the
+  shared rate window): [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)
 

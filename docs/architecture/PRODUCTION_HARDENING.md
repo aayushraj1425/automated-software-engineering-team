@@ -30,7 +30,8 @@ deploys somewhere sturdier than one dev machine (K8s + Helm).
 - **Benchmarks & security audit** — performance baselines for the hot paths
   (indexing, retrieval, run pipeline) and a checklist audit of the security
   boundaries (jail, secrets, webhooks, JWTs). Benchmarks design note:
-  [BENCHMARKS.md](BENCHMARKS.md).
+  [BENCHMARKS.md](BENCHMARKS.md); audit report:
+  [../security/SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md).
 
 ## First slice: OpenTelemetry traces + metrics
 

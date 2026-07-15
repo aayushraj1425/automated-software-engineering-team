@@ -239,7 +239,9 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ### Workstream: Benchmarks & Security Audit
 - [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/BENCHMARKS.md](architecture/BENCHMARKS.md)
-- [ ] Checklist audit of the security boundaries (jail, secrets, webhooks, JWTs)
+- [x] Checklist audit of the security boundaries — every boundary verified with code evidence, one finding fixed inline (the route-table auth sweep test), the rest logged: [security/SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)
+- [ ] Loud startup warning (or refusal outside dev) when `ENGINE_ENCRYPTION_KEY` is unset and secrets fall back to the key derived from `ENGINE_SERVICE_SECRET` (audit finding 2)
+- [ ] Webhook replay/dedupe guard — a GitHub redelivery currently re-reviews the same pull request (audit finding 3, minor)
 
 ## Beyond Phase 3 (headlines only)
 
@@ -259,6 +261,19 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-15 · Security-boundary audit (closing the planned Phase 7
+  workstreams): every boundary the platform claims — service JWT, webhook
+  HMAC, workspace path jail, clone/push URL hygiene, sandbox isolation,
+  secrets at rest, row-level security, rate limiting, PR gates, CORS —
+  walked and verified against the code, each with evidence and a verdict in
+  security/SECURITY_AUDIT.md. One finding fixed in the same change: auth was
+  a per-route convention (88 hand-written dependencies), so
+  tests/test_route_auth_sweep.py now flattens the real route table and calls
+  every endpoint unauthenticated — anything that fails to 401 fails the
+  suite, making the boundary structural. Two findings logged as follow-ups:
+  the ENGINE_ENCRYPTION_KEY dev-fallback deserves a loud production warning,
+  and webhook redeliveries re-review the same PR. Engine 330 passed,
+  1 skipped; web untouched.
 - 2026-07-15 · Performance benchmarks: `engine/benchmark.py` measures the
   three hot paths through the real code, offline (`LLM_FAKE=1`, fake
   embeddings — provider latency measures them, not us). Indexing: a
