@@ -18,6 +18,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import KnowledgeKind
 from engine.db.models import KnowledgeItem, Repository
 from engine.db.session import get_session
+from engine.db.visibility import can_access
 from engine.knowledge.recall import recall_memories
 from engine.knowledge.store import MAX_CONTENT, remember
 
@@ -71,11 +72,11 @@ def _item_out(item: KnowledgeItem, score: float | None = None) -> KnowledgeItemO
     )
 
 
-async def _owned_repository(
+async def _visible_repository(
     db: AsyncSession, repository_id: uuid.UUID, principal: Principal
 ) -> Repository:
     repo = await db.get(Repository, repository_id)
-    if repo is None or repo.owner_id != principal.user_id:
+    if repo is None or not can_access(principal, repo.owner_id, repo.org_id):
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
 
@@ -88,7 +89,7 @@ async def list_knowledge(
     db: AsyncSession = Depends(get_session),
 ) -> list[KnowledgeItemOut]:
     """Newest memories first; with `q`, the hybrid-recall ranking instead."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     if q and q.strip():
         recalled = await recall_memories(db, repository_id, q.strip(), limit=_SEARCH_LIMIT)
         ids = [m.id for m in recalled]
@@ -121,7 +122,7 @@ async def create_knowledge(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> KnowledgeItemOut:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     item = await remember(
         db,
         repository_id,
@@ -143,7 +144,7 @@ async def delete_knowledge(
     db: AsyncSession = Depends(get_session),
 ) -> None:
     """Memories that turn out to be wrong are deleted, not argued with."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     item = await db.get(KnowledgeItem, item_id)
     if item is None or item.repository_id != repository_id:
         raise HTTPException(status_code=404, detail="Knowledge item not found")

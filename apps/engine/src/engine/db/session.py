@@ -13,13 +13,14 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import Session, SessionTransaction
 
-from engine.auth import peek_user_id
+from engine.auth import peek_principal
 from engine.config import get_settings
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 _RLS_USER_KEY = "rls_user_id"
+_RLS_ORG_KEY = "rls_org_id"
 
 
 def get_engine() -> AsyncEngine:
@@ -36,13 +37,17 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return _sessionmaker
 
 
-def bind_session_to_user(session: AsyncSession, user_id: str) -> None:
+def bind_session_to_user(session: AsyncSession, user_id: str, org_id: str | None = None) -> None:
     """Pin the session to one user: every transaction it opens carries the
     transaction-local ``app.user_id`` setting, and the row-level-security
     policies (db/rls.py) restrict it to that user's rows — even when a query
-    forgets its WHERE clause. Unpinned sessions are the trusted internal
-    context (runner, webhooks, migrations) and behave as before RLS."""
+    forgets its WHERE clause. ``org_id`` (the JWT's membership-checked active
+    organization) additionally opens that organization's shared rows on the
+    org-shared tables (docs/architecture/ORGANIZATION_SHARING.md). Unpinned
+    sessions are the trusted internal context (runner, webhooks, migrations)
+    and behave as before RLS."""
     session.info[_RLS_USER_KEY] = user_id
+    session.info[_RLS_ORG_KEY] = org_id
 
 
 @event.listens_for(Session, "after_begin")
@@ -55,18 +60,24 @@ def _apply_rls_context(
     user_id: Any = session.info.get(_RLS_USER_KEY)
     if user_id:
         connection.exec_driver_sql("SELECT set_config('app.user_id', %s, true)", (user_id,))
+        org_id: Any = session.info.get(_RLS_ORG_KEY)
+        if org_id:
+            connection.exec_driver_sql("SELECT set_config('app.org_id', %s, true)", (org_id,))
 
 
 @asynccontextmanager
-async def session_scope(user_id: str | None = None) -> AsyncIterator[AsyncSession]:
+async def session_scope(
+    user_id: str | None = None, org_id: str | None = None
+) -> AsyncIterator[AsyncSession]:
     """Explicit session context. Prefer this over the request-scoped dependency
     inside streaming generators — FastAPI tears down yield-dependencies before
     a StreamingResponse body finishes. Pass ``user_id`` to pin the session to
-    that user's rows; without it the session runs in the trusted internal
-    context (see bind_session_to_user)."""
+    that user's rows (plus ``org_id`` for the active organization's shared
+    rows); without it the session runs in the trusted internal context (see
+    bind_session_to_user)."""
     async with get_sessionmaker()() as session:
         if user_id is not None:
-            bind_session_to_user(session, user_id)
+            bind_session_to_user(session, user_id, org_id)
         yield session
 
 
@@ -76,9 +87,9 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     require_service_auth checks — so every route's queries are confined to
     the caller's rows at the database level."""
     async with get_sessionmaker()() as session:
-        user_id = peek_user_id(request)
-        if user_id is not None:
-            bind_session_to_user(session, user_id)
+        principal = peek_principal(request)
+        if principal is not None:
+            bind_session_to_user(session, principal.user_id, principal.org_id)
         yield session
 
 

@@ -83,10 +83,8 @@ proving no code path silently depended on cross-user reads.
   ownership column; the API reaches them only after an owner check on the
   parent. Subquery policies (`EXISTS (SELECT 1 FROM agent_runs …)`) can pin
   them down too, at a per-row planning cost — a follow-up, not this slice.
-- **Organization-aware sharing is not this.** These policies enforce the
-  *current* model (every resource has one owning user). Sharing a repository
-  with an organization needs `org_id` columns, better-auth membership reads,
-  and the organization switcher UI — the switcher shipped 2026-07-16
-  (SIGN_IN_AND_ORGANIZATIONS.md) and the service JWT carries the `org`
-  claim, so the sharing slice is unblocked; these policies are where its
-  `org_id IN …` clause will land.
+- **Organization-aware sharing shipped 2026-07-16** as its own slice on top
+  of these policies: repositories and agent runs additionally open to
+  sessions whose `app.org_id` (the JWT's membership-checked active
+  organization) matches the row's `org_id`. Design note:
+  [ORGANIZATION_SHARING.md](ORGANIZATION_SHARING.md).

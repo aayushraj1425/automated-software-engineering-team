@@ -20,6 +20,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import Estimate, IntegrationKind, Priority, WorkItemKind, WorkItemStatus
 from engine.db.models import CodeChunk, Repository, WorkItem
 from engine.db.session import get_session
+from engine.db.visibility import can_access
 from engine.integrations.connections import load_config
 from engine.integrations.issues import ISSUE_TRACKER_KINDS, IssueError, create_issue
 from engine.knowledge.recall import format_memories, recall_memories
@@ -139,11 +140,11 @@ def _work_item_out(item: WorkItem) -> WorkItemOut:
     )
 
 
-async def _owned_repository(
+async def _visible_repository(
     db: AsyncSession, repository_id: uuid.UUID, principal: Principal
 ) -> Repository:
     repo = await db.get(Repository, repository_id)
-    if repo is None or repo.owner_id != principal.user_id:
+    if repo is None or not can_access(principal, repo.owner_id, repo.org_id):
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
 
@@ -151,7 +152,7 @@ async def _owned_repository(
 async def _owned_work_item(
     db: AsyncSession, repository_id: uuid.UUID, item_id: uuid.UUID, principal: Principal
 ) -> WorkItem:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     item = await db.get(WorkItem, item_id)
     if item is None or item.repository_id != repository_id:
         raise HTTPException(status_code=404, detail="Work item not found")
@@ -221,7 +222,7 @@ async def create_work_item(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> WorkItemOut:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     depends_on = await _validate_dependencies(db, repository_id, body.depends_on, None)
     item = WorkItem(
         repository_id=repository_id,
@@ -245,7 +246,7 @@ async def list_work_items(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> list[WorkItemOut]:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     rows = (
         (
             await db.execute(
@@ -319,7 +320,7 @@ async def reorder_work_items(
     db: AsyncSession = Depends(get_session),
 ) -> list[WorkItemOut]:
     """Set each item's board position from its index in `ordered_ids`."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     rows = (
         (await db.execute(select(WorkItem).where(WorkItem.repository_id == repository_id)))
         .scalars()
@@ -373,7 +374,7 @@ async def generate_repository_roadmap(
     db: AsyncSession = Depends(get_session),
 ) -> list[WorkItemOut]:
     """Scrum Master: turn a one-line goal into work items saved to the backlog."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     context = await _repository_context(db, repository_id)
     memory = format_memories(await recall_memories(db, repository_id, body.goal))
     # The caller's own provider keys for the roadmap call (PROVIDER_KEYS.md).
@@ -390,7 +391,7 @@ async def work_item_insights(
     db: AsyncSession = Depends(get_session),
 ) -> PlanInsightsOut:
     """Blocked items and the recommended next item — computed, never stored."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     items = (
         (
             await db.execute(

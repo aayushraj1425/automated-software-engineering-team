@@ -1,7 +1,9 @@
 """Repositories API: connect a repository, index it, and search the index.
 
-Owner-scoped like the runs API. Indexing runs as a background task; search
-embeds the question and returns the closest chunks by cosine distance
+Scoped to the caller's own repositories plus the active organization's
+shared ones (docs/architecture/ORGANIZATION_SHARING.md), like the runs API.
+Indexing runs as a background task; search embeds the question and returns
+the closest chunks by cosine distance
 (design note: docs/architecture/REPOSITORY_INTELLIGENCE.md).
 """
 
@@ -16,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from engine.auth import Principal, require_service_auth
 from engine.db.models import CodeChunk, CodeEdge, Repository
 from engine.db.session import get_session
+from engine.db.visibility import can_access, visible_clause
 from engine.indexing.chunker import LANGUAGES
 from engine.indexing.indexer import index_repository
 from engine.indexing.retrieval import retrieve_chunks
@@ -69,11 +72,11 @@ def _language_for(path: str) -> str:
     return LANGUAGES.get(path[dot:].lower(), "other") if dot != -1 else "other"
 
 
-async def _owned_repository(
+async def _visible_repository(
     db: AsyncSession, repository_id: uuid.UUID, principal: Principal
 ) -> Repository:
     repo = await db.get(Repository, repository_id)
-    if repo is None or repo.owner_id != principal.user_id:
+    if repo is None or not can_access(principal, repo.owner_id, repo.org_id):
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
 
@@ -106,13 +109,23 @@ async def connect_repository(
     db: AsyncSession = Depends(get_session),
 ) -> RepositoryOut:
     url = body.url.strip()
+    # Reuse any visible connection of the same URL — own or org-shared —
+    # preferring an owned row when both exist.
     repo = (
-        await db.execute(
-            select(Repository).where(
-                Repository.owner_id == principal.user_id, Repository.url == url
+        (
+            await db.execute(
+                select(Repository)
+                .where(
+                    visible_clause(Repository.owner_id, Repository.org_id, principal),
+                    Repository.url == url,
+                )
+                .order_by((Repository.owner_id == principal.user_id).desc())
+                .limit(1)
             )
         )
-    ).scalar_one_or_none()
+        .scalars()
+        .first()
+    )
     if repo is None:
         repo = Repository(owner_id=principal.user_id, org_id=principal.org_id, url=url)
         db.add(repo)
@@ -130,7 +143,7 @@ async def list_repositories(
             await db.execute(
                 select(Repository, func.count(CodeChunk.id))
                 .outerjoin(CodeChunk, CodeChunk.repository_id == Repository.id)
-                .where(Repository.owner_id == principal.user_id)
+                .where(visible_clause(Repository.owner_id, Repository.org_id, principal))
                 .group_by(Repository.id)
                 .order_by(Repository.created_at.desc())
                 .limit(100)
@@ -149,7 +162,7 @@ async def start_indexing(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> RepositoryOut:
-    repo = await _owned_repository(db, repository_id, principal)
+    repo = await _visible_repository(db, repository_id, principal)
     repo.status = "indexing"
     await db.commit()
     background.add_task(index_repository, repo.id)
@@ -163,7 +176,7 @@ async def search_repository(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> list[SearchHit]:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     chunks = await retrieve_chunks(db, repository_id, q)
     return [
         SearchHit(
@@ -184,7 +197,7 @@ async def repository_graph(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> DependencyGraph:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
 
     chunk_rows = (
         (

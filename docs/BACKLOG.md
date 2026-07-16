@@ -227,7 +227,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ### Workstream: RBAC & Row-Level Security
 - [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
-- [ ] Organization-aware sharing: `org_id` clauses in the same policies, better-auth membership reads — unblocked 2026-07-16: the organization switcher shipped and the service JWT already carries the `org` claim
+- [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)
 - [ ] True deny-by-default: a separate non-owner database role for the API and an explicit service context for internal paths (unset context is currently trusted)
 - [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
 
@@ -261,6 +261,24 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-16 · Organization-aware sharing: the org claim now means something —
+  repositories and agent runs created while an organization is active are
+  visible, and writable, to whoever has that organization active (members
+  are equal collaborators; roles are a later slice). The rule is stated
+  exactly twice: `engine/db/visibility.py` (`can_access` for point lookups,
+  `visible_clause` for lists — every route that checked `owner !=
+  principal.user_id` on a repository or run now asks the helper), and the
+  RLS policies, where the session pin gained `app.org_id` next to
+  `app.user_id` and the org-shared tables' policies gained the matching
+  clause (migration `0017_org_shared_rls`, `rls.py` still the living
+  source). The engine never reads better-auth's member table: `setActive`
+  already membership-checks the value the BFF signs, so `org` is trusted
+  like `sub`. Conversations, provider keys, and integrations stay personal.
+  Connecting an already-org-shared repository URL reuses the shared row
+  instead of duplicating it. Design note:
+  architecture/ORGANIZATION_SHARING.md. Engine 342 passed, 1 skipped (8 new
+  tests attack both seams: raw SQL through pinned sessions and real requests
+  carrying the claim); web 17 passed (panel copy).
 - 2026-07-16 · Sign-in providers and the organization switcher (the last two
   Phase 1 identity items): the server decides which social buttons exist —
   `configuredProviders()` checks env credential pairs, the sign-in/sign-up

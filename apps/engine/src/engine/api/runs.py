@@ -24,6 +24,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session, session_scope
+from engine.db.visibility import can_access, visible_clause
 from engine.events.bus import RunEventSubscription, publish_run_ping
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
@@ -168,9 +169,9 @@ def _run_out(run: AgentRun, repository_url: str) -> RunOut:
     )
 
 
-async def _owned_run(db: AsyncSession, run_id: uuid.UUID, principal: Principal) -> AgentRun:
+async def _visible_run(db: AsyncSession, run_id: uuid.UUID, principal: Principal) -> AgentRun:
     run = await db.get(AgentRun, run_id)
-    if run is None or run.user_id != principal.user_id:
+    if run is None or not can_access(principal, run.user_id, run.org_id):
         raise HTTPException(status_code=404, detail="Run not found")
     return run
 
@@ -183,13 +184,23 @@ async def create_run(
     db: AsyncSession = Depends(get_session),
 ) -> RunOut:
     url = body.repository_url.strip()
+    # Reuse any visible connection of the same URL — own or org-shared —
+    # preferring an owned row when both exist.
     repo = (
-        await db.execute(
-            select(Repository).where(
-                Repository.owner_id == principal.user_id, Repository.url == url
+        (
+            await db.execute(
+                select(Repository)
+                .where(
+                    visible_clause(Repository.owner_id, Repository.org_id, principal),
+                    Repository.url == url,
+                )
+                .order_by((Repository.owner_id == principal.user_id).desc())
+                .limit(1)
             )
         )
-    ).scalar_one_or_none()
+        .scalars()
+        .first()
+    )
     if repo is None:
         repo = Repository(owner_id=principal.user_id, org_id=principal.org_id, url=url)
         db.add(repo)
@@ -223,7 +234,7 @@ async def decide_run(
     db: AsyncSession = Depends(get_session),
 ) -> RunOut:
     """The human approval gate: approve starts the work, reject ends the run."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     new_status = RunStatus.EXECUTING if body.approved else RunStatus.CANCELLED
     # Claim the decision atomically: two concurrent decisions (a double-click,
     # two tabs) must never both pass a plain status check and execute twice.
@@ -284,7 +295,7 @@ async def list_runs(
         await db.execute(
             select(AgentRun, Repository.url)
             .join(Repository, AgentRun.repository_id == Repository.id)
-            .where(AgentRun.user_id == principal.user_id)
+            .where(visible_clause(AgentRun.user_id, AgentRun.org_id, principal))
             .order_by(AgentRun.created_at.desc())
             .limit(50)
         )
@@ -298,7 +309,7 @@ async def get_run(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> RunDetailOut:
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     repo = await db.get(Repository, run.repository_id)
     tasks = (
         (
@@ -351,7 +362,7 @@ async def get_run_diff(
     db: AsyncSession = Depends(get_session),
 ) -> DiffOut:
     """Everything the agents changed in the run's workspace since its base commit."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     ws = _load_run_workspace(run)
     try:
         diff = await run_git(ws.path, "diff", ws.base_sha)
@@ -383,7 +394,7 @@ async def list_run_files(
     db: AsyncSession = Depends(get_session),
 ) -> WorkspaceFilesOut:
     """The run workspace's files, for the run page's file browser."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     ws = _load_run_workspace(run)
     files, truncated = await asyncio.to_thread(_walk_workspace, ws.path)
     return WorkspaceFilesOut(files=files, truncated=truncated)
@@ -397,7 +408,7 @@ async def get_run_file(
     db: AsyncSession = Depends(get_session),
 ) -> FileContentOut:
     """One workspace file's text, jailed and size-capped."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     ws = _load_run_workspace(run)
     try:
         target = resolve_inside(ws.path, path)
@@ -442,7 +453,7 @@ async def write_run_file(
     db: AsyncSession = Depends(get_session),
 ) -> FileWriteOut:
     """Replace one workspace file (finished runs only), jailed to the workspace."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     _require_editable(run)
     ws = _load_run_workspace(run)
     target = _jailed_target(ws, body.path)
@@ -463,7 +474,7 @@ async def run_git_status(
     db: AsyncSession = Depends(get_session),
 ) -> GitStatusOut:
     """The run workspace's working-tree changes (git status --porcelain)."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     ws = _load_run_workspace(run)
     try:
         output = await run_git(ws.path, "status", "--porcelain")
@@ -483,7 +494,7 @@ async def commit_run_workspace(
     db: AsyncSession = Depends(get_session),
 ) -> CommitOut:
     """Stage everything and commit the workspace (finished runs only)."""
-    run = await _owned_run(db, run_id, principal)
+    run = await _visible_run(db, run_id, principal)
     _require_editable(run)
     ws = _load_run_workspace(run)
     message = body.message.strip()
@@ -505,7 +516,7 @@ async def list_events(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> list[EventOut]:
-    await _owned_run(db, run_id, principal)
+    await _visible_run(db, run_id, principal)
     rows = (
         (
             await db.execute(
@@ -585,7 +596,7 @@ async def stream_events(
     Each message carries its event id, so a reconnecting EventSource resumes
     from Last-Event-ID; the `after` query parameter seeds a fresh start.
     """
-    await _owned_run(db, run_id, principal)
+    await _visible_run(db, run_id, principal)
     last_event_id = request.headers.get("last-event-id", "")
     cursor = max(after, int(last_event_id)) if last_event_id.isdigit() else after
 

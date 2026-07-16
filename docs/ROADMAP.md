@@ -15,7 +15,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** *(documentation suite; Slack / Linear / Jira / GitLab integrations; and run-workspace file browser + editor + git-commit panel shipped; the terminal and Bitbucket remain)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
-| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, backups/DR, row-level security, and the Kubernetes deploy shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, backups/DR, row-level security with organization sharing, and the Kubernetes deploy shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 
 ## Phase exit criteria
 
@@ -114,9 +114,16 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   route unauthenticated and fails the suite on anything that doesn't 401, so
   per-route auth is a structural guarantee, not a convention — and two
   findings logged. ✅ *Security-audit slice met 2026-07-15*
-  ([SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)). What remains in the
-  phase needs real traffic or a real cluster (alerting rules, mTLS, the
-  shared rate window): [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+  ([SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)). Organization-aware
+  sharing extended row-level security: repositories and agent runs created
+  under an active organization are visible to its members — the rule stated
+  once for the route filters and once inside Postgres (`app.org_id`
+  alongside `app.user_id`), with conversations and provider keys staying
+  personal. ✅ *Organization-sharing slice met 2026-07-16*
+  ([ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)). What
+  remains in the phase needs real traffic or a real cluster (alerting rules,
+  mTLS, the shared rate window):
+  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
 
 ## Standing tracks (every phase)
 

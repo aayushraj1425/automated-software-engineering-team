@@ -7,8 +7,15 @@ runner, webhooks, migrations), which behaves exactly as before RLS existed.
 ``FORCE`` matters: the engine connects as the table owner, and owners bypass
 RLS without it.
 
+Org-shared tables (repositories, agent_runs) additionally open a row to
+sessions whose ``app.org_id`` — the JWT's membership-checked active
+organization — matches the row's ``org_id``, for reads and writes alike:
+organization members are equal collaborators
+(docs/architecture/ORGANIZATION_SHARING.md). Conversations, provider keys,
+and integrations stay strictly owner-only.
+
 This module is the single source of truth for the policy SQL. The Alembic
-migration freezes a copy in time; the test suite applies this living version
+migrations freeze copies in time; the test suite applies this living version
 after creating the schema, so the entire suite runs under FORCE RLS.
 Design note: docs/architecture/ROW_LEVEL_SECURITY.md.
 """
@@ -26,26 +33,42 @@ USER_OWNED_TABLES: dict[str, str] = {
     "integration_connections": "user_id",
 }
 
+# The subset whose rows the active organization shares. Every table here
+# carries a nullable ``org_id`` column stamped at creation time.
+ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs"})
+
+
+def _policy_predicate(table: str, owner_column: str) -> str:
+    """Visible when: trusted context, owner, or (shared tables) active org."""
+    predicate = f"""
+                NULLIF(current_setting('app.user_id', true), '') IS NULL
+                OR {owner_column} = current_setting('app.user_id', true)"""
+    if table in ORG_SHARED_TABLES:
+        predicate += """
+                OR (
+                    org_id IS NOT NULL
+                    AND org_id = NULLIF(current_setting('app.org_id', true), '')
+                )"""
+    return predicate
+
 
 def rls_statements() -> list[str]:
     """The DDL applying every policy. Idempotent: safe to run twice."""
     statements: list[str] = []
     for table, owner_column in USER_OWNED_TABLES.items():
+        predicate = _policy_predicate(table, owner_column)
         statements += [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
             f"DROP POLICY IF EXISTS {table}_owner_rows ON {table}",
             # Unset (NULL or empty) app.user_id = trusted internal context;
-            # set = only the owner's rows, for reads and writes alike.
+            # set = the owner's rows plus the active organization's shared
+            # rows, for reads and writes alike.
             f"""
             CREATE POLICY {table}_owner_rows ON {table} FOR ALL
-            USING (
-                NULLIF(current_setting('app.user_id', true), '') IS NULL
-                OR {owner_column} = current_setting('app.user_id', true)
+            USING ({predicate}
             )
-            WITH CHECK (
-                NULLIF(current_setting('app.user_id', true), '') IS NULL
-                OR {owner_column} = current_setting('app.user_id', true)
+            WITH CHECK ({predicate}
             )
             """,
         ]

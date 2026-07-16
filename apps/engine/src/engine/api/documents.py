@@ -18,6 +18,7 @@ from engine.auth import Principal, require_service_auth
 from engine.db.enums import DocumentKind
 from engine.db.models import GeneratedDocument, Repository
 from engine.db.session import get_session
+from engine.db.visibility import can_access
 from engine.docs.generator import gather_context, generate_document, persist_document
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
@@ -62,11 +63,11 @@ def _document_out(doc: GeneratedDocument) -> DocumentOut:
     )
 
 
-async def _owned_repository(
+async def _visible_repository(
     db: AsyncSession, repository_id: uuid.UUID, principal: Principal
 ) -> Repository:
     repo = await db.get(Repository, repository_id)
-    if repo is None or repo.owner_id != principal.user_id:
+    if repo is None or not can_access(principal, repo.owner_id, repo.org_id):
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
 
@@ -78,7 +79,7 @@ async def list_documents(
     db: AsyncSession = Depends(get_session),
 ) -> list[DocumentOut]:
     """The repository's generated documents, newest first."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     rows = (
         (
             await db.execute(
@@ -102,7 +103,7 @@ async def generate_repository_document(
     db: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
     """Technical Writer: generate a document from the index and save it."""
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     file_map, code_excerpts = await gather_context(db, repository_id, body.kind)
     memory = format_memories(
         await recall_memories(db, repository_id, _RECALL_QUERIES[str(body.kind)])
@@ -125,7 +126,7 @@ async def delete_document(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> None:
-    await _owned_repository(db, repository_id, principal)
+    await _visible_repository(db, repository_id, principal)
     doc = await db.get(GeneratedDocument, document_id)
     if doc is None or doc.repository_id != repository_id:
         raise HTTPException(status_code=404, detail="Document not found")

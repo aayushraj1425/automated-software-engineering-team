@@ -50,9 +50,9 @@ export function OrganizationsPanel() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Organizations</h2>
         <p className="text-xs text-zinc-500">
-          Work as yourself or inside an organization. The active organization travels with
-          every request; today it scopes nothing yet — organization-wide sharing is the
-          next step built on this switcher.
+          Work as yourself or inside an organization. Repositories and agent runs created
+          while an organization is active are shared with its members; conversations and
+          provider keys stay personal.
         </p>
       </section>
 

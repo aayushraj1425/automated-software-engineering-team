@@ -23,7 +23,9 @@ deploys somewhere sturdier than one dev machine (K8s + Helm).
   path, and a written recovery runbook. A backup that has never been restored is
   a hope, not a backup.
 - **RBAC depth & row-level security** — organization-aware authorization beyond
-  owner-scoping, enforced in Postgres (RLS) as well as the API.
+  owner-scoping, enforced in Postgres (RLS) as well as the API. Design notes:
+  [ROW_LEVEL_SECURITY.md](ROW_LEVEL_SECURITY.md),
+  [ORGANIZATION_SHARING.md](ORGANIZATION_SHARING.md).
 - **Deploy** — K8s manifests + a Helm chart; liveness/readiness wired to
   `/healthz`; resource limits informed by the benchmarks. Design note:
   [KUBERNETES_DEPLOY.md](KUBERNETES_DEPLOY.md).

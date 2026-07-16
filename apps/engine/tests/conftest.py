@@ -36,14 +36,19 @@ from engine.db.rls import apply_row_level_security  # noqa: E402
 
 
 def make_service_token(
-    user_id: str = "user_test", secret: str = "test-service-secret-0123456789abcdef"
+    user_id: str = "user_test",
+    secret: str = "test-service-secret-0123456789abcdef",
+    org_id: str | None = None,
 ) -> str:
     now = int(time.time())
-    return jwt.encode({"sub": user_id, "iat": now, "exp": now + 60}, secret, algorithm="HS256")
+    payload: dict[str, object] = {"sub": user_id, "iat": now, "exp": now + 60}
+    if org_id is not None:
+        payload["org"] = org_id
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def auth_headers(user_id: str = "user_test") -> dict[str, str]:
-    return {"Authorization": f"Bearer {make_service_token(user_id)}"}
+def auth_headers(user_id: str = "user_test", org_id: str | None = None) -> dict[str, str]:
+    return {"Authorization": f"Bearer {make_service_token(user_id, org_id=org_id)}"}
 
 
 def _ensure_test_database() -> None:

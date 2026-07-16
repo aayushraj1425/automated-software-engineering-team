@@ -12,6 +12,7 @@ from engine.agents.chat_graph import chat_graph
 from engine.auth import Principal, require_service_auth
 from engine.db.models import AuditLog, Conversation, Message, Repository
 from engine.db.session import session_scope
+from engine.db.visibility import can_access
 from engine.indexing.retrieval import retrieve_chunks
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
@@ -48,7 +49,9 @@ async def chat(
 ) -> StreamingResponse:
     # Persist the user message and load history before streaming starts —
     # streaming generators must not rely on request-scoped sessions.
-    async with session_scope(user_id=principal.user_id) as db:
+    async with session_scope(user_id=principal.user_id, org_id=principal.org_id) as db:
+        # Conversations stay personal even under an active organization
+        # (ORGANIZATION_SHARING.md) — owner check, not visibility.
         if req.conversation_id is not None:
             conversation = await db.get(Conversation, req.conversation_id)
             if conversation is None or conversation.user_id != principal.user_id:
@@ -72,7 +75,7 @@ async def chat(
         recalled: list[dict] | None = None
         if req.repository_id is not None:
             repo = await db.get(Repository, req.repository_id)
-            if repo is None or repo.owner_id != principal.user_id:
+            if repo is None or not can_access(principal, repo.owner_id, repo.org_id):
                 raise HTTPException(status_code=404, detail="Repository not found")
             chunks = await retrieve_chunks(db, repo.id, req.message)
             if chunks:
@@ -146,7 +149,7 @@ async def chat(
             yield _sse("error", {"message": "The model call failed. Check engine logs."})
             return
 
-        async with session_scope(user_id=principal.user_id) as db:
+        async with session_scope(user_id=principal.user_id, org_id=principal.org_id) as db:
             assistant = Message(
                 conversation_id=conversation_id,
                 role="assistant",
