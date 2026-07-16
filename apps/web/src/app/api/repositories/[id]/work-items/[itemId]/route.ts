@@ -21,7 +21,7 @@ export async function PATCH(
   }
 
   const { id, itemId } = await params;
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/repositories/${encodeURIComponent(id)}/work-items/${encodeURIComponent(itemId)}`,
     {

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { IntegrationsPanel } from "@/components/settings/integrations-panel";
+import { OrganizationsPanel } from "@/components/settings/organizations-panel";
 import { ProviderKeysPanel } from "@/components/settings/provider-keys-panel";
 import { auth } from "@/lib/auth";
 
@@ -38,6 +39,7 @@ export default async function SettingsPage() {
           </Link>
         </h1>
       </div>
+      <OrganizationsPanel />
       <ProviderKeysPanel />
       <IntegrationsPanel />
     </main>

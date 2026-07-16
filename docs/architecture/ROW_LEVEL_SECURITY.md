@@ -86,5 +86,7 @@ proving no code path silently depended on cross-user reads.
 - **Organization-aware sharing is not this.** These policies enforce the
   *current* model (every resource has one owning user). Sharing a repository
   with an organization needs `org_id` columns, better-auth membership reads,
-  and the organization switcher UI — that remains on the backlog as its own
-  slice, and these policies are where its `org_id IN …` clause will land.
+  and the organization switcher UI — the switcher shipped 2026-07-16
+  (SIGN_IN_AND_ORGANIZATIONS.md) and the service JWT carries the `org`
+  claim, so the sharing slice is unblocked; these policies are where its
+  `org_id IN …` clause will land.

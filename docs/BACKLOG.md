@@ -75,8 +75,8 @@ subset being built now.
 
 ### Workstream: Identity & Keys (planned)
 - [x] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment) — design note: [architecture/PROVIDER_KEYS.md](architecture/PROVIDER_KEYS.md)
-- [ ] GitHub OAuth sign-in enabled end to end (needs OAuth app credentials)
-- [ ] Organization switcher on top of the better-auth organization plugin
+- [x] GitHub OAuth sign-in surfaced in the UI: the server lists which providers have credentials (GitHub/Google/Microsoft), the sign-in and sign-up pages render one button per configured provider, and none configured means the email form alone — the OAuth app itself is operator setup, documented in the design note ([architecture/SIGN_IN_AND_ORGANIZATIONS.md](architecture/SIGN_IN_AND_ORGANIZATIONS.md))
+- [x] Organization switcher on top of the better-auth organization plugin: settings-page panel lists/creates organizations and picks the active one (or personal); the BFF service JWT now carries the active organization as its `org` claim on every engine call (same design note)
 
 ### Workstream: Evaluation Seed (planned)
 - [x] Fixture repository (small Python service + static web page, seeded bug) committed under `fixtures/demo-service/` — how-to: [EVALUATION.md](EVALUATION.md)
@@ -227,7 +227,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ### Workstream: RBAC & Row-Level Security
 - [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
-- [ ] Organization-aware sharing: `org_id` clauses in the same policies, better-auth membership reads — needs the organization switcher first
+- [ ] Organization-aware sharing: `org_id` clauses in the same policies, better-auth membership reads — unblocked 2026-07-16: the organization switcher shipped and the service JWT already carries the `org` claim
 - [ ] True deny-by-default: a separate non-owner database role for the API and an explicit service context for internal paths (unset context is currently trusted)
 - [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
 
@@ -261,6 +261,20 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-16 · Sign-in providers and the organization switcher (the last two
+  Phase 1 identity items): the server decides which social buttons exist —
+  `configuredProviders()` checks env credential pairs, the sign-in/sign-up
+  pages pass the list to a client `SocialSignIn` block, and no credentials
+  means the email form alone (social sign-in doubles as sign-up; better-auth
+  creates the account on first OAuth round-trip). The settings page gained an
+  Organizations panel — list, create, and switch the active organization or
+  back to personal — and `signServiceToken` now takes the whole session, so
+  every BFF-signed service JWT carries the active organization as its `org`
+  claim (the engine's Principal already parses it). That claim is the seam
+  org-aware RLS sharing builds on — that follow-up is now unblocked. Design
+  note: architecture/SIGN_IN_AND_ORGANIZATIONS.md. Web 17 passed (2 new test
+  files: the decoded token's claims, the provider-driven buttons); engine
+  untouched.
 - 2026-07-15 · Audit follow-ups (findings 2 and 3 closed the day they were
   raised): both process startups — the API lifespan and the arq worker — now
   call `warn_if_derived_key()`, which logs loudly when `ENGINE_ENCRYPTION_KEY`

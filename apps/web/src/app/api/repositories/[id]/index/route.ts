@@ -13,7 +13,7 @@ export async function POST(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/repositories/${encodeURIComponent(id)}/index`,
     { method: "POST", headers: { authorization: `Bearer ${token}` } },

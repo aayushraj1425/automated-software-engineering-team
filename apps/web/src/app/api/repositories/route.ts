@@ -9,7 +9,7 @@ export async function GET(req: Request): Promise<Response> {
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(`${env.ENGINE_URL}/v1/repositories`, {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -30,7 +30,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(`${env.ENGINE_URL}/v1/repositories`, {
     method: "POST",
     headers: {

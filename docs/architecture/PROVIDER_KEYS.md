@@ -44,7 +44,9 @@ flowchart LR
 ## Boundaries
 
 - Keys are per **user**, not per organization — organization-shared keys can
-  come with the organization switcher.
+  come now that the organization switcher exists
+  (SIGN_IN_AND_ORGANIZATIONS.md); the service JWT already carries the `org`
+  claim.
 - Repository indexing (embeddings) keeps using the server's key: it runs in a
   background task with no obvious "caller", and embedding cost is small.
   Revisit if hosted multi-tenancy arrives.

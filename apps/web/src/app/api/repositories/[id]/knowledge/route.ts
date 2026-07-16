@@ -15,7 +15,7 @@ export async function GET(
   const { id } = await params;
   const q = new URL(req.url).searchParams.get("q");
   const query = q ? `?q=${encodeURIComponent(q)}` : "";
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/repositories/${encodeURIComponent(id)}/knowledge${query}`,
     { headers: { authorization: `Bearer ${token}` }, cache: "no-store" },
@@ -40,7 +40,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/repositories/${encodeURIComponent(id)}/knowledge`,
     {

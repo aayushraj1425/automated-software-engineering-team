@@ -14,7 +14,7 @@ export async function GET(
   }
   const { id } = await params;
   const after = new URL(req.url).searchParams.get("after") ?? "0";
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/runs/${encodeURIComponent(id)}/events?after=${encodeURIComponent(after)}`,
     { headers: { authorization: `Bearer ${token}` }, cache: "no-store" },

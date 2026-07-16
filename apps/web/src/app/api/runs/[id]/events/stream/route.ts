@@ -20,7 +20,7 @@ export async function GET(
   const { id } = await params;
   const after = new URL(req.url).searchParams.get("after");
   const query = after ? `?after=${encodeURIComponent(after)}` : "";
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const headers: Record<string, string> = { authorization: `Bearer ${token}` };
   const lastEventId = req.headers.get("last-event-id");
   if (lastEventId) headers["last-event-id"] = lastEventId;

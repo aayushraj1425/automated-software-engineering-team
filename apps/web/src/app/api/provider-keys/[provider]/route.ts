@@ -21,7 +21,7 @@ export async function PUT(
   }
 
   const { provider } = await params;
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/provider-keys/${encodeURIComponent(provider)}`,
     {
@@ -42,7 +42,7 @@ export async function DELETE(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { provider } = await params;
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/provider-keys/${encodeURIComponent(provider)}`,
     { method: "DELETE", headers: { authorization: `Bearer ${token}` } },

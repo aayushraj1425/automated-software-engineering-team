@@ -19,7 +19,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const token = await signServiceToken(session.user.id);
+  const token = await signServiceToken(session);
   const upstream = await fetch(`${env.ENGINE_URL}/v1/chat`, {
     method: "POST",
     headers: {
