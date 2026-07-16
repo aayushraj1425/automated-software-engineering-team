@@ -4,9 +4,9 @@ Configuration-driven so adding or retuning a role never touches runtime code:
 the table below is the single place a role's model tier and tool policy live,
 and prompts are versioned markdown assets in engine/agents/prompts/.
 
-Tool names are declarative for now; the Agent Tools workstream binds them to
-implementations, and the executor must enforce that an agent may only invoke
-tools in its policy (ADR-0008 — deny by default).
+The executor enforces that an agent may only invoke tools in its policy
+(ADR-0008 — deny by default); names without an implementation in
+engine/agents/tools.py are simply never offered to the model.
 """
 
 from dataclasses import dataclass
@@ -37,7 +37,11 @@ class AgentSpec:
         return (PROMPTS_DIR / self.prompt_file).read_text(encoding="utf-8")
 
 
-_ENGINEER_TOOLS = (*_READ_TOOLS, *_WRITE_TOOLS, *_GIT_TOOLS, "update_task_status")
+# Task-board tools (TASK_BOARD_TOOLS.md): engineers add newly discovered
+# work to the run's board and skip tasks that turned out unnecessary.
+_BOARD_TOOLS = ("add_task", "update_task_status")
+
+_ENGINEER_TOOLS = (*_READ_TOOLS, *_WRITE_TOOLS, *_GIT_TOOLS, *_BOARD_TOOLS)
 
 _REGISTRY: dict[AgentRole, AgentSpec] = {
     spec.role: spec
@@ -53,7 +57,9 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
         AgentSpec(
             role=AgentRole.PRODUCT_MANAGER,
             model_tier="planner",
-            tools=(*_READ_TOOLS, "create_tasks"),
+            # The initial board is created in one validated step from the
+            # plan's JSON contract — the PM never adds tasks piecemeal.
+            tools=_READ_TOOLS,
             prompt_file="product_manager.md",
         ),
         AgentSpec(

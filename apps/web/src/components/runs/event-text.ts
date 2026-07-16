@@ -21,13 +21,18 @@ export function describeEvent(event: RunEvent): string {
       return `${agentName(event.agent)} wrote the plan (${
         Array.isArray(p.tasks) ? p.tasks.length : 0
       } tasks)`;
+    case "task.created":
+      return `${agentName(event.agent)} added a task: "${String(p.title ?? "")}"`;
     case "task.status_changed": {
       const to = String(p.to ?? "");
       const title = p.title ? ` "${String(p.title)}"` : "";
       if (to === "in_progress") return `${agentName(event.agent)} started${title}`;
       if (to === "done") return `${agentName(event.agent)} finished: ${String(p.result ?? "task done")}`;
       if (to === "failed") return `${agentName(event.agent)} failed the task`;
-      if (to === "skipped") return `Task skipped (the run stopped first)`;
+      if (to === "skipped")
+        return p.reason
+          ? `Task${title} skipped: ${String(p.reason)}`
+          : `Task skipped (the run stopped first)`;
       return `Task is now ${to.replace("_", " ")}`;
     }
     case "task.attempt_failed":

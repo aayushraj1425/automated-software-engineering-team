@@ -11,9 +11,13 @@ Semantics (docs/architecture/AGENT_RUNTIME.md):
   the task fails and the run fails with a surfaced reason
 - when the run fails (or dependencies deadlock), remaining unstarted tasks
   are marked skipped
+- an executor may report board changes the agents made mid-task
+  (TASK_BOARD_TOOLS.md): new tasks join the board and get scheduled like
+  any other; skips flip in-memory pending tasks so they never execute
 """
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import TypedDict, cast
 
 from langgraph.graph import END, StateGraph
@@ -41,8 +45,20 @@ class SupervisorState(TypedDict):
     failure: str | None
 
 
-# Executes one task and returns its result summary; raises on failure.
-TaskExecutor = Callable[[TaskState], Awaitable[str]]
+@dataclass
+class ExecutionOutcome:
+    """A task's result plus the board changes the agents made while working
+    (through the task-board tools — TASK_BOARD_TOOLS.md). A plain string
+    result means "no board changes"."""
+
+    result: str
+    new_tasks: list[TaskState] = field(default_factory=list)
+    skipped_task_ids: list[str] = field(default_factory=list)
+
+
+# Executes one task; raises on failure. Returning a plain string is
+# shorthand for an ExecutionOutcome without board changes.
+TaskExecutor = Callable[[TaskState], Awaitable[str | ExecutionOutcome]]
 
 _FINISHED = (TaskStatus.DONE, TaskStatus.SKIPPED)
 
@@ -105,8 +121,18 @@ def _make_execute(executor: TaskExecutor):
                 }
             task["status"] = TaskStatus.PENDING
             return {"tasks": tasks}
+        outcome = result if isinstance(result, ExecutionOutcome) else ExecutionOutcome(result)
         task["status"] = TaskStatus.DONE
-        task["result"] = result
+        task["result"] = outcome.result
+        # Merge the board changes agents made mid-task: new tasks join the
+        # board (and get scheduled), skips make sure a task an agent deemed
+        # unnecessary never executes.
+        known = {t["id"] for t in tasks}
+        tasks.extend(t for t in outcome.new_tasks if t["id"] not in known)
+        skipped = set(outcome.skipped_task_ids)
+        for t in tasks:
+            if t["id"] in skipped and t["status"] == TaskStatus.PENDING:
+                t["status"] = TaskStatus.SKIPPED
         return {"tasks": tasks}
 
     return _execute

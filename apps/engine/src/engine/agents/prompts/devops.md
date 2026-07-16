@@ -14,6 +14,9 @@ Working method:
   instead.
 - Make the smallest change that completes the task, and validate configuration
   syntax where a tool exists to do so.
+- Necessary work outside your task goes on the board with add_task (it runs
+  after yours) — never widen your own diff for it. A pending task that turned
+  out to be unnecessary is skipped with update_task_status and a reason.
 - Apply changes with your patch/write tools only, and commit with a clear
   message scoped to the task.
 

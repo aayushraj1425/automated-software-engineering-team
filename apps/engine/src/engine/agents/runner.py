@@ -25,7 +25,7 @@ from engine.agents.loop import LlmUsage
 from engine.agents.product_manager import create_plan
 from engine.agents.qa import fix_failing_tests
 from engine.agents.reviewer import APPROVE, REQUEST_CHANGES, review_run
-from engine.agents.supervisor import TaskState, build_supervisor_graph
+from engine.agents.supervisor import ExecutionOutcome, TaskState, build_supervisor_graph
 from engine.config import get_settings
 from engine.db.enums import AgentRole, IntegrationKind, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
@@ -294,7 +294,8 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         board = [_to_task_state(t) for t in rows]
 
     ws = load_workspace(run_id, branch, base_sha)
-    graph = build_supervisor_graph(_make_task_executor(run_id, request, ws))
+    known_ids = {t["id"] for t in board}
+    graph = build_supervisor_graph(_make_task_executor(run_id, request, ws, known_ids))
     final = await graph.ainvoke(
         {"tasks": board, "current_task_id": None, "failure": None},
         {"recursion_limit": 100},
@@ -623,11 +624,14 @@ def _to_task_state(task: AgentTask) -> TaskState:
     )
 
 
-def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
+def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace, known_ids: set[str]):
     """Wraps the engineer agents with the task board's bookkeeping: statuses,
-    timestamps, events, and the run's token/cost totals."""
+    timestamps, events, and the run's token/cost totals. After a task
+    succeeds it reloads the board and reports what the agents changed
+    through the task-board tools — new tasks and skips — so the supervisor
+    can merge them (TASK_BOARD_TOOLS.md)."""
 
-    async def _execute(task: TaskState) -> str:
+    async def _execute(task: TaskState) -> ExecutionOutcome:
         task_id = uuid.UUID(task["id"])
         async with session_scope() as session:
             row = await session.get(AgentTask, task_id)
@@ -690,7 +694,18 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace):
                 agent=task["role"],
                 task_id=task_id,
             )
+            # What did the agents change on the board while working? New rows
+            # (add_task) and fresh skips (update_task_status) go back to the
+            # supervisor so scheduling sees them.
+            rows = (
+                (await session.execute(select(AgentTask).where(AgentTask.run_id == run_id)))
+                .scalars()
+                .all()
+            )
+            new_tasks = [_to_task_state(r) for r in rows if str(r.id) not in known_ids]
+            known_ids.update(str(r.id) for r in rows)
+            skipped_ids = [str(r.id) for r in rows if r.status == TaskStatus.SKIPPED]
             await _commit_and_ping(session, run_id)
-        return result
+        return ExecutionOutcome(result, new_tasks=new_tasks, skipped_task_ids=skipped_ids)
 
     return _execute

@@ -46,6 +46,17 @@ describe("describeEvent", () => {
     );
   });
 
+  it("describes the agents' own board changes", () => {
+    expect(describeEvent(event("task.created", { title: "Add tests" }, "backend"))).toBe(
+      'Backend added a task: "Add tests"',
+    );
+    expect(
+      describeEvent(
+        event("task.status_changed", { to: "skipped", title: "Old task", reason: "not needed" }),
+      ),
+    ).toBe('Task "Old task" skipped: not needed');
+  });
+
   it("falls back to the raw type for unknown events", () => {
     expect(describeEvent(event("something.new", {}))).toBe("something.new");
   });

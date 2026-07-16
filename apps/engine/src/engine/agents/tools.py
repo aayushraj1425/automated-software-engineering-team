@@ -1,16 +1,22 @@
-"""The agents' toolbox: read, write, search, and git — all inside the jail.
+"""The agents' toolbox: read, write, search, git, and the task board.
 
 Each tool is an async function plus a JSON schema (the part the AI model
 sees). call_tool() is the single dispatcher: it checks the tool is on the
 agent's allow-list (deny by default, per the registry), runs it, and turns
 any ToolError into a plain error message the agent can read and react to.
 Every path an agent supplies goes through the jail before anything is touched.
+The task-board tools write agent_tasks directly (durable, and the UI board
+sees the change immediately); the supervisor learns about the changes when
+the current task's executor returns (TASK_BOARD_TOOLS.md).
 """
 
 import asyncio
 from typing import Any
 
-from engine.db.models import AgentRun
+from sqlalchemy import func, select
+
+from engine.db.enums import AgentRole, TaskStatus
+from engine.db.models import AgentEvent, AgentRun, AgentTask
 from engine.db.session import session_scope
 from engine.indexing.retrieval import retrieve_chunks
 from engine.workspace.jail import JailViolation, resolve_inside
@@ -22,6 +28,12 @@ MAX_SEARCH_RESULTS = 50
 MAX_SEARCH_FILE_BYTES = 512_000
 SEARCH_CODE_RESULTS = 6
 SEARCH_CODE_SNIPPET_CHARS = 500
+
+# A looping agent must not flood the run with work (TASK_BOARD_TOOLS.md).
+MAX_BOARD_TASKS = 30
+# New tasks take engineer roles only — never the reviewer or the planners.
+_TASK_ROLES = (AgentRole.BACKEND, AgentRole.FRONTEND, AgentRole.DEVOPS)
+_UNFINISHED = (TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED)
 
 
 class ToolError(Exception):
@@ -111,6 +123,101 @@ async def search_code(ws: Workspace, query: str) -> str:
         f"{c.content[:SEARCH_CODE_SNIPPET_CHARS]}"
         for c in chunks
     )
+
+
+async def add_task(ws: Workspace, title: str, description: str = "", role: str = "backend") -> str:
+    """Append a newly discovered task to this run's board. It lands pending
+    with the next sequence and no dependencies; the supervisor schedules it
+    after the current task finishes (TASK_BOARD_TOOLS.md)."""
+    title = title.strip()
+    if not title:
+        raise ToolError("task title is empty")
+    if role not in _TASK_ROLES:
+        allowed = ", ".join(_TASK_ROLES)
+        raise ToolError(f"role {role!r} cannot take tasks — choose one of: {allowed}")
+    async with session_scope() as db:
+        count = (
+            await db.execute(
+                select(func.count()).select_from(AgentTask).where(AgentTask.run_id == ws.run_id)
+            )
+        ).scalar_one()
+        if count >= MAX_BOARD_TASKS:
+            raise ToolError(
+                f"the board already has {count} tasks (cap {MAX_BOARD_TASKS}) — "
+                "finish existing work instead of adding more"
+            )
+        next_sequence = (
+            (
+                await db.execute(
+                    select(func.max(AgentTask.sequence)).where(AgentTask.run_id == ws.run_id)
+                )
+            ).scalar_one()
+            or 0
+        ) + 1
+        task = AgentTask(
+            run_id=ws.run_id,
+            sequence=next_sequence,
+            role=role,
+            title=title[:256],
+            description=description.strip() or None,
+        )
+        db.add(task)
+        db.add(
+            AgentEvent(
+                run_id=ws.run_id,
+                task_id=task.id,
+                agent=role,
+                type="task.created",
+                payload={"sequence": next_sequence, "title": task.title, "role": role},
+            )
+        )
+        await db.commit()
+    return f"added task #{next_sequence} ({role}): {task.title}"
+
+
+async def update_task_status(ws: Workspace, sequence: int, status: str, reason: str = "") -> str:
+    """Mark a pending task skipped — the only transition agents get; every
+    other status belongs to the runner and supervisor. Skipping a task that
+    unfinished work depends on is refused: a skipped dependency can never
+    become done, so its dependents would deadlock the board."""
+    if status != TaskStatus.SKIPPED:
+        raise ToolError(f"agents may only set status '{TaskStatus.SKIPPED}', not {status!r}")
+    async with session_scope() as db:
+        rows = (
+            (await db.execute(select(AgentTask).where(AgentTask.run_id == ws.run_id)))
+            .scalars()
+            .all()
+        )
+        task = next((t for t in rows if t.sequence == sequence), None)
+        if task is None:
+            raise ToolError(f"no task #{sequence} on this run's board")
+        if task.status != TaskStatus.PENDING:
+            raise ToolError(
+                f"task #{sequence} is {task.status} — only pending tasks can be skipped"
+            )
+        dependents = [
+            t.sequence for t in rows if str(task.id) in t.depends_on and t.status in _UNFINISHED
+        ]
+        if dependents:
+            waiting = ", ".join(f"#{s}" for s in sorted(dependents))
+            raise ToolError(f"task #{sequence} cannot be skipped — {waiting} still depend(s) on it")
+        task.status = TaskStatus.SKIPPED
+        task.result = reason.strip() or None
+        db.add(
+            AgentEvent(
+                run_id=ws.run_id,
+                task_id=task.id,
+                type="task.status_changed",
+                payload={
+                    "from": TaskStatus.PENDING,
+                    "to": TaskStatus.SKIPPED,
+                    "title": task.title,
+                    "reason": reason.strip()[:300],
+                },
+            )
+        )
+        await db.commit()
+    return f"skipped task #{sequence}: {task.title}"
 
 
 async def git_commit(ws: Workspace, message: str) -> str:
@@ -223,6 +330,45 @@ TOOLS: dict[str, tuple[Any, dict]] = {
     "git_diff": (
         git_diff,
         _schema("git_diff", "Show everything changed since the run started.", {}, []),
+    ),
+    "add_task": (
+        add_task,
+        _schema(
+            "add_task",
+            "Add a newly discovered task to this run's board instead of "
+            "widening your own diff. It runs after your current task.",
+            {
+                "title": {"type": "string", "description": "Short imperative title."},
+                "description": {
+                    "type": "string",
+                    "description": "What needs doing and why (optional).",
+                },
+                "role": {
+                    "type": "string",
+                    "enum": list(_TASK_ROLES),
+                    "description": "Which engineer should take it.",
+                },
+            },
+            ["title"],
+        ),
+    ),
+    "update_task_status": (
+        update_task_status,
+        _schema(
+            "update_task_status",
+            "Skip a pending task that turned out to be unnecessary. Give the "
+            "reason — it shows on the board in place of a result.",
+            {
+                "sequence": {"type": "integer", "description": "The task number to skip."},
+                "status": {
+                    "type": "string",
+                    "enum": [str(TaskStatus.SKIPPED)],
+                    "description": "Only 'skipped' is allowed.",
+                },
+                "reason": {"type": "string", "description": "Why the task is unnecessary."},
+            },
+            ["sequence", "status"],
+        ),
     ),
 }
 

@@ -10,6 +10,9 @@ Working method:
   with search or git_diff.
 - Make the smallest change that completes the task. Anything you noticed but
   did not do belongs in your task summary, not in the diff.
+- Necessary work outside your task goes on the board with add_task (it runs
+  after yours) — never widen your own diff for it. A pending task that turned
+  out to be unnecessary is skipped with update_task_status and a reason.
 - Update or add tests alongside the change; a behavior change without a test
   is an incomplete task.
 - Apply changes with your patch/write tools only — never describe changes

@@ -55,7 +55,7 @@ subset being built now.
 - [x] Write-side tools: write file — jailed (apply-patch with unified diffs still pending)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
 - [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
-- [ ] Task-board tools: create tasks, update task status (writes `agent_tasks`)
+- [x] Task-board tools: engineers add newly discovered work with `add_task` (pending, next sequence — the supervisor merges and schedules it in the same run) and skip unnecessary pending tasks with `update_task_status` (skipped-only; refuses when unfinished work depends on the task) — design note: [architecture/TASK_BOARD_TOOLS.md](architecture/TASK_BOARD_TOOLS.md)
 - [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored; `audit_logs` mirror pending)
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
 
@@ -261,6 +261,24 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-16 · Task-board agent tools (the Agent Tools workstream's last
+  open item): engineers can now change the board they work from. `add_task`
+  appends a newly discovered task (pending, next sequence, engineer roles
+  only, board capped at 30) instead of the agent silently widening its own
+  diff; `update_task_status` skips a pending task that turned out
+  unnecessary — skipped-only by design (every other transition belongs to
+  the runner and supervisor) and refused when unfinished work depends on
+  the task, because a skipped dependency would deadlock the board. The
+  supervisor learns about changes through the executor seam: the runner
+  reloads the board after each task and returns an `ExecutionOutcome`
+  (result + new tasks + skips) that the graph merges before scheduling —
+  executors returning a plain string still mean "no board changes", so the
+  existing semantics are untouched. Both tools audit to the timeline
+  (`task.created`, `task.status_changed` with the reason), the engineer
+  prompts teach the discipline, and the run page renders the new events in
+  plain English. Design note: architecture/TASK_BOARD_TOOLS.md. Engine 352
+  passed, 1 skipped (10 new tests across tools, supervisor merge, and the
+  runner glue); web 18 passed.
 - 2026-07-16 · Organization-aware sharing: the org claim now means something —
   repositories and agent runs created while an organization is active are
   visible, and writable, to whoever has that organization active (members
