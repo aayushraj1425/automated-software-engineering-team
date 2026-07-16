@@ -63,7 +63,7 @@ subset being built now.
 - [x] Product Manager agent: feature request → mini-specification + task breakdown (structured JSON contract, strict validation with one corrective round)
 - [x] Backend, Frontend, and DevOps engineer agents: task → edits + task summary (shared tool loop; commit required before the summary)
 - [x] Reviewer agent: diff → verdict (approve / request changes with role-tagged findings); one revision loop, second verdict is final
-- [ ] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested
+- [x] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested: a checked-in SHA-256 snapshot fails the suite on any prompt drift and names the file; deliberate edits refresh the snapshot and commit both together — design note: [architecture/PROMPT_SNAPSHOTS.md](architecture/PROMPT_SNAPSHOTS.md)
 
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
@@ -261,6 +261,18 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-16 · Prompt snapshots: editing an agent prompt is now a visible
+  decision instead of a silent behavior change. `tests/prompt_snapshots.json`
+  records each of the nine prompts' SHA-256 (small, diff-friendly); the test
+  fails on any drift — changed, added without a snapshot, or deleted — and
+  names the file with the refresh command. The test module doubles as the
+  refresher (`uv run python tests/test_prompt_snapshots.py`), so the format
+  lives in one place; a second test pins the snapshot set to exactly the
+  registry's prompt files. Verified the failure path for real: a one-newline
+  edit failed the suite naming backend.md. Drift detection only — prompt
+  *quality* stays the evaluation harness's job. Design note:
+  architecture/PROMPT_SNAPSHOTS.md. Engine 354 passed, 1 skipped; web
+  untouched.
 - 2026-07-16 · Task-board agent tools (the Agent Tools workstream's last
   open item): engineers can now change the board they work from. `add_task`
   appends a newly discovered task (pending, next sequence, engineer roles

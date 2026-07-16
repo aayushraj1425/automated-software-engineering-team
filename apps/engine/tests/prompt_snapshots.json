@@ -1,0 +1,38 @@
+{
+  "backend.md": {
+    "sha256": "82175d9f51e37327f2c5b3ccc78714dcedb11b5b098b9c893decb7610fb45766",
+    "lines": 23
+  },
+  "devops.md": {
+    "sha256": "4d0cfd965a344b4e3bf4384bc0cc636368ebc515e0c7660ef0916868a09ea717",
+    "lines": 24
+  },
+  "frontend.md": {
+    "sha256": "c78dbeaa7065d387becc6b81e7cee939364aac3a114819e4ba13a540c3d55f68",
+    "lines": 22
+  },
+  "product_manager.md": {
+    "sha256": "76814ba47ae0fc722214757c37eb96dfc6880e51a9ca18aba4aededaa476c4a9",
+    "lines": 22
+  },
+  "qa.md": {
+    "sha256": "1232ee4f6a327ba8f0179fed851cd7a6777c143e05db71a57b95493ac0c77249",
+    "lines": 20
+  },
+  "reviewer.md": {
+    "sha256": "b107cfb129ab1aebc5def261d18e2e43503017c68cc62cb17b5d62276d9d4a12",
+    "lines": 20
+  },
+  "scrum_master.md": {
+    "sha256": "3f4a595cdc5022a1e94d84b6ab105c9e29db5e1d56c2183d7f79f41359934115",
+    "lines": 30
+  },
+  "supervisor.md": {
+    "sha256": "46198b59b946d23cd43d115b90ce908b86c4dbace2aaffe9874678f2a1c58a97",
+    "lines": 15
+  },
+  "technical_writer.md": {
+    "sha256": "e8c9adb8264af563a19a837a8bdf5d5fe8ecea9df9a694dd9564671f13f7ef3e",
+    "lines": 33
+  }
+}
