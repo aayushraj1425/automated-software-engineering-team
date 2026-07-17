@@ -67,6 +67,9 @@ async def run_git(cwd: Path, *args: str) -> str:
         return subprocess.run(  # noqa: S603 — fixed executable, no shell
             ["git", *args],
             cwd=cwd,
+            # No git call here ever needs input; a credential prompt reading
+            # stdin must fail immediately instead of hanging until timeout.
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             timeout=120,

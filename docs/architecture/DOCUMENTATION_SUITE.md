@@ -68,12 +68,26 @@ everywhere else ([KNOWLEDGE_AND_MEMORY.md](KNOWLEDGE_AND_MEMORY.md)).
 |---|---|---|
 | `readme` | Project overview: what it is, how to set it up, how to use it | entry points, setup/config files |
 | `api_reference` | The endpoints/functions the code exposes | routes, handlers, public functions |
-| `changelog` | A human summary of what the codebase currently does, grouped by area | the file map and module structure |
+| `changelog` | What actually changed, from the repository's real commit history | `git log` of a bounded shallow clone *(since 2026-07-17)* |
 | `architecture` | How the modules fit together | high-level modules and their dependencies |
 
-The changelog is generated from the current indexed snapshot, not from git
-history — a first-slice limitation noted here on purpose. Wiring it to real
-commit history is a later item.
+## The changelog reads real history *(added 2026-07-17)*
+
+The first slice generated the changelog from the indexed snapshot — honest,
+but a snapshot is not a changelog. Now:
+
+- `engine/docs/git_history.py` fetches the last commits (bounded, default
+  100) with a **temporary bare shallow clone** — history only, no working
+  tree, removed afterwards. The URL goes through the same
+  `ensure_cloneable_url` hygiene as every other clone (SOURCE_HOSTS.md).
+- Each line the writer sees is `date hash subject (author)` — real dates and
+  real subjects, so the model groups actual changes instead of inventing
+  versions.
+- **Fallback stays honest:** when the history cannot be fetched (private
+  remote without credentials, network down), the changelog falls back to the
+  snapshot summary and says so in the document — never a fabricated history.
+- Offline mode lists the real commit subjects, so the tests prove history
+  flows end to end without a model.
 
 ## Offline mode
 
@@ -92,6 +106,8 @@ and readable on the docs page after the tab is closed and reopened.
 
 - No publishing anywhere external (no pushing docs into the repo, a wiki, or a
   docs site) — that belongs with the integrations workstreams.
-- No git-history changelog — the changelog summarizes the current snapshot.
 - Documents are read-only artifacts here; in-place editing of a generated
   document is a later refinement.
+- The history fetch is anonymous (no credentials): a private repository's
+  changelog falls back to the snapshot summary until the fetch learns to use
+  the owner's connection tokens.

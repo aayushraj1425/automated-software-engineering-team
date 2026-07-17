@@ -6,11 +6,13 @@ the whole path (generate → persist → list → delete) runs without a model.
 Design note: docs/architecture/DOCUMENTATION_SUITE.md.
 """
 
+import subprocess
 import uuid
 
 from engine.db.models import CodeChunk
 from engine.db.session import session_scope
 from engine.docs.generator import DocumentKind, generate_document
+from engine.docs.git_history import collect_history
 from engine.llm.router import model_router
 from tests.conftest import auth_headers
 
@@ -71,6 +73,62 @@ async def test_generate_offline_returns_a_titled_document():
         assert doc["content"].strip()
         # the offline document grounds itself in the real file map
         assert "src/app.py" in doc["content"]
+
+
+# ── The changelog reads real commit history ─────────────────────────────────
+
+
+def _git(cwd, *args):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def _local_repo_with_commits(tmp_path, subjects: list[str]) -> str:
+    """A real local git repository with one commit per subject."""
+    repo = tmp_path / "history-repo"
+    repo.mkdir()
+    _git(repo, "init", "--initial-branch=main")
+    _git(repo, "config", "user.name", "Fixture")
+    _git(repo, "config", "user.email", "fixture@test.local")
+    for n, subject in enumerate(subjects):
+        (repo / f"file{n}.txt").write_text(f"{subject}\n")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-m", subject)
+    return str(repo)
+
+
+async def test_collect_history_returns_real_log_lines(tmp_path):
+    url = _local_repo_with_commits(tmp_path, ["add the parser", "fix the off-by-one"])
+    lines = (await collect_history(url)).splitlines()
+    assert len(lines) == 2
+    assert "fix the off-by-one" in lines[0]  # newest first
+    assert "add the parser" in lines[1]
+    assert "(Fixture)" in lines[0]  # date hash subject (author)
+
+
+async def test_collect_history_is_empty_when_the_fetch_fails():
+    assert await collect_history("https://example.invalid/acme/gone") == ""
+
+
+async def test_changelog_is_generated_from_the_commit_history(client, tmp_path):
+    """End to end: the document the API stores lists the real subjects."""
+    url = _local_repo_with_commits(tmp_path, ["introduce the engine", "wire the api"])
+    headers = _headers()
+    repo_id = await _create_repo(client, headers, url=url)
+
+    doc = await _generate(client, headers, repo_id, kind="changelog")
+    assert "commit history" in doc["content"]
+    assert "wire the api" in doc["content"]
+    assert "introduce the engine" in doc["content"]
+
+
+async def test_changelog_without_history_falls_back_to_the_snapshot(client):
+    """An unfetchable remote degrades honestly to the snapshot summary."""
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)  # https://github.com/acme/demo-… (no such repo)
+
+    doc = await _generate(client, headers, repo_id, kind="changelog")
+    assert "Commits (newest first)" not in doc["content"]
+    assert "repository index" in doc["content"]  # the snapshot placeholder path
 
 
 # ── The API: generate, list, delete ─────────────────────────────────────────

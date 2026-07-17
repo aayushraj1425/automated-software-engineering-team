@@ -56,16 +56,29 @@ INSTRUCTIONS: dict[str, str] = {
         "functions, or commands the code exposes, each with what it takes and "
         "returns. Group related entries."
     ),
+    # The snapshot fallback, used only when commit history is unavailable —
+    # with history, _CHANGELOG_FROM_HISTORY replaces it (git_history.py).
     DocumentKind.CHANGELOG: (
         "Write a changelog-style summary of what this codebase currently does, "
-        "grouped by area of the code. Describe the current snapshot — do not "
-        "invent version numbers or dates."
+        "grouped by area of the code. Commit history was unavailable, so "
+        "describe the current snapshot, say so in one opening line, and do "
+        "not invent version numbers or dates."
     ),
     DocumentKind.ARCHITECTURE: (
         "Write an architecture overview for this repository: the main modules, "
         "what each is responsible for, and how they depend on one another."
     ),
 }
+
+
+_CHANGELOG_FROM_HISTORY = (
+    "Write a changelog for this repository from its real commit history "
+    "below (one `date hash subject (author)` line per commit, newest "
+    "first). Group related commits into themes with the real dates; never "
+    "invent version numbers or entries the history does not support."
+)
+# Cap what the prompt carries — 100 log lines fit comfortably under this.
+_HISTORY_CHARS = 12_000
 
 
 def _kind(kind: DocumentKind | str) -> str:
@@ -107,15 +120,23 @@ async def generate_document(
     file_map: str = "",
     code_excerpts: str = "",
     memory: str = "",
+    history: str = "",
 ) -> dict[str, Any]:
     """A `{title, content}` document for the kind. Offline mode returns a fixed
-    document that lists the repository's real files."""
+    document that lists the repository's real files. The changelog kind reads
+    `history` (real `git log` lines — git_history.py) when the caller could
+    fetch it; without it the snapshot fallback applies."""
     kind = _kind(kind)
     title = TITLES[kind]
     if get_settings().llm_fake:
-        return {"title": title, "content": _offline_document(kind, file_map)}
+        return {"title": title, "content": _offline_document(kind, file_map, history)}
 
     spec = get_agent_spec(AgentRole.TECHNICAL_WRITER)
+    instruction = INSTRUCTIONS[kind]
+    history_block = ""
+    if kind == DocumentKind.CHANGELOG and history:
+        instruction = _CHANGELOG_FROM_HISTORY
+        history_block = f"\n\nCommit history:\n{history[:_HISTORY_CHARS]}"
     map_block = f"\n\nRepository files:\n{file_map}" if file_map else ""
     code_block = f"\n\nRelevant code:\n{code_excerpts}" if code_excerpts else ""
     # Recalled team memory rides along as context, never as command
@@ -125,16 +146,25 @@ async def generate_document(
         {"role": "system", "content": spec.system_prompt},
         {
             "role": "user",
-            "content": f"{INSTRUCTIONS[kind]}{map_block}{code_block}{memory_block}",
+            "content": f"{instruction}{history_block}{map_block}{code_block}{memory_block}",
         },
     ]
     reply = await model_router.complete("planner", messages)
-    content = reply.strip()[:MAX_CONTENT] or _offline_document(kind, file_map)
+    content = reply.strip()[:MAX_CONTENT] or _offline_document(kind, file_map, history)
     return {"title": title, "content": content}
 
 
-def _offline_document(kind: str, file_map: str) -> str:
-    """A deterministic document so the path runs without a model (LLM_FAKE=1)."""
+def _offline_document(kind: str, file_map: str, history: str = "") -> str:
+    """A deterministic document so the path runs without a model (LLM_FAKE=1).
+    A changelog with history lists the real commit lines, proving the history
+    flows end to end in the tests."""
+    if kind == DocumentKind.CHANGELOG and history:
+        commits = "\n".join(f"- {line}" for line in history.splitlines() if line.strip())
+        return (
+            f"# {TITLES[kind]}\n\n"
+            f"_Generated offline (LLM_FAKE=1) from the repository's commit history._\n\n"
+            f"## Commits (newest first)\n\n{commits}"
+        )
     files = file_map.strip() or "(the repository has not been indexed yet)"
     return (
         f"# {TITLES[kind]}\n\n"

@@ -20,6 +20,7 @@ from engine.db.models import GeneratedDocument, Repository
 from engine.db.session import get_session
 from engine.db.visibility import can_access
 from engine.docs.generator import gather_context, generate_document, persist_document
+from engine.docs.git_history import collect_history
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
 
@@ -102,15 +103,21 @@ async def generate_repository_document(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
-    """Technical Writer: generate a document from the index and save it."""
-    await _visible_repository(db, repository_id, principal)
+    """Technical Writer: generate a document from the index and save it.
+    The changelog additionally reads the repository's real commit history
+    (bounded shallow fetch — engine/docs/git_history.py); when the fetch
+    fails it falls back to the snapshot summary honestly."""
+    repo = await _visible_repository(db, repository_id, principal)
     file_map, code_excerpts = await gather_context(db, repository_id, body.kind)
+    history = ""
+    if body.kind == DocumentKind.CHANGELOG:
+        history = await collect_history(repo.url)
     memory = format_memories(
         await recall_memories(db, repository_id, _RECALL_QUERIES[str(body.kind)])
     )
     # The caller's own provider keys for the writer call (PROVIDER_KEYS.md).
     provider_keys_var.set(await load_provider_keys(db, principal.user_id))
-    document = await generate_document(body.kind, file_map, code_excerpts, memory)
+    document = await generate_document(body.kind, file_map, code_excerpts, memory, history)
     doc = await persist_document(
         db, repository_id, body.kind, document, created_by=principal.user_id
     )

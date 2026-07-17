@@ -187,7 +187,7 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Generator grounded in the index: file map + kind-seeded retrieved code + recalled memory → Markdown document; deterministic offline document under `LLM_FAKE`
 - [x] Documents API: generate / list / delete under `/v1/repositories/{id}/documents`
 - [x] Docs page (`/docs`): pick a document kind, generate it, browse / read / delete the results
-- [ ] Git-history changelog (generate from real commit history, not the current snapshot)
+- [x] Git-history changelog: the changelog kind now reads the repository's real commit history (bounded bare shallow clone, `date hash subject (author)` per line) and falls back to the snapshot summary honestly when the fetch fails — design note: [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md)
 - [ ] In-place editing of a generated document
 
 ### Workstream: Workspace Panels (planned)
@@ -261,6 +261,24 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Git-history changelog: a snapshot is not a changelog — the
+  changelog document kind now reads the repository's real commit history.
+  `engine/docs/git_history.py` fetches the last 100 commits with a
+  temporary bare shallow clone (history only, no working tree, removed
+  afterwards; the URL passes the same `ensure_cloneable_url` hygiene as
+  every clone) and hands the writer one `date hash subject (author)` line
+  per commit, so the model groups real changes under real dates instead of
+  inventing versions. When the fetch fails — private remote, network down —
+  the changelog falls back to the snapshot summary and says so in its
+  opening line; the fetch is anonymous by design (credential helpers
+  disabled, so an unreachable remote fails fast instead of prompting), and
+  `run_git` globally gained `stdin=DEVNULL` so no git call can ever hang on
+  a credential prompt. Offline mode lists the real subjects, proving the
+  history flows end to end in the tests: 4 new (log lines newest-first from
+  a real local repo, empty on an unfetchable URL, the API-stored changelog
+  contains the real subjects, the fallback document). Design note:
+  architecture/DOCUMENTATION_SUITE.md (updated in place). Engine 361
+  passed, 1 skipped; web untouched.
 - 2026-07-17 · Manual workspace push: the last stranded step in the
   edit-by-hand loop. A finished run's workspace could be browsed, edited,
   and committed from the run page — but the commit stayed local.
