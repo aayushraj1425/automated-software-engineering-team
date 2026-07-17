@@ -21,11 +21,13 @@ from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
-from engine.db.enums import RunStatus, TaskStatus
+from engine.db.enums import IntegrationKind, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session, session_scope
 from engine.db.visibility import can_access, visible_clause
 from engine.events.bus import RunEventSubscription, publish_run_ping
+from engine.integrations import gitlab
+from engine.integrations.connections import load_config
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
 from engine.workspace.jail import JailViolation, resolve_inside
@@ -33,6 +35,7 @@ from engine.workspace.manager import (
     Workspace,
     WorkspaceError,
     load_workspace,
+    push_branch,
     remove_workspace,
     run_git,
 )
@@ -507,6 +510,52 @@ async def commit_run_workspace(
     except WorkspaceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     return CommitOut(sha=sha, message=message)
+
+
+class PushOut(BaseModel):
+    branch: str
+    pushed: bool
+
+
+@router.post("/v1/runs/{run_id}/push")
+async def push_workspace(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> PushOut:
+    """Push the run's branch to its host (finished runs only) — the way a
+    manual workspace commit leaves the machine (WORKSPACE_PANELS.md). The
+    credential logic mirrors the run pipeline's publish step: a GitLab
+    repository uses the run owner's encrypted connection, GitHub uses the
+    environment token, anything else pushes plainly."""
+    run = await _visible_run(db, run_id, principal)
+    _require_editable(run)
+    ws = _load_run_workspace(run)
+
+    repo = await db.get(Repository, run.repository_id)
+    credential: tuple[str, str] | None = None
+    if repo is not None and gitlab.parse_gitlab_repo(repo.url) is not None:
+        config = await load_config(db, run.user_id, IntegrationKind.GITLAB)
+        if config:
+            credential = ("oauth2", config["token"])
+
+    try:
+        pushed = await push_branch(ws, credential)
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    if not pushed:
+        raise HTTPException(status_code=400, detail="This run's workspace has no remote to push to")
+
+    db.add(
+        AgentEvent(
+            run_id=run.id,
+            type="branch.pushed",
+            payload={"branch": ws.branch, "by": principal.user_id},
+        )
+    )
+    await db.commit()
+    await publish_run_ping(run.id)
+    return PushOut(branch=ws.branch, pushed=True)
 
 
 @router.get("/v1/runs/{run_id}/events")

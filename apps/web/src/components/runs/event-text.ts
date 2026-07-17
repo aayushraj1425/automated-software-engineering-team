@@ -54,6 +54,8 @@ export function describeEvent(event: RunEvent): string {
       return p.pr_url
         ? "Branch pushed and pull request opened"
         : `Branch ${String(p.branch ?? "")} pushed`;
+    case "branch.pushed":
+      return `Branch ${String(p.branch ?? "")} pushed by hand`;
     case "plan.approved":
       return "You approved the plan — work begins";
     case "plan.rejected":

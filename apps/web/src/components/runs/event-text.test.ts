@@ -46,6 +46,15 @@ describe("describeEvent", () => {
     );
   });
 
+  it("distinguishes a manual push from the pipeline's publish", () => {
+    expect(describeEvent(event("branch.pushed", { branch: "asep/run-1" }))).toBe(
+      "Branch asep/run-1 pushed by hand",
+    );
+    expect(
+      describeEvent(event("branch.published", { branch: "asep/run-1", pr_url: "https://x" })),
+    ).toBe("Branch pushed and pull request opened");
+  });
+
   it("describes the agents' own board changes", () => {
     expect(describeEvent(event("task.created", { title: "Add tests" }, "backend"))).toBe(
       'Backend added a task: "Add tests"',

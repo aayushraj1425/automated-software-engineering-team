@@ -193,7 +193,7 @@ panels and external integrations remain and are not yet scheduled.
 ### Workstream: Workspace Panels (planned)
 - [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
 - [x] In-browser editor + git status/commit panel: on a *finished* run (completed/failed) a file can be edited (jailed write) and the working tree committed; editing an in-flight run is a `409` so a human write never races the agent loop
-- [ ] Push a manual workspace commit back to the host (re-publish after an edit)
+- [x] Push a manual workspace commit back to the host: `POST /v1/runs/{id}/push` sends the run branch with the pipeline's own credential logic (GitLab connection, GitHub env token, plain otherwise), the git panel gained a Push branch button, and every push lands on the timeline as `branch.pushed` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
 - [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
 
 ### Workstream: External Integrations (planned)
@@ -261,6 +261,21 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Manual workspace push: the last stranded step in the
+  edit-by-hand loop. A finished run's workspace could be browsed, edited,
+  and committed from the run page — but the commit stayed local.
+  `POST /v1/runs/{id}/push` now sends the run branch to its host through
+  the same `push_branch` the pipeline publishes with: a GitLab repository
+  authenticates with the run owner's encrypted connection, GitHub with the
+  environment token, anything else pushes plainly — so an updated branch
+  refreshes the run's existing pull request. Finished runs only (the same
+  409 the write endpoints use), a scratch workspace's missing remote is a
+  plain-language 400, and every push lands on the timeline as
+  `branch.pushed` with who pressed the button. The git panel gained a
+  Push branch button beside Commit. Proven against a real local bare
+  origin in the tests: commit by hand, push by hand, the origin has the
+  branch. Design note: architecture/WORKSPACE_PANELS.md (updated in
+  place). Engine 357 passed, 1 skipped (3 new tests); web 19 passed.
 - 2026-07-16 · Prompt snapshots: editing an agent prompt is now a visible
   decision instead of a silent behavior change. `tests/prompt_snapshots.json`
   records each of the nine prompts' SHA-256 (small, diff-friendly); the test

@@ -63,22 +63,42 @@ The crucial guard: **writes are refused unless the run is finished**
 (`completed` or `failed`). While a run is queued, planning, executing, or
 reviewing, the agent loop owns the workspace — a human write then would race it —
 so those states get a `409`. A finished run's workspace is idle, so a human can
-safely make a manual fix and commit it. Pushing that commit is a separate,
-explicit step (a later item); this slice keeps the change local to the workspace.
+safely make a manual fix and commit it.
+
+## Pushing the branch *(added 2026-07-16)*
+
+A manual commit used to be stranded: it lived in the local workspace while the
+pull request showed the agents' last push. One endpoint closes the loop:
+
+- `POST /v1/runs/{id}/push` — push the run's branch to its host, exactly the
+  way the run pipeline publishes (`push_branch`): a GitLab repository uses the
+  **run owner's** encrypted GitLab connection, GitHub uses the environment
+  token, anything else pushes plainly. Finished runs only (the same `409`
+  guard as writes); a scratch workspace with no remote is a `400` with a
+  plain-language reason. Every push lands on the timeline as `branch.pushed`,
+  recording the branch and who pressed the button.
+- The git panel gains a **Push branch** button next to Commit: commit your
+  manual fix, push it, and the run's existing pull request updates — no
+  leaving the platform.
+
+If the run belongs to an organization, any member can push (members are equal
+collaborators — ORGANIZATION_SHARING.md); the credential used is always the
+run owner's and never leaves the server.
 
 ## Exit criterion
 
 On a run that has a workspace, the run page lists the workspace's files and opens
 any one; a path that tries to escape the workspace is refused. On a *finished*
-run, a file can be edited and the change committed; editing an in-flight run is
-refused.
+run, a file can be edited, the change committed, and the branch pushed back to
+the host; editing an in-flight run is refused.
 
 ## Boundaries (kept out)
 
 - **No terminal.** A terminal means running commands, which is the arbitrary-shell
   boundary ADR-0008 draws at the Phase 3 sandbox; it is deliberately deferred.
-- **No push of a manual commit.** A workspace commit stays local; re-publishing
-  it to the host is a later item.
+- **Push updates the branch, never opens a pull request.** A finished run
+  either already has its PR (the push updates it) or the pipeline chose not
+  to open one — that decision is not re-made by hand here.
 - **No file create/rename/delete** from the tree, and no writes to an in-flight
   run (the agent loop owns it then).
 - Binary files are returned as best-effort decoded text (`errors="replace"`); a

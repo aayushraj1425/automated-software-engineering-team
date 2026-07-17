@@ -7,6 +7,7 @@ httpx's ASGI transport waits for FastAPI background tasks, so by the time a
 POST response arrives the background work has already finished — no polling.
 """
 
+import subprocess
 import uuid
 
 import pytest
@@ -381,6 +382,61 @@ async def test_commit_with_nothing_to_commit_is_400(client):
         f"/v1/runs/{run_id}/commit", json={"message": "Nothing changed"}, headers=headers
     )
     assert resp.status_code == 400
+
+
+# ── Pushing the branch to the host (finished runs only) ─────────────────────
+
+
+async def test_push_sends_the_branch_to_the_origin(client, tmp_path):
+    """Commit by hand, push by hand — the origin ends up with the branch."""
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+
+    # Give the scratch workspace a real (local) origin to push to.
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    ws_path = workspaces_root() / run_id
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(origin)],
+        cwd=ws_path,
+        check=True,
+        capture_output=True,
+    )
+
+    resp = await client.post(f"/v1/runs/{run_id}/push", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["pushed"] is True
+
+    branches = subprocess.run(
+        ["git", "branch", "--list", body["branch"]],
+        cwd=origin,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert body["branch"] in branches  # the origin really has the run branch
+
+    events = (await client.get(f"/v1/runs/{run_id}/events", headers=headers)).json()
+    pushes = [e for e in events if e["type"] == "branch.pushed"]
+    assert len(pushes) == 1
+    assert pushes[0]["payload"]["branch"] == body["branch"]
+
+
+async def test_push_without_a_remote_is_400(client):
+    """Offline scratch workspaces have no origin — a plain-language refusal."""
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    resp = await client.post(f"/v1/runs/{run_id}/push", headers=headers)
+    assert resp.status_code == 400
+    assert "no remote" in resp.json()["detail"]
+
+
+async def test_push_is_refused_before_the_run_finishes(client):
+    headers = _headers()
+    created = await _create_run(client, headers)  # left at awaiting_approval
+    resp = await client.post(f"/v1/runs/{created['id']}/push", headers=headers)
+    assert resp.status_code == 409  # the agent loop still owns the workspace
 
 
 async def test_write_is_owner_scoped(client):

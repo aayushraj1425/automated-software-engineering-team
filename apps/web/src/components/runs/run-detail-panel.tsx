@@ -49,6 +49,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [gitChanges, setGitChanges] = useState<{ path: string; code: string }[]>([]);
   const [commitMessage, setCommitMessage] = useState("");
   const [committing, setCommitting] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
@@ -117,6 +118,21 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       setWorkspaceNote(err instanceof Error ? err.message : "Commit failed");
     } finally {
       setCommitting(false);
+    }
+  }
+
+  async function pushBranch() {
+    setPushing(true);
+    setWorkspaceNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/push`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.detail ?? `Push failed (${res.status})`);
+      setWorkspaceNote(`Branch ${body.branch} pushed.`);
+    } catch (err) {
+      setWorkspaceNote(err instanceof Error ? err.message : "Push failed");
+    } finally {
+      setPushing(false);
     }
   }
 
@@ -436,6 +452,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                   className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
                 >
                   {committing ? "Committing…" : "Commit"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void pushBranch()}
+                  disabled={pushing || committing}
+                  title="Push the run's branch to its host — the existing pull request updates"
+                  className="shrink-0 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
+                >
+                  {pushing ? "Pushing…" : "Push branch"}
                 </button>
               </div>
               {workspaceNote && <p className="text-xs text-zinc-500">{workspaceNote}</p>}
