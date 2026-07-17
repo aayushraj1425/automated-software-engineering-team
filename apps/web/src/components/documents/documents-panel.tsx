@@ -20,6 +20,9 @@ export function DocumentsPanel() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -60,6 +63,32 @@ export function DocumentsPanel() {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startEditing(doc: GeneratedDocument) {
+    setEditingId(doc.id);
+    setDraft(doc.content);
+    setOpenId(doc.id);
+  }
+
+  async function saveEdit(id: string) {
+    if (!repositoryId || !draft.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/repositories/${repositoryId}/documents/${id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: draft }),
+      });
+      if (!res.ok) throw new Error(`Could not save the document (${res.status})`);
+      setEditingId(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -163,11 +192,50 @@ export function DocumentsPanel() {
               >
                 {openId === doc.id ? "hide" : "read"}
               </button>
+              {editingId !== doc.id && (
+                <button
+                  type="button"
+                  onClick={() => startEditing(doc)}
+                  className="text-zinc-500 hover:text-zinc-300"
+                  title="Correct the document where the model got it wrong"
+                >
+                  edit
+                </button>
+              )}
             </div>
-            {openId === doc.id && (
-              <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-md bg-zinc-950 p-4 text-xs text-zinc-300">
-                {doc.content}
-              </pre>
+            {openId === doc.id && editingId === doc.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  spellCheck={false}
+                  className="h-80 w-full rounded-md border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-300 outline-none focus:border-zinc-600"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveEdit(doc.id)}
+                    disabled={saving || !draft.trim()}
+                    className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
+                  >
+                    {saving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(null)}
+                    disabled={saving}
+                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              openId === doc.id && (
+                <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-md bg-zinc-950 p-4 text-xs text-zinc-300">
+                  {doc.content}
+                </pre>
+              )
             )}
           </div>
         ))}

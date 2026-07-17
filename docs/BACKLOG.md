@@ -188,7 +188,7 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Documents API: generate / list / delete under `/v1/repositories/{id}/documents`
 - [x] Docs page (`/docs`): pick a document kind, generate it, browse / read / delete the results
 - [x] Git-history changelog: the changelog kind now reads the repository's real commit history (bounded bare shallow clone, `date hash subject (author)` per line) and falls back to the snapshot summary honestly when the fetch fails — design note: [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md)
-- [ ] In-place editing of a generated document
+- [x] In-place editing of a generated document: `PUT …/documents/{docId}` replaces the content (and optionally the title), the docs page gained an edit toggle with Save/Cancel, and regenerating still creates a new document so an edit is never silently overwritten — design note: [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md)
 
 ### Workstream: Workspace Panels (planned)
 - [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
@@ -261,6 +261,19 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · In-place document editing: a generated document is a
+  starting point, not gospel — the person who knows the project can now
+  correct the prose where the model got it wrong. `PUT
+  /v1/repositories/{id}/documents/{docId}` replaces the content (size-
+  capped like generation) and optionally the title, with the same
+  visibility scoping as every other document call; the docs page's open
+  document gained an edit toggle — textarea, Save/Cancel, nothing more.
+  Regenerating a kind still creates a *new* document, so a human edit is
+  never silently overwritten by the model; last save wins (no versioning —
+  logged as a boundary). Design note: architecture/DOCUMENTATION_SUITE.md
+  (updated in place). Engine 364 passed, 1 skipped (3 new tests: edit
+  roundtrip with title kept on content-only saves, unknown document 404,
+  intruder 404); web 19 passed.
 - 2026-07-17 · Git-history changelog: a snapshot is not a changelog — the
   changelog document kind now reads the repository's real commit history.
   `engine/docs/git_history.py` fetches the last 100 commits with a

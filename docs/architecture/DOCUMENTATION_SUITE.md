@@ -89,6 +89,21 @@ but a snapshot is not a changelog. Now:
 - Offline mode lists the real commit subjects, so the tests prove history
   flows end to end without a model.
 
+## Editing a document in place *(added 2026-07-17)*
+
+A generated document is a starting point, not gospel — the person who knows
+the project corrects the prose where the model got it wrong. One endpoint:
+
+- `PUT /v1/repositories/{id}/documents/{docId}` — replace the document's
+  content (and optionally its title). Same visibility scoping as every
+  other document call; the body is size-capped like generation
+  (`MAX_CONTENT`); `updated_at` moves so the list shows what was touched.
+- The docs page gains an **edit** toggle on an open document: a textarea
+  with Save/Cancel, nothing more. Markdown in, markdown out.
+
+Regenerating a kind still creates a *new* document — an edit is never
+silently overwritten by the model.
+
 ## Offline mode
 
 Under `LLM_FAKE=1` (tests and offline dev) the generator returns a deterministic
@@ -106,8 +121,9 @@ and readable on the docs page after the tab is closed and reopened.
 
 - No publishing anywhere external (no pushing docs into the repo, a wiki, or a
   docs site) — that belongs with the integrations workstreams.
-- Documents are read-only artifacts here; in-place editing of a generated
-  document is a later refinement.
+- No edit history or concurrent-edit protection: the last save wins, like a
+  plain file. Versioning a document is a later refinement if it earns its
+  keep.
 - The history fetch is anonymous (no credentials): a private repository's
   changelog falls back to the snapshot summary until the fetch learns to use
   the owner's connection tokens.

@@ -131,6 +131,59 @@ async def test_changelog_without_history_falls_back_to_the_snapshot(client):
     assert "repository index" in doc["content"]  # the snapshot placeholder path
 
 
+# ── Editing a document in place ─────────────────────────────────────────────
+
+
+async def test_update_replaces_content_and_optionally_the_title(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    doc = await _generate(client, headers, repo_id)
+
+    resp = await client.put(
+        f"/v1/repositories/{repo_id}/documents/{doc['id']}",
+        json={"content": "# Corrected\n\nThe human fixed the prose.", "title": "Corrected README"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    updated = resp.json()
+    assert updated["title"] == "Corrected README"
+    assert "The human fixed the prose." in updated["content"]
+
+    # the list shows the edit, and content-only updates keep the title
+    only_content = await client.put(
+        f"/v1/repositories/{repo_id}/documents/{doc['id']}",
+        json={"content": "shorter still"},
+        headers=headers,
+    )
+    assert only_content.json()["title"] == "Corrected README"
+    listed = await _list(client, headers, repo_id)
+    assert listed[0]["content"] == "shorter still"
+
+
+async def test_update_unknown_document_is_404(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    resp = await client.put(
+        f"/v1/repositories/{repo_id}/documents/{uuid.uuid4()}",
+        json={"content": "x"},
+        headers=headers,
+    )
+    assert resp.status_code == 404
+
+
+async def test_update_is_owner_scoped(client):
+    headers = _headers()
+    repo_id = await _create_repo(client, headers)
+    doc = await _generate(client, headers, repo_id)
+    intruder = _headers()
+    resp = await client.put(
+        f"/v1/repositories/{repo_id}/documents/{doc['id']}",
+        json={"content": "defaced"},
+        headers=intruder,
+    )
+    assert resp.status_code == 404
+
+
 # ── The API: generate, list, delete ─────────────────────────────────────────
 
 

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,7 @@ from engine.db.enums import DocumentKind
 from engine.db.models import GeneratedDocument, Repository
 from engine.db.session import get_session
 from engine.db.visibility import can_access
-from engine.docs.generator import gather_context, generate_document, persist_document
+from engine.docs.generator import MAX_CONTENT, gather_context, generate_document, persist_document
 from engine.docs.git_history import collect_history
 from engine.knowledge.recall import format_memories, recall_memories
 from engine.llm.keys import load_provider_keys, provider_keys_var
@@ -38,6 +38,14 @@ _RECALL_QUERIES: dict[str, str] = {
 
 class DocumentIn(BaseModel):
     kind: DocumentKind = DocumentKind.README
+
+
+class DocumentUpdate(BaseModel):
+    """An in-place correction: the person who knows the project fixes the
+    prose. Content is required; the title only changes when sent."""
+
+    content: str = Field(min_length=1, max_length=MAX_CONTENT)
+    title: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 class DocumentOut(BaseModel):
@@ -121,6 +129,28 @@ async def generate_repository_document(
     doc = await persist_document(
         db, repository_id, body.kind, document, created_by=principal.user_id
     )
+    await db.commit()
+    await db.refresh(doc)
+    return _document_out(doc)
+
+
+@router.put("/v1/repositories/{repository_id}/documents/{document_id}")
+async def update_document(
+    repository_id: uuid.UUID,
+    document_id: uuid.UUID,
+    body: DocumentUpdate,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> DocumentOut:
+    """Replace a document's content (and optionally its title) in place —
+    an edit is never silently overwritten: regenerating creates a new row."""
+    await _visible_repository(db, repository_id, principal)
+    doc = await db.get(GeneratedDocument, document_id)
+    if doc is None or doc.repository_id != repository_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.content = body.content
+    if body.title is not None:
+        doc.title = body.title.strip()[:256]
     await db.commit()
     await db.refresh(doc)
     return _document_out(doc)
