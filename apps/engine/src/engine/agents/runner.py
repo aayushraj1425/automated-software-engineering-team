@@ -32,8 +32,8 @@ from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import session_scope
 from engine.events.bus import publish_run_ping
 from engine.github import open_pull_request, parse_github_repo
-from engine.integrations import gitlab
-from engine.integrations.connections import load_config
+from engine.integrations import bitbucket, gitlab
+from engine.integrations.hosts import host_connection, push_credential
 from engine.integrations.notify import notify_run_outcome
 from engine.knowledge.capture import capture_run_memory
 from engine.knowledge.recall import format_memories, recall_memories
@@ -416,8 +416,9 @@ async def _publish(
     ws: Workspace,
 ) -> str | None:
     """Push the run branch and open the host's request: a GitHub pull request
-    (env token) or a GitLab merge request (the owner's connection token). A repo
-    on neither host — or a scratch workspace — just pushes. Design note:
+    (env token), a GitLab merge request, or a Bitbucket pull request (the
+    owner's encrypted connection either way). A repo on none of the hosts —
+    or a scratch workspace — just pushes. Design note:
     docs/architecture/SOURCE_HOSTS.md."""
     title = request.strip().splitlines()[0][:72]
     body = (
@@ -426,23 +427,25 @@ async def _publish(
         "Review checklist: correctness, scope, security, consistency."
     )
 
-    # A GitLab repo publishes with the run owner's encrypted GitLab connection.
-    gitlab_config: dict | None = None
-    if gitlab.parse_gitlab_repo(repo_url) is not None:
-        async with session_scope() as session:
-            run = await session.get(AgentRun, run_id)
-            if run is not None:
-                gitlab_config = await load_config(session, run.user_id, IntegrationKind.GITLAB)
+    # GitLab/Bitbucket repos publish with the run owner's encrypted connection.
+    host: tuple[str, dict] | None = None
+    async with session_scope() as session:
+        run = await session.get(AgentRun, run_id)
+        if run is not None:
+            host = await host_connection(session, run.user_id, repo_url)
 
-    credential = ("oauth2", gitlab_config["token"]) if gitlab_config else None
-    pushed = await push_branch(ws, credential)
+    pushed = await push_branch(ws, push_credential(host))
     if not pushed:
         return None
 
     pr_url: str | None = None
-    if gitlab_config is not None:
+    if host is not None and host[0] == IntegrationKind.GITLAB:
         pr_url = await gitlab.open_merge_request(
-            gitlab_config, repo_url, ws.branch, default_branch, title, body
+            host[1], repo_url, ws.branch, default_branch, title, body
+        )
+    elif host is not None and host[0] == IntegrationKind.BITBUCKET:
+        pr_url = await bitbucket.open_pull_request(
+            host[1], repo_url, ws.branch, default_branch, title, body
         )
     elif parse_github_repo(repo_url) is not None and get_settings().github_token:
         pr_url = await open_pull_request(repo_url, ws.branch, default_branch, title, body)

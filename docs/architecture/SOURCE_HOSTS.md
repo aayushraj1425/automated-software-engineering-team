@@ -20,11 +20,13 @@ flowchart TD
     P --> D{Which host is<br/>the repo on?}
     D -->|github.com| GH[push with the env token<br/>open a pull request]
     D -->|gitlab.com| GL[push with the owner's token<br/>open a merge request]
-    D -.->|bitbucket| LATER[later slice]
+    D -->|bitbucket.org| BB[push with the owner's<br/>app password<br/>open a pull request]
     D -->|local / unknown| PUSHONLY[push only, no request]
-    GL --> C[(owner's GitLab connection<br/>token, encrypted at rest)]
+    GL --> C[(owner's connection,<br/>encrypted at rest)]
+    BB --> C
     GH --> EV[["branch.published<br/>timeline event"]]
     GL --> EV
+    BB --> EV
 ```
 
 ## The design
@@ -55,19 +57,40 @@ beside the existing GitHub one.
   (`INTEGRATIONS_DRY_RUN=1`) returns a deterministic placeholder so the piece is
   testable offline.
 
-## Exit criterion (this slice)
+## Bitbucket, behind the same seam *(added 2026-07-17)*
+
+Bitbucket is the third host, and it reuses every joint GitLab cut:
+
+- **Detection** — `parse_bitbucket_repo` (in
+  `engine/integrations/bitbucket.py`) recognizes `bitbucket.org` URLs and
+  returns `workspace/repo` (Bitbucket paths never nest).
+- **Credentials** — a Bitbucket **connection** in the same encrypted per-user
+  store: `{username, app_password}` (Bitbucket Cloud's app passwords; the
+  label shows the username, never the password).
+- **Push auth** — the same `push_branch` credential seam:
+  `(username, app_password)` authenticates the https push, redacted from any
+  error like the other tokens.
+- **Pull request** — `open_pull_request` POSTs to
+  `https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests`
+  with HTTP Basic auth and returns the PR's html link. Dry-run returns a
+  deterministic placeholder, so the piece is testable offline.
+- The manual **Push branch** button on the run page (WORKSPACE_PANELS.md)
+  resolves the same credential, so a Bitbucket run's hand-made commit also
+  reaches its host.
+
+## Exit criterion
 
 A run on a `gitlab.com` repository, with the owner's GitLab token connected,
 pushes its branch to GitLab and opens a merge request, its URL recorded on the
-run exactly like a GitHub pull request. GitHub runs are unchanged.
+run exactly like a GitHub pull request — and the same for a `bitbucket.org`
+repository with the owner's app password connected. GitHub runs are unchanged.
 
 ## Boundaries
 
-- `gitlab.com` (SaaS) URL detection only; a self-hosted GitLab whose host is not
-  `gitlab.com` is a later refinement (the connection already carries a
+- `gitlab.com` / `bitbucket.org` (SaaS) URL detection only; self-hosted
+  instances are a later refinement (the GitLab connection already carries a
   `base_url` for the API, so it is a small step).
-- Bitbucket is not implemented here — it is the next host behind the same seam.
-- No two-way sync and no draft/reviewer/label options on the merge request —
-  title, description, source and target branch only.
-- GitLab credentials are per **user**, not per organization (same call as the
+- No two-way sync and no draft/reviewer/label options on the merge/pull
+  request — title, description, source and target branch only.
+- Host credentials are per **user**, not per organization (same call as the
   other connections).

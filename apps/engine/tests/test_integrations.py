@@ -73,9 +73,10 @@ async def test_a_bad_webhook_is_rejected(client):
 
 async def test_inactive_kind_is_refused(client):
     headers = _headers()
-    # bitbucket has no adapter yet, so the API refuses the connection outright.
+    # every current kind has an adapter, so the deny-by-default gate is
+    # proven with a kind that does not exist at all.
     resp = await client.put(
-        "/v1/integrations/bitbucket", json={"config": {"token": "x"}}, headers=headers
+        "/v1/integrations/asana", json={"config": {"token": "x"}}, headers=headers
     )
     assert resp.status_code == 400
 
@@ -208,6 +209,86 @@ async def test_open_merge_request_is_dry_run_offline():
         "body",
     )
     assert url == "https://gitlab.com/acme/demo/-/merge_requests/dry-run"
+
+
+async def test_connect_bitbucket_labels_without_leaking_the_password(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/bitbucket",
+        json={"config": {"username": "dev-user", "app_password": "ATBB-secret"}},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["kind"] == "bitbucket"
+    assert "dev-user" in body["label"]
+    assert "ATBB-secret" not in body["label"]
+
+
+async def test_connect_bitbucket_needs_both_fields(client):
+    headers = _headers()
+    resp = await client.put(
+        "/v1/integrations/bitbucket",
+        json={"config": {"username": "dev-user"}},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_bitbucket_is_not_an_issue_tracker(client):
+    """Bitbucket is a git host, not a work-item push target."""
+    from engine.integrations.issues import ISSUE_TRACKER_KINDS
+
+    assert "bitbucket" not in ISSUE_TRACKER_KINDS
+
+
+def test_parse_bitbucket_repo_recognizes_workspace_paths():
+    from engine.integrations.bitbucket import parse_bitbucket_repo
+
+    assert parse_bitbucket_repo("https://bitbucket.org/acme/demo") == "acme/demo"
+    assert parse_bitbucket_repo("https://bitbucket.org/acme/demo.git") == "acme/demo"
+    assert parse_bitbucket_repo("git@bitbucket.org:acme/demo.git") == "acme/demo"
+    assert parse_bitbucket_repo("https://gitlab.com/acme/demo") is None
+    assert parse_bitbucket_repo("C:/tmp/fixture-repo") is None
+
+
+async def test_open_bitbucket_pull_request_is_dry_run_offline():
+    from engine.integrations.bitbucket import open_pull_request
+
+    url = await open_pull_request(
+        {"username": "dev-user", "app_password": "x"},
+        "https://bitbucket.org/acme/demo",
+        "asep/run-1",
+        "main",
+        "Add a thing",
+        "body",
+    )
+    assert url == "https://bitbucket.org/acme/demo/pull-requests/dry-run"
+
+
+async def test_host_connection_resolves_the_push_credential(client, prepared_db):
+    """The shared resolver (integrations/hosts.py): the right kind, the right
+    credential shape, and None for GitHub or unconnected hosts."""
+    import uuid as _uuid
+
+    from engine.db.session import session_scope
+    from engine.integrations.hosts import host_connection, push_credential
+
+    user = f"host_{_uuid.uuid4().hex[:8]}"
+    await client.put(
+        "/v1/integrations/bitbucket",
+        json={"config": {"username": "dev-user", "app_password": "ATBB-secret"}},
+        headers=auth_headers(user),
+    )
+
+    async with session_scope() as db:
+        host = await host_connection(db, user, "https://bitbucket.org/acme/demo")
+        assert host is not None and host[0] == "bitbucket"
+        assert push_credential(host) == ("dev-user", "ATBB-secret")
+
+        assert await host_connection(db, user, "https://github.com/acme/demo") is None
+        assert await host_connection(db, user, "https://gitlab.com/acme/demo") is None
+        assert push_credential(None) is None
 
 
 async def test_connections_are_owner_scoped(client):

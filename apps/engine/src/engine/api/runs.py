@@ -21,13 +21,12 @@ from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
-from engine.db.enums import IntegrationKind, RunStatus, TaskStatus
+from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session, session_scope
 from engine.db.visibility import can_access, visible_clause
 from engine.events.bus import RunEventSubscription, publish_run_ping
-from engine.integrations import gitlab
-from engine.integrations.connections import load_config
+from engine.integrations.hosts import host_connection, push_credential
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
 from engine.workspace.jail import JailViolation, resolve_inside
@@ -525,19 +524,18 @@ async def push_workspace(
 ) -> PushOut:
     """Push the run's branch to its host (finished runs only) — the way a
     manual workspace commit leaves the machine (WORKSPACE_PANELS.md). The
-    credential logic mirrors the run pipeline's publish step: a GitLab
-    repository uses the run owner's encrypted connection, GitHub uses the
-    environment token, anything else pushes plainly."""
+    credential logic is the run pipeline's own (integrations/hosts.py): a
+    GitLab or Bitbucket repository uses the run owner's encrypted
+    connection, GitHub uses the environment token, anything else pushes
+    plainly."""
     run = await _visible_run(db, run_id, principal)
     _require_editable(run)
     ws = _load_run_workspace(run)
 
     repo = await db.get(Repository, run.repository_id)
     credential: tuple[str, str] | None = None
-    if repo is not None and gitlab.parse_gitlab_repo(repo.url) is not None:
-        config = await load_config(db, run.user_id, IntegrationKind.GITLAB)
-        if config:
-            credential = ("oauth2", config["token"])
+    if repo is not None:
+        credential = push_credential(await host_connection(db, run.user_id, repo.url))
 
     try:
         pushed = await push_branch(ws, credential)

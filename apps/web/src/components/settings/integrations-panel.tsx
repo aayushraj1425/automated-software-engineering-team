@@ -36,6 +36,8 @@ export function IntegrationsPanel() {
   // GitLab draft
   const [gitlabToken, setGitlabToken] = useState("");
   const [gitlabUrl, setGitlabUrl] = useState("");
+  const [bitbucketUsername, setBitbucketUsername] = useState("");
+  const [bitbucketPassword, setBitbucketPassword] = useState("");
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/integrations");
@@ -71,6 +73,8 @@ export function IntegrationsPanel() {
       setJiraProject("");
       setGitlabToken("");
       setGitlabUrl("");
+      setBitbucketUsername("");
+      setBitbucketPassword("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -114,6 +118,7 @@ export function IntegrationsPanel() {
   const linear = connections.linear;
   const jira = connections.jira;
   const gitlab = connections.gitlab;
+  const bitbucket = connections.bitbucket;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6 pt-0">
@@ -397,6 +402,75 @@ export function IntegrationsPanel() {
               type="button"
               onClick={() => void remove("gitlab")}
               disabled={busy === "gitlab"}
+              className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Bitbucket */}
+      <section className="space-y-2 rounded-md border border-zinc-800 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-200">Bitbucket</p>
+          {bitbucket ? (
+            <span className="text-xs text-emerald-400">
+              {bitbucket.label} · {new Date(bitbucket.updated_at).toLocaleDateString()}
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">not connected</span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500">
+          Connect your Bitbucket username and an{" "}
+          <a
+            href="https://bitbucket.org/account/settings/app-passwords/"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-zinc-300"
+          >
+            app password
+          </a>{" "}
+          (repositories: write, pull requests: write) and a run on a Bitbucket repository
+          opens a pull request when it finishes.
+        </p>
+        <div className="flex gap-3">
+          <input
+            value={bitbucketUsername}
+            onChange={(e) => setBitbucketUsername(e.target.value)}
+            placeholder="Username"
+            autoComplete="off"
+            className={inputClasses}
+          />
+          <input
+            type="password"
+            value={bitbucketPassword}
+            onChange={(e) => setBitbucketPassword(e.target.value)}
+            placeholder={bitbucket ? "Replace the app password" : "App password"}
+            autoComplete="off"
+            className={inputClasses}
+          />
+          <button
+            type="button"
+            onClick={() =>
+              void save("bitbucket", {
+                username: bitbucketUsername.trim(),
+                app_password: bitbucketPassword.trim(),
+              })
+            }
+            disabled={
+              busy === "bitbucket" || !bitbucketUsername.trim() || !bitbucketPassword.trim()
+            }
+            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+          >
+            {busy === "bitbucket" ? "Saving…" : bitbucket ? "Replace" : "Save"}
+          </button>
+          {bitbucket && (
+            <button
+              type="button"
+              onClick={() => void remove("bitbucket")}
+              disabled={busy === "bitbucket"}
               className="shrink-0 rounded-md border border-red-800 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
             >
               Remove

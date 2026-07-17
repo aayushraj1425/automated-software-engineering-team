@@ -202,7 +202,8 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Issue trackers: push a work item to Linear (`issueCreate`) from the planning board, storing the issue link on the item, behind a tracker-agnostic dispatch (`engine/integrations/issues.py`) so Jira reuses it
 - [x] Issue trackers: add Jira as a second tracker behind the same dispatch (REST `/rest/api/3/issue`, HTTP-Basic auth, ADF description); the planning board pushes to each connected tracker
 - [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
-- [ ] Source hosts: add Bitbucket (and self-hosted GitLab) behind the same host-aware publish seam
+- [x] Source hosts: Bitbucket behind the same host-aware publish seam — `bitbucket.org` detection, an encrypted username + app-password connection, the https push authenticates with it, and a finished run opens a Bitbucket pull request; credential resolution now lives once in `engine/integrations/hosts.py`, shared by the pipeline and the manual Push branch button — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
+- [ ] Source hosts: self-hosted GitLab/Bitbucket instances (URL detection beyond the SaaS hosts; the GitLab connection already carries a `base_url`)
 
 ## Phase 7 — Production Hardening
 
@@ -261,6 +262,21 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Bitbucket as the third source host, behind the seam GitLab
+  cut: `parse_bitbucket_repo` recognizes `bitbucket.org/workspace/repo`,
+  the settings page connects a username + app password (encrypted at rest,
+  the label shows the username only), the https push authenticates with
+  that pair through the same `push_branch` credential, and a finished run
+  opens a Bitbucket pull request via the 2.0 API (Basic auth; dry-run
+  placeholder keeps it offline-testable). Credential resolution got its
+  own home — `engine/integrations/hosts.py` (`host_connection` +
+  `push_credential`) — used by both the pipeline's publish and the run
+  page's manual Push branch button, so the two can never drift. Bitbucket
+  is a git host, not an issue tracker (asserted in tests like GitLab).
+  Every `IntegrationKind` now has an adapter, so the deny-by-default gate
+  test proves itself with a kind that does not exist. Design note:
+  architecture/SOURCE_HOSTS.md (updated in place). Engine 370 passed,
+  1 skipped (7 new tests); web 19 passed.
 - 2026-07-17 · In-place document editing: a generated document is a
   starting point, not gospel — the person who knows the project can now
   correct the prose where the model got it wrong. `PUT

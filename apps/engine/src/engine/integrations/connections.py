@@ -21,12 +21,14 @@ from engine.security.crypto import DecryptionError, decrypt, encrypt
 log = structlog.get_logger()
 
 # The kinds whose adapter exists and the API will accept. Grows one at a time.
-# (GitLab is a git host, not an issue tracker — see issues.ISSUE_TRACKER_KINDS.)
+# (GitLab and Bitbucket are git hosts, not issue trackers — see
+# issues.ISSUE_TRACKER_KINDS.)
 ACTIVE_KINDS: tuple[str, ...] = (
     IntegrationKind.SLACK,
     IntegrationKind.LINEAR,
     IntegrationKind.JIRA,
     IntegrationKind.GITLAB,
+    IntegrationKind.BITBUCKET,
 )
 
 
@@ -82,6 +84,13 @@ def build_config(kind: str, raw: dict[str, Any]) -> tuple[str, str]:
         host = base_url.split("://", 1)[1]
         label = f"GitLab · {host}"
         return json.dumps({"token": token, "base_url": base_url}), label
+    if kind == IntegrationKind.BITBUCKET:
+        username = str(raw.get("username", "")).strip()
+        app_password = str(raw.get("app_password", "")).strip()
+        if not username or not app_password:
+            raise ConfigError("Bitbucket needs both a username and an app password")
+        label = f"Bitbucket · {username}"
+        return json.dumps({"username": username, "app_password": app_password}), label
     raise ConfigError(f"{kind} is not yet supported")
 
 
