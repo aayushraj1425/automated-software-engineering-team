@@ -203,7 +203,7 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Issue trackers: add Jira as a second tracker behind the same dispatch (REST `/rest/api/3/issue`, HTTP-Basic auth, ADF description); the planning board pushes to each connected tracker
 - [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
 - [x] Source hosts: Bitbucket behind the same host-aware publish seam — `bitbucket.org` detection, an encrypted username + app-password connection, the https push authenticates with it, and a finished run opens a Bitbucket pull request; credential resolution now lives once in `engine/integrations/hosts.py`, shared by the pipeline and the manual Push branch button — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
-- [ ] Source hosts: self-hosted GitLab/Bitbucket instances (URL detection beyond the SaaS hosts; the GitLab connection already carries a `base_url`)
+- [x] Source hosts: self-hosted GitLab — the connection's `base_url` names the instance for detection too, so a run on `https://git.acme.dev/…` pushes with the connection's token and opens its merge request on that instance; self-hosted Bitbucket documented out (Server/Data Center is a different API, not a different host)
 
 ## Phase 7 — Production Hardening
 
@@ -263,6 +263,19 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-18 · Self-hosted GitLab, closing the Source Hosts workstream:
+  the connection's `base_url` now names the instance for *detection* as
+  well as for the API. `connection_repo_path` matches a repository URL
+  against gitlab.com or the connection's own host (https and ssh forms,
+  suffix-spoofing hosts rejected); `host_connection` asks the connection
+  when a URL is on no SaaS host (GitHub URLs never consult it), and
+  `open_merge_request` resolves the project path the same way — so a run
+  on `https://git.acme.dev/team/demo` pushes with the connection's token
+  and opens its merge request on that instance. Self-hosted Bitbucket
+  documented out on purpose: Server/Data Center speaks a different API
+  (1.0-style REST, different auth) — a different protocol, not a
+  different host. Design note: architecture/SOURCE_HOSTS.md (updated in
+  place). Engine 385 passed, 1 skipped (3 new tests); web untouched.
 - 2026-07-17 · Ripgrep-backed search: the agents' plain-text `search` tool
   uses ripgrep when it is on PATH — fixed-string, case-insensitive, `.git`
   excluded, size-capped exactly like the Python scan, plus one deliberate

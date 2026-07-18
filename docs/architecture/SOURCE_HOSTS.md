@@ -85,11 +85,22 @@ pushes its branch to GitLab and opens a merge request, its URL recorded on the
 run exactly like a GitHub pull request — and the same for a `bitbucket.org`
 repository with the owner's app password connected. GitHub runs are unchanged.
 
+## Self-hosted GitLab *(added 2026-07-18)*
+
+The GitLab connection's `base_url` now does double duty: besides naming the
+API endpoint, it names the instance for **detection**. A repository URL on
+no SaaS host — `https://git.acme.dev/team/demo`, or its ssh form — is
+matched against the host in the user's connection (`connection_repo_path`);
+on a match, the push authenticates with the connection's token and the
+merge request goes to the connection's API. GitHub URLs never consult the
+connection, and a suffix-spoofing host (`git.acme.dev.evil.io`) does not
+match.
+
 ## Boundaries
 
-- `gitlab.com` / `bitbucket.org` (SaaS) URL detection only; self-hosted
-  instances are a later refinement (the GitLab connection already carries a
-  `base_url` for the API, so it is a small step).
+- **Self-hosted Bitbucket stays out.** Bitbucket Server/Data Center speaks
+  a different API (1.0-style REST, different auth) — a different protocol,
+  not just a different host. It gets its own slice if a user ever needs it.
 - No two-way sync and no draft/reviewer/label options on the merge/pull
   request — title, description, source and target branch only.
 - Host credentials are per **user**, not per organization (same call as the

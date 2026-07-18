@@ -211,6 +211,57 @@ async def test_open_merge_request_is_dry_run_offline():
     assert url == "https://gitlab.com/acme/demo/-/merge_requests/dry-run"
 
 
+def test_connection_repo_path_recognizes_the_self_hosted_instance():
+    from engine.integrations.gitlab import connection_repo_path
+
+    config = {"token": "x", "base_url": "https://git.acme.dev"}
+    assert connection_repo_path(config, "https://git.acme.dev/team/demo") == "team/demo"
+    assert connection_repo_path(config, "https://git.acme.dev/team/sub/demo.git") == "team/sub/demo"
+    assert connection_repo_path(config, "git@git.acme.dev:team/demo.git") == "team/demo"
+    assert connection_repo_path(config, "https://gitlab.com/acme/demo") == "acme/demo"  # SaaS still
+    assert connection_repo_path(config, "https://github.com/acme/demo") is None
+    assert connection_repo_path(config, "https://gitlab.acme.dev.evil.io/x/y") is None
+
+
+async def test_self_hosted_merge_request_targets_the_connection_base_url():
+    from engine.integrations.gitlab import open_merge_request
+
+    url = await open_merge_request(
+        {"token": "x", "base_url": "https://git.acme.dev"},
+        "https://git.acme.dev/team/demo",
+        "asep/run-1",
+        "main",
+        "Add a thing",
+        "body",
+    )
+    assert url == "https://git.acme.dev/team/demo/-/merge_requests/dry-run"
+
+
+async def test_host_connection_resolves_a_self_hosted_gitlab(client, prepared_db):
+    import uuid as _uuid
+
+    from engine.db.session import session_scope
+    from engine.integrations.hosts import host_connection, push_credential
+
+    user = f"selfhost_{_uuid.uuid4().hex[:8]}"
+    await client.put(
+        "/v1/integrations/gitlab",
+        json={"config": {"token": "glpat-self", "base_url": "https://git.acme.dev"}},
+        headers=auth_headers(user),
+    )
+
+    async with session_scope() as db:
+        host = await host_connection(db, user, "https://git.acme.dev/team/demo")
+        assert host is not None and host[0] == "gitlab"
+        assert push_credential(host) == ("oauth2", "glpat-self")
+
+        # GitHub URLs never consult the connection; a foreign host stays None.
+        assert await host_connection(db, user, "https://github.com/acme/demo") is None
+        assert await host_connection(db, user, "https://code.other.dev/a/b") is None
+        # And without any connection there is nothing to match against.
+        assert await host_connection(db, "nobody", "https://git.acme.dev/team/demo") is None
+
+
 async def test_connect_bitbucket_labels_without_leaking_the_password(client):
     headers = _headers()
     resp = await client.put(

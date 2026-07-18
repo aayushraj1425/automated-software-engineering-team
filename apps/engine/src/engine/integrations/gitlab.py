@@ -19,18 +19,34 @@ log = structlog.get_logger(__name__)
 DEFAULT_BASE_URL = "https://gitlab.com"
 _TIMEOUT_SECONDS = 30
 
-# gitlab.com/group/repo or gitlab.com/group/subgroup/repo (project path may nest).
-_GITLAB_URL = re.compile(r"gitlab\.com[:/](?P<path>[^\s]+?)(?:\.git)?/?$")
-
 
 class MergeRequestError(Exception):
     """The merge request could not be created; the message is safe to show."""
 
 
+def _path_for_host(url: str, host: str) -> str | None:
+    """The project path (may nest: group/subgroup/repo) when `url` lives on
+    `host` — https or ssh form, optional .git suffix; None otherwise."""
+    pattern = re.compile(r"(?:^|[/@.])" + re.escape(host) + r"[:/](?P<path>[^\s]+?)(?:\.git)?/?$")
+    match = pattern.search(url.strip())
+    return match.group("path") if match else None
+
+
 def parse_gitlab_repo(url: str) -> str | None:
     """The project path (e.g. "group/repo") for a gitlab.com URL; None otherwise."""
-    match = _GITLAB_URL.search(url.strip())
-    return match.group("path") if match else None
+    return _path_for_host(url, "gitlab.com")
+
+
+def connection_repo_path(config: dict, url: str) -> str | None:
+    """The project path for this connection: gitlab.com, or the self-hosted
+    instance the connection's base_url names (SOURCE_HOSTS.md)."""
+    path = parse_gitlab_repo(url)
+    if path is not None:
+        return path
+    base_host = config.get("base_url", DEFAULT_BASE_URL).split("://", 1)[-1].strip("/")
+    if base_host and base_host != "gitlab.com":
+        return _path_for_host(url, base_host)
+    return None
 
 
 async def open_merge_request(
@@ -42,7 +58,7 @@ async def open_merge_request(
     body: str,
 ) -> str:
     """Create a merge request and return its web URL."""
-    project_path = parse_gitlab_repo(repo_url)
+    project_path = connection_repo_path(config, repo_url)
     if project_path is None:
         raise MergeRequestError(f"not a GitLab repository URL: {repo_url}")
     base_url = config.get("base_url", DEFAULT_BASE_URL)
