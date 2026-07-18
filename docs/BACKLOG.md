@@ -51,7 +51,7 @@ subset being built now.
 - [x] Path-jail module with symlink/UNC/traversal tests (security-critical, ADR-0008); paths validated under both Windows and POSIX semantics
 
 ### Workstream: Agent Tools (blocking)
-- [x] Read-side tools: list directory, read file (size-capped), search (plain-text scan; ripgrep upgrade pending)
+- [x] Read-side tools: list directory, read file (size-capped), search — ripgrep when it is on PATH (fast, gitignore-aware), the Python scan as the no-dependency fallback, same output contract either way — design note: [architecture/RIPGREP_SEARCH.md](architecture/RIPGREP_SEARCH.md)
 - [x] Write-side tools: write file and apply-patch, both jailed — `apply_patch` applies a unified diff via `git apply` (dry-run first, both prefix styles, whitespace-tolerant), so an edit is the size of the change instead of the whole file — design note: [architecture/APPLY_PATCH_TOOL.md](architecture/APPLY_PATCH_TOOL.md)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
 - [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
@@ -263,6 +263,20 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Ripgrep-backed search: the agents' plain-text `search` tool
+  uses ripgrep when it is on PATH — fixed-string, case-insensitive, `.git`
+  excluded, size-capped exactly like the Python scan, plus one deliberate
+  improvement: `.gitignore` is respected, so vendored dependencies and
+  build output no longer drown the results. The Python scan stays as the
+  no-dependency fallback, and both engines honor one output contract
+  (`path:line: content`, 50-result cap, same empty-result message) —
+  proven by a test that runs the *same query through both engines* and
+  asserts byte-identical output (on this machine, against VS Code's
+  bundled rg; on CI, the preinstalled one; skips cleanly where neither
+  exists). No regex exposure — the tool stays plain-text; `search_code`
+  remains the meaning-based arm. Design note:
+  architecture/RIPGREP_SEARCH.md. Engine 382 passed, 1 skipped; web
+  untouched.
 - 2026-07-17 · The apply_patch tool: engineers no longer rewrite a whole
   file for a two-line fix. The long-declared name is now bound — a unified
   diff goes through two jails (every path in the diff through

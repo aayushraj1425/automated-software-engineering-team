@@ -11,6 +11,8 @@ the current task's executor returns (TASK_BOARD_TOOLS.md).
 """
 
 import asyncio
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -136,32 +138,81 @@ async def apply_patch(ws: Workspace, patch: str) -> str:
 
 
 async def search(ws: Workspace, text: str, path: str = ".") -> str:
-    """Case-insensitive plain-text search across the workspace files."""
+    """Case-insensitive plain-text search across the workspace files.
+
+    ripgrep when it is on PATH (fast, gitignore-aware), the Python scan
+    otherwise — same output contract either way (RIPGREP_SEARCH.md)."""
     if not text.strip():
         raise ToolError("search text is empty")
     root = _safe(ws, path)
+
+    ripgrep = shutil.which("rg")
+    if ripgrep:
+        return await asyncio.to_thread(_ripgrep_scan, ws, text, root, ripgrep)
+    return await asyncio.to_thread(_python_scan, ws, text, root)
+
+
+def _ripgrep_scan(ws: Workspace, text: str, root: Path, ripgrep: str) -> str:
+    """The fast engine: fixed-string, case-insensitive, .git excluded,
+    size-capped like the Python scan (and .gitignore respected — vendored
+    dependencies no longer drown the results)."""
+    result = subprocess.run(  # noqa: S603 — fixed executable, no shell
+        [
+            ripgrep,
+            "--fixed-strings",
+            "--ignore-case",
+            "--line-number",
+            "--no-heading",
+            "--hidden",
+            "--glob",
+            "!.git",
+            "--max-filesize",
+            str(MAX_SEARCH_FILE_BYTES),
+            "--",
+            text,
+            str(root.relative_to(ws.path)) if root != ws.path else ".",
+        ],
+        cwd=ws.path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+    )
+    if result.returncode not in (0, 1):  # 1 = clean "no matches"
+        raise ToolError(f"search failed: {result.stderr.strip()[:200]}")
+    hits: list[str] = []
+    for line in result.stdout.splitlines():
+        file_part, _, rest = line.partition(":")
+        lineno, _, content = rest.partition(":")
+        if not lineno.isdigit():
+            continue  # defensive: an unparseable line never corrupts output
+        rel = file_part.replace("\\", "/").removeprefix("./")
+        hits.append(f"{rel}:{lineno}: {content.strip()[:200]}")
+        if len(hits) >= MAX_SEARCH_RESULTS:
+            return "\n".join(hits) + "\n... (more results cut off)"
+    return "\n".join(hits) or f"no matches for {text!r}"
+
+
+def _python_scan(ws: Workspace, text: str, root: Path) -> str:
+    """The fallback engine: walks and reads the whole tree — in a thread so
+    a large repository cannot stall the event loop (and every other run)."""
     needle = text.lower()
-
-    def _scan() -> str:
-        # Walks and reads the whole tree — run in a thread so a large
-        # repository cannot stall the event loop (and every other run).
-        hits: list[str] = []
-        for file in sorted(root.rglob("*")):
-            if ".git" in file.parts or not file.is_file():
-                continue
-            if file.stat().st_size > MAX_SEARCH_FILE_BYTES:
-                continue
-            rel = file.relative_to(ws.path)
-            for lineno, line in enumerate(
-                file.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
-            ):
-                if needle in line.lower():
-                    hits.append(f"{rel.as_posix()}:{lineno}: {line.strip()[:200]}")
-                    if len(hits) >= MAX_SEARCH_RESULTS:
-                        return "\n".join(hits) + "\n... (more results cut off)"
-        return "\n".join(hits) or f"no matches for {text!r}"
-
-    return await asyncio.to_thread(_scan)
+    hits: list[str] = []
+    for file in sorted(root.rglob("*")):
+        if ".git" in file.parts or not file.is_file():
+            continue
+        if file.stat().st_size > MAX_SEARCH_FILE_BYTES:
+            continue
+        rel = file.relative_to(ws.path)
+        for lineno, line in enumerate(
+            file.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
+        ):
+            if needle in line.lower():
+                hits.append(f"{rel.as_posix()}:{lineno}: {line.strip()[:200]}")
+                if len(hits) >= MAX_SEARCH_RESULTS:
+                    return "\n".join(hits) + "\n... (more results cut off)"
+    return "\n".join(hits) or f"no matches for {text!r}"
 
 
 async def search_code(ws: Workspace, query: str) -> str:

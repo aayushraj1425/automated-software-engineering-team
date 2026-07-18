@@ -59,6 +59,42 @@ async def test_list_read_and_search(ws):
     assert hits == "src/app.py:2: return 'hello world'"
 
 
+def _find_ripgrep() -> str | None:
+    """rg from PATH, or VS Code's bundled copy on a dev machine without one."""
+    import glob
+    import os
+
+    found = __import__("shutil").which("rg")
+    if found:
+        return found
+    for pattern in (
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\**\rg.exe"),
+        os.path.expandvars(r"%ProgramFiles%\Microsoft VS Code\**\rg.exe"),
+    ):
+        hits = glob.glob(pattern, recursive=True)
+        if hits:
+            return hits[0]
+    return None
+
+
+async def test_search_engines_agree(ws, monkeypatch):
+    """Both engines honor the same output contract (RIPGREP_SEARCH.md)."""
+    import engine.agents.tools as tools_module
+
+    monkeypatch.setattr(tools_module.shutil, "which", lambda _name: None)
+    fallback = await search(ws, "HELLO")
+    assert fallback == "src/app.py:2: return 'hello world'"
+
+    ripgrep = _find_ripgrep()
+    if ripgrep is None:
+        pytest.skip("ripgrep not installed on this machine")
+    monkeypatch.setattr(tools_module.shutil, "which", lambda _name: ripgrep)
+    fast = await search(ws, "HELLO")
+    assert fast == fallback
+
+    assert await search(ws, "nothing says this") == "no matches for 'nothing says this'"
+
+
 async def test_write_creates_folders_and_diff_sees_it(ws):
     await write_file(ws, "src/api/status.py", "STATUS = 'ok'\n")
     assert (ws.path / "src" / "api" / "status.py").read_text() == "STATUS = 'ok'\n"
