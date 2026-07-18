@@ -231,7 +231,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)
 - [x] Deny-by-default policies with an explicit service context: a session that asserts neither a user pin nor `app.service='1'` reads and writes zero rows; `session_scope()` is the documented internal entry point and the alembic connection asserts the context for data migrations — a forgotten pin is now loud, not a leak
 - [ ] Separate non-owner database role for the API (the service flag guards against our own bugs; an attacker with raw SQL can set it — role separation removes that escape hatch)
-- [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
+- [x] Subquery policies for the child tables — all ten (`messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`, `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, `generated_documents`) are now visible exactly when their parent row is, via an `EXISTS` that runs under the parent's own policy; org sharing flows through automatically and retrieval latency is unchanged
 
 ### Workstream: Deploy
 - [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
@@ -263,6 +263,22 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Child-table row-level security: the last tables guarded only
+  by convention now carry policies of their own. All ten children —
+  `messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`,
+  `code_edges`, `indexed_files`, `work_items`, `knowledge_items`,
+  `generated_documents` — are visible exactly when their parent row is: an
+  `EXISTS` subquery that runs under the *parent's* policy, so the owner/org
+  logic stays written once and org sharing flows through automatically (an
+  org member sees the tasks of a shared run; a pinned session cannot attach
+  rows to a stranger's run — WITH CHECK). The explicit service context
+  skips the subquery; `audit_logs` stays policy-free on purpose (no owning
+  parent, service-written). Retrieval benchmark re-run after the policies:
+  p50 103.2 ms / p95 115.1 ms — unchanged from the baseline (the benchmark
+  exercises the service path; the user path adds one primary-key EXISTS).
+  Migration `0019_child_table_rls`; design note updated in place. Engine
+  374 passed, 1 skipped, one unrelated Redis-fallback timing flake that
+  passes in isolation; web untouched.
 - 2026-07-17 · Row-level security is now deny-by-default: the audit's
   biggest accepted boundary — "unset context is trusted" — is closed. The
   policies require an explicit assertion: API sessions pin `app.user_id`

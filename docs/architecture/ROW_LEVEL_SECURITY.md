@@ -96,11 +96,15 @@ loads (post-data section) — proven by the restore-from-a-real-dump test.
   `set_config('app.service','1',…)`. True privilege separation needs a
   separate, non-owner database role for the API with no policy escape hatch
   — that remains on the backlog as its own slice.
-- **Child tables are guarded through their parents.** `messages`,
-  `agent_tasks`, `agent_events`, `code_chunks`, `work_items` carry no
-  ownership column; the API reaches them only after an owner check on the
-  parent. Subquery policies (`EXISTS (SELECT 1 FROM agent_runs …)`) can pin
-  them down too, at a per-row planning cost — a follow-up, not this slice.
+- **Child tables carry their own policies** *(closed 2026-07-17)* —
+  `messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`,
+  `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, and
+  `generated_documents` are each visible exactly when their parent row is:
+  an `EXISTS` subquery that runs under the *parent's* policy, so the
+  owner/org logic stays written once and org sharing flows through
+  automatically. The explicit service context skips the subquery. Retrieval
+  benchmarks are unchanged (p50 103 ms before and after); `audit_logs`
+  stays policy-free on purpose — no owning parent, service-written.
 - **Organization-aware sharing shipped 2026-07-16** as its own slice on top
   of these policies: repositories and agent runs additionally open to
   sessions whose `app.org_id` (the JWT's membership-checked active

@@ -14,13 +14,18 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import ProgrammingError
 
 from engine.db.models import (
+    AgentEvent,
     AgentRun,
+    AgentTask,
     Conversation,
+    GeneratedDocument,
     IntegrationConnection,
+    Message,
     ProviderKey,
     Repository,
+    WorkItem,
 )
-from engine.db.rls import USER_OWNED_TABLES
+from engine.db.rls import CHILD_TABLES, USER_OWNED_TABLES
 from engine.db.session import session_scope
 
 
@@ -166,6 +171,124 @@ def _rows_for(user_id: str) -> tuple[Repository, list]:
         ProviderKey(user_id=user_id, provider="anthropic", encrypted_key="x", last4="1234"),
         IntegrationConnection(user_id=user_id, encrypted_config="x"),
     ]
+
+
+# ── Child tables: visible exactly when the parent is ────────────────────────
+
+
+async def _seed_family(user_id: str) -> None:
+    """A repository, a run under it, a conversation — and one child row in
+    each policy-carrying child table that hangs off them."""
+    async with session_scope() as session:
+        repo = Repository(
+            id=uuid.uuid4(), owner_id=user_id, url=f"https://github.com/{user_id}/repo"
+        )
+        conversation = Conversation(id=uuid.uuid4(), user_id=user_id)
+        session.add_all([repo, conversation])
+        await session.flush()
+        run = AgentRun(id=uuid.uuid4(), user_id=user_id, repository_id=repo.id, request="child rls")
+        session.add(run)
+        await session.flush()
+        session.add_all(
+            [
+                Message(conversation_id=conversation.id, role="user", content=f"{user_id} secret"),
+                AgentTask(run_id=run.id, sequence=1, role="backend", title=f"{user_id} task"),
+                AgentEvent(run_id=run.id, type="run.started", payload={"who": user_id}),
+                WorkItem(repository_id=repo.id, title=f"{user_id} item"),
+                GeneratedDocument(
+                    repository_id=repo.id, kind="readme", title=f"{user_id} doc", content="x"
+                ),
+            ]
+        )
+        await session.commit()
+
+
+_CHILD_PROBES = {
+    "messages": "content",
+    "agent_tasks": "title",
+    "agent_events": "payload->>'who'",
+    "work_items": "title",
+    "generated_documents": "title",
+}
+
+
+async def test_child_rows_follow_their_parents_visibility(prepared_db):
+    """Bare SELECTs on the child tables return only rows whose parent the
+    session may see — the API's parent check is now also Postgres's."""
+    me, stranger = f"child_me_{uuid.uuid4().hex[:6]}", f"child_other_{uuid.uuid4().hex[:6]}"
+    await _seed_family(me)
+    await _seed_family(stranger)
+
+    async with session_scope(user_id=me) as session:
+        for table, column in _CHILD_PROBES.items():
+            values = (
+                (await session.execute(text(f"SELECT {column} FROM {table}")))  # noqa: S608
+                .scalars()
+                .all()
+            )
+            assert any(value and me in value for value in values), table
+            assert not any(value and stranger in value for value in values), table
+
+
+async def test_child_rows_open_through_an_org_shared_parent(prepared_db):
+    """The parent's org clause flows through the EXISTS: an org member sees
+    the tasks of a shared run without owning it."""
+    tag = uuid.uuid4().hex[:6]
+    alice, bob, org = f"corg_a_{tag}", f"corg_b_{tag}", f"corg_org_{tag}"
+    async with session_scope() as session:
+        repo = Repository(
+            id=uuid.uuid4(), owner_id=alice, org_id=org, url=f"https://github.com/{alice}/shared"
+        )
+        session.add(repo)
+        await session.flush()
+        run = AgentRun(
+            id=uuid.uuid4(), user_id=alice, org_id=org, repository_id=repo.id, request="shared"
+        )
+        session.add(run)
+        await session.flush()
+        session.add(AgentTask(run_id=run.id, sequence=1, role="backend", title=f"{tag} shared"))
+        await session.commit()
+
+    async with session_scope(user_id=bob, org_id=org) as session:
+        titles = (await session.execute(text("SELECT title FROM agent_tasks"))).scalars().all()
+    assert any(title and tag in title for title in titles)
+
+    async with session_scope(user_id=bob) as session:  # personal context
+        titles = (await session.execute(text("SELECT title FROM agent_tasks"))).scalars().all()
+    assert not any(title and tag in title for title in titles)
+
+
+async def test_child_insert_needs_a_visible_parent(prepared_db):
+    """WITH CHECK: a pinned session cannot attach rows to a stranger's run."""
+    me, stranger = f"cins_me_{uuid.uuid4().hex[:6]}", f"cins_other_{uuid.uuid4().hex[:6]}"
+    await _seed_family(stranger)
+    async with session_scope() as session:
+        stranger_run_id = (
+            await session.execute(select(AgentRun.id).where(AgentRun.user_id == stranger))
+        ).scalar_one()
+
+    async with session_scope(user_id=me) as session:
+        session.add(AgentTask(run_id=stranger_run_id, sequence=99, role="backend", title="planted"))
+        with pytest.raises(ProgrammingError, match="row-level security policy"):
+            await session.commit()
+
+
+def test_every_child_table_is_in_the_policy_map():
+    """The probe list stays honest: every probed table is policy-carrying,
+    and the full map covers the repository/run/conversation children."""
+    assert set(_CHILD_PROBES) <= set(CHILD_TABLES)
+    assert set(CHILD_TABLES) == {
+        "messages",
+        "agent_tasks",
+        "agent_events",
+        "artifacts",
+        "code_chunks",
+        "code_edges",
+        "indexed_files",
+        "work_items",
+        "knowledge_items",
+        "generated_documents",
+    }
 
 
 async def test_every_protected_table_filters_by_owner(prepared_db):
