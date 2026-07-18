@@ -384,6 +384,104 @@ async def test_commit_with_nothing_to_commit_is_400(client):
     assert resp.status_code == 400
 
 
+# ── Editing the plan at the approval gate ───────────────────────────────────
+
+
+async def test_plan_edit_retitles_and_drops_then_runs_the_edited_board(client):
+    headers = _headers()
+    created = await _create_run(client, headers)  # awaiting_approval
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    tasks = detail["tasks"]
+    assert len(tasks) == 3
+
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/plan",
+        json={
+            "tasks": [
+                {"id": tasks[0]["id"], "title": "Retitled by the human", "description": "be safe"},
+                {"id": tasks[1]["id"], "title": tasks[1]["title"], "drop": True},
+                {"id": tasks[2]["id"], "title": tasks[2]["title"]},
+            ]
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"edited": 1, "dropped": 1}
+
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    titles = [t["title"] for t in detail["tasks"]]
+    assert len(titles) == 2 and "Retitled by the human" in titles
+    assert detail["plan"]["tasks"] == titles  # the header follows the board
+    events = (await client.get(f"/v1/runs/{created['id']}/events", headers=headers)).json()
+    assert any(e["type"] == "plan.edited" for e in events)
+
+    # Approving executes exactly the edited board — the dropped task never runs.
+    await _decide(client, headers, created["id"], True)
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    assert detail["status"] == "completed"
+    assert len(detail["tasks"]) == 2
+    assert all(t["status"] == "done" for t in detail["tasks"])
+
+
+async def test_plan_edit_cleans_dangling_dependencies(client):
+    """Dropping a task removes it from the survivors' depends_on — the
+    board must never deadlock waiting on a ghost."""
+    headers = _headers()
+    created = await _create_run(client, headers)
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    tasks = detail["tasks"]
+    # The offline plan chains 1 <- 2 <- 3; drop task 1 (the others' dependency).
+    assert any(tasks[0]["id"] in t["depends_on"] for t in tasks[1:])
+
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/plan",
+        json={
+            "tasks": [
+                {"id": tasks[0]["id"], "title": tasks[0]["title"], "drop": True},
+                {"id": tasks[1]["id"], "title": tasks[1]["title"]},
+                {"id": tasks[2]["id"], "title": tasks[2]["title"]},
+            ]
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    await _decide(client, headers, created["id"], True)
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    assert detail["status"] == "completed"  # no deadlock — the survivors ran
+
+
+async def test_plan_edit_guardrails(client):
+    headers = _headers()
+    created = await _create_run(client, headers)
+    detail = (await client.get(f"/v1/runs/{created['id']}", headers=headers)).json()
+    tasks = detail["tasks"]
+
+    # Dropping everything is Reject's job, not an edit.
+    all_dropped = [{"id": t["id"], "title": t["title"], "drop": True} for t in tasks]
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/plan", json={"tasks": all_dropped}, headers=headers
+    )
+    assert resp.status_code == 400
+
+    # A task id from some other run is refused.
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/plan",
+        json={"tasks": [{"id": str(uuid.uuid4()), "title": "planted"}]},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+    # After approval the gate is closed.
+    await _decide(client, headers, created["id"], True)
+    resp = await client.put(
+        f"/v1/runs/{created['id']}/plan",
+        json={"tasks": [{"id": tasks[0]["id"], "title": "too late"}]},
+        headers=headers,
+    )
+    assert resp.status_code == 409
+
+
 # ── Disconnecting a repository: run history survives ────────────────────────
 
 

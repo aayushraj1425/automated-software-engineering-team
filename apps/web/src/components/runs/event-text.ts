@@ -56,6 +56,15 @@ export function describeEvent(event: RunEvent): string {
         : `Branch ${String(p.branch ?? "")} pushed`;
     case "branch.pushed":
       return `Branch ${String(p.branch ?? "")} pushed by hand`;
+    case "plan.edited": {
+      const edited = Number(p.edited ?? 0);
+      const dropped = Number(p.dropped ?? 0);
+      const parts = [
+        edited > 0 ? `${edited} task(s) edited` : "",
+        dropped > 0 ? `${dropped} task(s) dropped` : "",
+      ].filter(Boolean);
+      return `You changed the plan: ${parts.join(", ") || "no changes"}`;
+    }
     case "plan.approved":
       return "You approved the plan — work begins";
     case "plan.rejected":

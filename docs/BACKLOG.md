@@ -68,7 +68,7 @@ subset being built now.
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
 - [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback; per-agent output panes come later)
-- [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page (in-place plan editing still pending)
+- [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page, and a nearly-right plan can be edited in place before approving — retitle, re-describe, or drop tasks (dangling dependencies cleaned; the edit lands on the timeline) — design note: [architecture/PLAN_EDITING.md](architecture/PLAN_EDITING.md)
 - [x] Pull-request link on the run page
 - [x] Diff viewer: the run page shows everything the agents changed, colored by +/-
 - [x] Run cost widget (token and cost totals in the run header)
@@ -263,6 +263,27 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-18 · In-place plan editing, closing the approval gate's oldest
+  pending note: a nearly-right plan no longer forces a reject-and-replan
+  round trip. `PUT /v1/runs/{id}/plan` — only while `awaiting_approval`
+  (409 otherwise, the same closed-gate shape as everywhere) — lets the
+  human retitle, re-describe, or drop tasks: at least one must remain
+  (dropping everything is Reject's job), a dropped task's id disappears
+  from every survivor's `depends_on` so the board can never deadlock on a
+  ghost, `run.plan`'s title list follows the board, and `plan.edited`
+  lands on the timeline with what changed. Description semantics are
+  non-destructive: omitted leaves it alone, empty clears it (a bug the
+  tests caught — the first draft silently cleared descriptions on
+  title-only edits). Deliberately no adding tasks (mid-run the agents add
+  their own; a missing-from-the-start task means the plan deserves
+  rejection), no role changes, no reordering. The run page's gate gained
+  Edit plan → per-task title input, description textarea, drop/keep
+  toggle → Save; approving then executes exactly the edited board.
+  Design note: architecture/PLAN_EDITING.md. Engine 391 passed, 1 skipped
+  (3 new tests: edit+drop then the edited board runs to completion,
+  dangling-dependency cleanup proven by a no-deadlock run, and the
+  guardrails — all-dropped 400, foreign task id 400, post-approval 409);
+  web 20 passed.
 - 2026-07-18 · Run-history retention and repository disconnect, closing
   the debt-register item flagged "before any hosted deployment". The rule:
   deleting a repository removes the *repository's* data, never the *runs'*

@@ -46,6 +46,15 @@ describe("describeEvent", () => {
     );
   });
 
+  it("describes the human's plan edits", () => {
+    expect(describeEvent(event("plan.edited", { edited: 2, dropped: 1 }))).toBe(
+      "You changed the plan: 2 task(s) edited, 1 task(s) dropped",
+    );
+    expect(describeEvent(event("plan.edited", { edited: 1, dropped: 0 }))).toBe(
+      "You changed the plan: 1 task(s) edited",
+    );
+  });
+
   it("distinguishes a manual push from the pipeline's publish", () => {
     expect(describeEvent(event("branch.pushed", { branch: "asep/run-1" }))).toBe(
       "Branch asep/run-1 pushed by hand",

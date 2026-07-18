@@ -50,6 +50,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [commitMessage, setCommitMessage] = useState("");
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [planDrafts, setPlanDrafts] = useState<
+    Record<string, { title: string; description: string; drop: boolean }>
+  >({});
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planNote, setPlanNote] = useState<string | null>(null);
   const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
@@ -133,6 +139,53 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       setWorkspaceNote(err instanceof Error ? err.message : "Push failed");
     } finally {
       setPushing(false);
+    }
+  }
+
+  function startPlanEdit() {
+    if (!run) return;
+    setPlanDrafts(
+      Object.fromEntries(
+        run.tasks.map((task) => [
+          task.id,
+          { title: task.title, description: task.description ?? "", drop: false },
+        ]),
+      ),
+    );
+    setPlanNote(null);
+    setEditingPlan(true);
+  }
+
+  async function savePlan() {
+    if (!run) return;
+    setSavingPlan(true);
+    setPlanNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/plan`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          tasks: run.tasks.map((task) => {
+            const draft = planDrafts[task.id];
+            return {
+              id: task.id,
+              title: draft?.title ?? task.title,
+              // "" clears the description; null would leave it unchanged.
+              description: draft ? draft.description : null,
+              drop: draft?.drop ?? false,
+            };
+          }),
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.detail ?? `Could not save the plan (${res.status})`);
+      setEditingPlan(false);
+      const refreshed = await fetch(`/api/runs/${runId}`);
+      if (refreshed.ok) setRun(await refreshed.json());
+    } catch (err) {
+      setPlanNote(err instanceof Error ? err.message : "Could not save the plan");
+    } finally {
+      setSavingPlan(false);
     }
   }
 
@@ -294,24 +347,52 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       {run.status === "awaiting_approval" && (
         <section className="space-y-3 rounded-md border border-violet-900 bg-violet-950/30 p-4">
           <p className="text-sm text-zinc-200">
-            The plan is ready. Nothing runs until you decide.
+            The plan is ready. Nothing runs until you decide — a nearly-right plan can be
+            edited below before approving.
           </p>
           <div className="flex gap-3">
             <button
               onClick={() => void decide(true)}
-              disabled={deciding}
+              disabled={deciding || editingPlan}
               className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Approve plan
             </button>
             <button
               onClick={() => void decide(false)}
-              disabled={deciding}
+              disabled={deciding || editingPlan}
               className="rounded-md border border-red-800 px-4 py-2 text-sm font-medium text-red-300 disabled:opacity-50"
             >
               Reject
             </button>
+            {editingPlan ? (
+              <>
+                <button
+                  onClick={() => void savePlan()}
+                  disabled={savingPlan}
+                  className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+                >
+                  {savingPlan ? "Saving…" : "Save plan"}
+                </button>
+                <button
+                  onClick={() => setEditingPlan(false)}
+                  disabled={savingPlan}
+                  className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startPlanEdit}
+                disabled={deciding}
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
+              >
+                Edit plan
+              </button>
+            )}
           </div>
+          {planNote && <p className="text-sm text-red-400">{planNote}</p>}
         </section>
       )}
 
@@ -320,20 +401,71 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         {run.tasks.length === 0 && (
           <p className="text-sm text-zinc-500">No tasks yet — the plan is being written.</p>
         )}
-        {run.tasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-center justify-between gap-3 rounded-md border border-zinc-800 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm">
-                {task.sequence}. {task.title}
-              </p>
-              <p className="text-xs text-zinc-500">{agentName(task.role)}</p>
+        {run.tasks.map((task) =>
+          editingPlan ? (
+            <div
+              key={task.id}
+              className={`space-y-2 rounded-md border px-4 py-3 ${
+                planDrafts[task.id]?.drop ? "border-red-900 opacity-60" : "border-zinc-700"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-xs text-zinc-500">{task.sequence}.</span>
+                <input
+                  value={planDrafts[task.id]?.title ?? task.title}
+                  onChange={(e) =>
+                    setPlanDrafts((prev) => ({
+                      ...prev,
+                      [task.id]: { ...prev[task.id], title: e.target.value },
+                    }))
+                  }
+                  disabled={planDrafts[task.id]?.drop}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm outline-none focus:border-zinc-500 disabled:line-through"
+                />
+                <span className="shrink-0 text-xs text-zinc-500">{agentName(task.role)}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPlanDrafts((prev) => ({
+                      ...prev,
+                      [task.id]: { ...prev[task.id], drop: !prev[task.id]?.drop },
+                    }))
+                  }
+                  className="shrink-0 text-xs text-zinc-500 hover:text-red-400"
+                >
+                  {planDrafts[task.id]?.drop ? "keep" : "drop"}
+                </button>
+              </div>
+              {!planDrafts[task.id]?.drop && (
+                <textarea
+                  value={planDrafts[task.id]?.description ?? ""}
+                  onChange={(e) =>
+                    setPlanDrafts((prev) => ({
+                      ...prev,
+                      [task.id]: { ...prev[task.id], description: e.target.value },
+                    }))
+                  }
+                  placeholder="Description (optional)"
+                  rows={2}
+                  className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-zinc-600"
+                />
+              )}
             </div>
-            <StatusChip status={task.status} />
-          </div>
-        ))}
+          ) : (
+            <div
+              key={task.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-zinc-800 px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm">
+                  {task.sequence}. {task.title}
+                </p>
+                <p className="text-xs text-zinc-500">{agentName(task.role)}</p>
+              </div>
+              <StatusChip status={task.status} />
+            </div>
+          ),
+        )}
       </section>
 
       {diff && (

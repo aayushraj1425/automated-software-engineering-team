@@ -235,6 +235,101 @@ async def create_run(
     return _run_out(run, url)
 
 
+class PlanTaskEdit(BaseModel):
+    """One task's edit at the approval gate: retitle, re-describe, or drop.
+    An omitted description leaves the existing one alone; an empty string
+    clears it."""
+
+    id: uuid.UUID
+    title: str = Field(min_length=1, max_length=256)
+    description: str | None = Field(default=None, max_length=4000)
+    drop: bool = False
+
+    @field_validator("title")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("title must not be blank")
+        return stripped
+
+
+class PlanEditIn(BaseModel):
+    tasks: list[PlanTaskEdit] = Field(min_length=1)
+
+
+class PlanEditOut(BaseModel):
+    edited: int
+    dropped: int
+
+
+@router.put("/v1/runs/{run_id}/plan")
+async def edit_plan(
+    run_id: uuid.UUID,
+    body: PlanEditIn,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> PlanEditOut:
+    """Fix a nearly-right plan at the approval gate instead of rejecting it:
+    retitle, re-describe, or drop tasks (PLAN_EDITING.md). Only while the
+    run awaits approval — before that there is no plan, after that it runs."""
+    run = await _visible_run(db, run_id, principal)
+    if run.status != RunStatus.AWAITING_APPROVAL:
+        raise HTTPException(status_code=409, detail="The plan can only be edited before approval")
+
+    rows = (await db.execute(select(AgentTask).where(AgentTask.run_id == run_id))).scalars().all()
+    by_id = {row.id: row for row in rows}
+    unknown = [str(edit.id) for edit in body.tasks if edit.id not in by_id]
+    if unknown:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown task id(s) on this run: {', '.join(unknown)}"
+        )
+
+    dropped_ids = {edit.id for edit in body.tasks if edit.drop}
+    if len(dropped_ids) >= len(rows):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one task must remain — reject the plan if none of it is right",
+        )
+
+    edited = 0
+    for edit in body.tasks:
+        if edit.drop:
+            continue
+        row = by_id[edit.id]
+        new_description = (
+            row.description if edit.description is None else (edit.description.strip() or None)
+        )
+        if row.title != edit.title or row.description != new_description:
+            row.title = edit.title
+            row.description = new_description
+            edited += 1
+    for task_id in dropped_ids:
+        await db.delete(by_id[task_id])
+
+    # A dropped task must vanish from every surviving depends_on, or the
+    # board would deadlock waiting on a ghost.
+    dropped_keys = {str(task_id) for task_id in dropped_ids}
+    survivors = [row for row in rows if row.id not in dropped_ids]
+    for row in survivors:
+        if any(dep in dropped_keys for dep in row.depends_on):
+            row.depends_on = [dep for dep in row.depends_on if dep not in dropped_keys]
+
+    # The plan header follows the board it summarizes.
+    survivors.sort(key=lambda row: row.sequence)
+    run.plan = {**(run.plan or {}), "tasks": [row.title for row in survivors]}
+    db.add(
+        AgentEvent(
+            run_id=run_id,
+            type="plan.edited",
+            payload={"edited": edited, "dropped": len(dropped_ids), "by": principal.user_id},
+        )
+    )
+    await db.commit()
+    await publish_run_ping(run_id)
+    return PlanEditOut(edited=edited, dropped=len(dropped_ids))
+
+
 class DecisionIn(BaseModel):
     approved: bool
 
