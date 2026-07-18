@@ -259,10 +259,28 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
 | Rate limiting is per engine replica (in-process buckets), and the BFF itself is unlimited | engine ceiling covers BFF-proxied traffic; single-replica deployments | Deploy workstream (Redis-backed shared window) |
 | Playwright smoke not in CI (needs the compose stack) | CI time budget | Phase 1 |
-| Deleting a repository cascades away its run history (`agent_runs` FK) | development-phase simplicity | retention/audit policy before any hosted deployment |
+| ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
 
+- 2026-07-18 · Run-history retention and repository disconnect, closing
+  the debt-register item flagged "before any hosted deployment". The rule:
+  deleting a repository removes the *repository's* data, never the *runs'*
+  data. `agent_runs.repository_id` went from `ON DELETE CASCADE` to
+  nullable `SET NULL` (migration `0020`, whose downgrade honestly deletes
+  detached runs — the exact loss the upgrade prevents), so a run outlives
+  its repository with timeline, task board, audit events, and cost totals
+  intact; the runs list shows "(repository disconnected)" where the URL
+  was. Disconnect itself now exists — `DELETE /v1/repositories/{id}` with
+  the usual visibility scoping, refused with a 409 while runs are active
+  (the runner never sees a vanished repository mid-flight), and a
+  disconnect action with a plain-language confirm on the repositories
+  page. Repository-scoped data (index, work items, knowledge, documents)
+  cascades as before; memory capture skips detached runs; the benchmark
+  harness deletes its synthetic runs explicitly now that the cascade no
+  longer does. Design note: architecture/RUN_HISTORY_RETENTION.md. Engine
+  388 passed, 1 skipped (3 new tests: history survives with full record,
+  409 while active then 204 after finishing, intruder 404); web 19 passed.
 - 2026-07-18 · Self-hosted GitLab, closing the Source Hosts workstream:
   the connection's `base_url` now names the instance for *detection* as
   well as for the API. `connection_repo_path` matches a repository URL

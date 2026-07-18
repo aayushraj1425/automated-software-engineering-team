@@ -384,6 +384,61 @@ async def test_commit_with_nothing_to_commit_is_400(client):
     assert resp.status_code == 400
 
 
+# ── Disconnecting a repository: run history survives ────────────────────────
+
+
+async def _repository_id_of(client, headers, run_id: str) -> str:
+    """The repository the run was created against (via the repositories list)."""
+    repos = (await client.get("/v1/repositories", headers=headers)).json()
+    assert repos, "the run should have connected a repository"
+    return repos[0]["id"]
+
+
+async def test_disconnect_keeps_the_run_history(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    repo_id = await _repository_id_of(client, headers, run_id)
+
+    resp = await client.delete(f"/v1/repositories/{repo_id}", headers=headers)
+    assert resp.status_code == 204
+
+    # The repository is gone…
+    assert (await client.get("/v1/repositories", headers=headers)).json() == []
+
+    # …but the run survives with its full record, URL replaced by the marker.
+    listed = (await client.get("/v1/runs", headers=headers)).json()
+    assert [r["id"] for r in listed] == [run_id]
+    assert listed[0]["repository_url"] == "(repository disconnected)"
+
+    detail = (await client.get(f"/v1/runs/{run_id}", headers=headers)).json()
+    assert detail["status"] == "completed"
+    assert len(detail["tasks"]) == 3  # the task board is intact
+    events = (await client.get(f"/v1/runs/{run_id}/events", headers=headers)).json()
+    assert any(e["type"] == "run.finished" for e in events)  # the timeline too
+
+
+async def test_disconnect_is_refused_while_a_run_is_active(client):
+    headers = _headers()
+    created = await _create_run(client, headers)  # left at awaiting_approval
+    repo_id = await _repository_id_of(client, headers, created["id"])
+
+    resp = await client.delete(f"/v1/repositories/{repo_id}", headers=headers)
+    assert resp.status_code == 409
+    assert "active" in resp.json()["detail"]
+
+    # Finishing the run unblocks the disconnect.
+    await _decide(client, headers, created["id"], True)
+    assert (await client.delete(f"/v1/repositories/{repo_id}", headers=headers)).status_code == 204
+
+
+async def test_disconnect_is_owner_scoped(client):
+    headers = _headers()
+    run_id = await _completed_run(client, headers)
+    repo_id = await _repository_id_of(client, headers, run_id)
+    intruder = _headers()
+    assert (await client.delete(f"/v1/repositories/{repo_id}", headers=intruder)).status_code == 404
+
+
 # ── Pushing the branch to the host (finished runs only) ─────────────────────
 
 

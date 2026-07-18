@@ -62,6 +62,26 @@ export function RepositoriesPanel() {
     if (res.ok) await refresh();
   }
 
+  async function disconnect(id: string) {
+    if (
+      !window.confirm(
+        "Disconnect this repository? Its index, work items, knowledge, and documents " +
+          "are removed. Run history is kept.",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    const res = await fetch(`/api/repositories/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => null);
+      setError(detail?.detail ?? `Could not disconnect (${res.status})`);
+      return;
+    }
+    if (selectedId === id) setSelectedId(null);
+    await refresh();
+  }
+
   async function search(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedId) return;
@@ -161,6 +181,16 @@ export function RepositoriesPanel() {
                   : repo.chunks > 0
                     ? "Re-index"
                     : "Index"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void disconnect(repo.id);
+                }}
+                title="Disconnect — run history is kept"
+                className="text-xs text-zinc-600 hover:text-red-400"
+              >
+                disconnect
               </button>
             </div>
           </div>

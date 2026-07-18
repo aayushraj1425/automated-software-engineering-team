@@ -16,7 +16,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
-from engine.db.models import CodeChunk, CodeEdge, Repository
+from engine.db.enums import RunStatus
+from engine.db.models import AgentRun, CodeChunk, CodeEdge, Repository
 from engine.db.session import get_session
 from engine.db.visibility import can_access, visible_clause
 from engine.indexing.chunker import LANGUAGES
@@ -153,6 +154,47 @@ async def list_repositories(
         .all()
     )
     return [_repository_out(repo, chunks) for repo, chunks in rows]
+
+
+# Runs in these states pin their repository: the runner is (or is about to
+# be) working in it, and a mid-flight disconnect would crash the run.
+_ACTIVE_RUN_STATUSES = (
+    RunStatus.QUEUED,
+    RunStatus.PLANNING,
+    RunStatus.AWAITING_APPROVAL,
+    RunStatus.EXECUTING,
+    RunStatus.REVIEWING,
+)
+
+
+@router.delete("/v1/repositories/{repository_id}", status_code=204)
+async def disconnect_repository(
+    repository_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    """Disconnect: the repository's data (index, work items, knowledge,
+    documents) goes with it; run history survives detached — the FK is
+    SET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md)."""
+    repo = await _visible_repository(db, repository_id, principal)
+    active = (
+        await db.execute(
+            select(func.count())
+            .select_from(AgentRun)
+            .where(
+                AgentRun.repository_id == repository_id,
+                AgentRun.status.in_(_ACTIVE_RUN_STATUSES),
+            )
+        )
+    ).scalar_one()
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{active} run(s) are still active on this repository — "
+            "wait for them to finish or cancel them first",
+        )
+    await db.delete(repo)
+    await db.commit()
 
 
 @router.post("/v1/repositories/{repository_id}/index", status_code=202)

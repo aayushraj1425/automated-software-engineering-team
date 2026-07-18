@@ -178,6 +178,18 @@ async def _visible_run(db: AsyncSession, run_id: uuid.UUID, principal: Principal
     return run
 
 
+# What the runs list shows where the URL was, after a disconnect
+# (RUN_HISTORY_RETENTION.md — history survives the repository).
+DISCONNECTED_REPOSITORY = "(repository disconnected)"
+
+
+async def _run_repository(db: AsyncSession, run: AgentRun) -> Repository | None:
+    """The run's repository, or None once it has been disconnected."""
+    if run.repository_id is None:
+        return None
+    return await db.get(Repository, run.repository_id)
+
+
 @router.post("/v1/runs", status_code=201)
 async def create_run(
     body: RunCreate,
@@ -284,7 +296,7 @@ async def decide_run(
     else:
         # The workspace was cloned during planning; a rejected run won't use it.
         await asyncio.to_thread(remove_workspace, run.id)
-    repo = await db.get(Repository, run.repository_id)
+    repo = await _run_repository(db, run)
     return _run_out(run, repo.url if repo else "")
 
 
@@ -296,13 +308,13 @@ async def list_runs(
     rows = (
         await db.execute(
             select(AgentRun, Repository.url)
-            .join(Repository, AgentRun.repository_id == Repository.id)
+            .outerjoin(Repository, AgentRun.repository_id == Repository.id)
             .where(visible_clause(AgentRun.user_id, AgentRun.org_id, principal))
             .order_by(AgentRun.created_at.desc())
             .limit(50)
         )
     ).all()
-    return [_run_out(run, url) for run, url in rows]
+    return [_run_out(run, url or DISCONNECTED_REPOSITORY) for run, url in rows]
 
 
 @router.get("/v1/runs/{run_id}")
@@ -312,7 +324,7 @@ async def get_run(
     db: AsyncSession = Depends(get_session),
 ) -> RunDetailOut:
     run = await _visible_run(db, run_id, principal)
-    repo = await db.get(Repository, run.repository_id)
+    repo = await _run_repository(db, run)
     tasks = (
         (
             await db.execute(
@@ -322,7 +334,7 @@ async def get_run(
         .scalars()
         .all()
     )
-    base = _run_out(run, repo.url if repo else "")
+    base = _run_out(run, repo.url if repo else DISCONNECTED_REPOSITORY)
     return RunDetailOut(
         **base.model_dump(),
         plan=run.plan,
@@ -532,7 +544,7 @@ async def push_workspace(
     _require_editable(run)
     ws = _load_run_workspace(run)
 
-    repo = await db.get(Repository, run.repository_id)
+    repo = await _run_repository(db, run)
     credential: tuple[str, str] | None = None
     if repo is not None:
         credential = push_credential(await host_connection(db, run.user_id, repo.url))

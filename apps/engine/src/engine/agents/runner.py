@@ -192,6 +192,9 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.QUEUED:
             return
+        # Disconnect is refused while a run is active, so an active run's
+        # repository always exists (RUN_HISTORY_RETENTION.md).
+        assert run.repository_id is not None
         repo = await session.get(Repository, run.repository_id)
         assert repo is not None
         repo_url = repo.url
@@ -272,6 +275,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         run = await session.get(AgentRun, run_id)
         if run is None or run.status != RunStatus.EXECUTING:
             return
+        assert run.repository_id is not None  # disconnect refused while active
         repo = await session.get(Repository, run.repository_id)
         assert repo is not None
         repo_url = repo.url

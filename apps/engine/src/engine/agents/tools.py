@@ -226,7 +226,7 @@ async def search_code(ws: Workspace, query: str) -> str:
         raise ToolError("search query is empty")
     async with session_scope() as db:
         run = await db.get(AgentRun, ws.run_id)
-        if run is None:
+        if run is None or run.repository_id is None:
             return "no code index is connected to this run; use the plain 'search' tool instead"
         chunks = await retrieve_chunks(db, run.repository_id, query, limit=SEARCH_CODE_RESULTS)
     if not chunks:

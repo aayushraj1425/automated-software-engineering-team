@@ -39,6 +39,8 @@ async def capture_run_memory(run_id: uuid.UUID) -> None:
             run = await session.get(AgentRun, run_id)
             if run is None or run.status not in (RunStatus.COMPLETED, RunStatus.FAILED):
                 return
+            if run.repository_id is None:
+                return  # repository disconnected — nowhere for the memory to live
             already = await session.execute(
                 select(KnowledgeItem.id).where(
                     KnowledgeItem.source_run_id == run_id,
@@ -92,6 +94,8 @@ async def capture_plan_rejected(
     the next planning round recalls it. Never fails the rejection request.
     """
     try:
+        if run.repository_id is None:
+            return None  # repository disconnected — nowhere for the memory to live
         plan_summary = str((run.plan or {}).get("summary", "")).strip()
         content = (
             "The human rejected this proposed plan at the approval gate. "

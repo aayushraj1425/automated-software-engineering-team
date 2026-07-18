@@ -110,14 +110,19 @@ async def _register_repository(origin: Path) -> uuid.UUID:
 
 async def _drop_repository(repository_id: uuid.UUID) -> None:
     """Benchmarks tidy up after themselves — the dev database should not
-    accumulate synthetic corpora (chunks/edges cascade with the row)."""
-    from engine.db.models import Repository
+    accumulate synthetic corpora (chunks/edges cascade with the row; runs
+    survive a repository delete by design, so they are removed explicitly —
+    RUN_HISTORY_RETENTION.md)."""
+    from sqlalchemy import delete as sql_delete
+
+    from engine.db.models import AgentRun, Repository
 
     async with session_scope() as session:
+        await session.execute(sql_delete(AgentRun).where(AgentRun.repository_id == repository_id))
         repo = await session.get(Repository, repository_id)
         if repo is not None:
             await session.delete(repo)
-            await session.commit()
+        await session.commit()
 
 
 async def _count_chunks(repository_id: uuid.UUID) -> int:

@@ -111,8 +111,11 @@ class AgentRun(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     org_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
-    repository_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    # SET NULL, not CASCADE: run history is the audit record of what the
+    # agents did — it outlives a disconnected repository
+    # (docs/architecture/RUN_HISTORY_RETENTION.md).
+    repository_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("repositories.id", ondelete="SET NULL"), index=True, nullable=True
     )
     request: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default=RunStatus.QUEUED, index=True)
