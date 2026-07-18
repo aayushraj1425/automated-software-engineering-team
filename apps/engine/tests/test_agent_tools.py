@@ -7,6 +7,7 @@ import pytest
 
 from engine.agents.tools import (
     ToolError,
+    apply_patch,
     call_tool,
     git_commit,
     git_diff,
@@ -158,6 +159,70 @@ async def test_search_code_without_an_index_guides_the_agent(ws, prepared_db):
 
 
 def test_schemas_only_cover_implemented_tools():
-    schemas = schemas_for(("read_file", "apply_patch", "git_diff"))
+    schemas = schemas_for(("read_file", "git_branch", "apply_patch", "git_diff"))
     names = [s["function"]["name"] for s in schemas]
-    assert names == ["read_file", "git_diff"]  # apply_patch not built yet
+    assert names == ["read_file", "apply_patch", "git_diff"]  # git_branch not built
+
+
+# ── apply_patch: the edit is the size of the change ─────────────────────────
+
+
+async def test_apply_patch_modifies_a_file_with_git_prefixes(ws):
+    patch = (
+        "diff --git a/src/app.py b/src/app.py\n"
+        "--- a/src/app.py\n"
+        "+++ b/src/app.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def greet():\n"
+        "-    return 'hello world'\n"
+        "+    return 'hello patch'\n"
+    )
+    out = await apply_patch(ws, patch)
+    assert out == "patched 1 file(s): src/app.py"
+    assert "hello patch" in (ws.path / "src" / "app.py").read_text()
+
+
+async def test_apply_patch_accepts_bare_paths_too(ws):
+    patch = (
+        "--- src/app.py\n"
+        "+++ src/app.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def greet():\n"
+        "-    return 'hello world'\n"
+        "+    return 'hello p0'\n"
+    )
+    await apply_patch(ws, patch)
+    assert "hello p0" in (ws.path / "src" / "app.py").read_text()
+
+
+async def test_apply_patch_creates_a_new_file(ws):
+    patch = "--- /dev/null\n+++ b/docs/note.md\n@@ -0,0 +1,2 @@\n+# Note\n+patched into being\n"
+    out = await apply_patch(ws, patch)
+    assert "docs/note.md" in out
+    assert (ws.path / "docs" / "note.md").read_text() == "# Note\npatched into being\n"
+
+
+async def test_apply_patch_refuses_jail_escapes(ws):
+    patch = "--- /dev/null\n+++ b/../escape.txt\n@@ -0,0 +1 @@\n+nope\n"
+    with pytest.raises(ToolError, match="path not allowed"):
+        await apply_patch(ws, patch)
+    assert not (ws.path.parent / "escape.txt").exists()
+
+
+async def test_apply_patch_mismatch_asks_for_a_regenerated_diff(ws):
+    patch = (
+        "--- a/src/app.py\n"
+        "+++ b/src/app.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def greet():\n"
+        "-    return 'something the file never said'\n"
+        "+    return 'x'\n"
+    )
+    with pytest.raises(ToolError, match="regenerate the diff"):
+        await apply_patch(ws, patch)
+    assert "hello world" in (ws.path / "src" / "app.py").read_text()  # untouched
+
+
+async def test_apply_patch_rejects_non_diffs(ws):
+    with pytest.raises(ToolError, match="not a unified diff"):
+        await apply_patch(ws, "please change the greeting to hello")

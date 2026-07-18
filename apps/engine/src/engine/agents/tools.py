@@ -11,6 +11,8 @@ the current task's executor returns (TASK_BOARD_TOOLS.md).
 """
 
 import asyncio
+import tempfile
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
@@ -71,6 +73,66 @@ async def write_file(ws: Workspace, path: str, content: str) -> str:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8", newline="\n")
     return f"wrote {len(content.encode('utf-8'))} bytes to {path}"
+
+
+def _patch_paths(patch: str) -> tuple[list[str], bool]:
+    """Every file path a unified diff touches, plus whether it uses the
+    git-style ``a/``/``b/`` prefixes (``-p1``) or bare paths (``-p0``)."""
+    paths: list[str] = []
+    prefixed = 0
+    bare = 0
+    for line in patch.splitlines():
+        if not line.startswith(("--- ", "+++ ")):
+            continue
+        target = line[4:].split("\t")[0].strip()
+        if not target or target == "/dev/null":
+            continue
+        if target.startswith(("a/", "b/")):
+            prefixed += 1
+            target = target[2:]
+        else:
+            bare += 1
+        if target and target not in paths:
+            paths.append(target)
+    return paths, prefixed >= bare
+
+
+async def apply_patch(ws: Workspace, patch: str) -> str:
+    """Apply a unified diff to the workspace — the edit is the size of the
+    change, not the file (APPLY_PATCH_TOOL.md). Every path in the diff goes
+    through the jail before git ever sees the patch; `git apply --check`
+    dry-runs it first, so a patch applies completely or not at all."""
+    if not patch.strip() or "+++" not in patch or "@@" not in patch:
+        raise ToolError("not a unified diff — it needs ---/+++ headers and @@ hunks")
+    if not patch.endswith("\n"):
+        patch += "\n"
+    paths, prefixed = _patch_paths(patch)
+    if not paths:
+        raise ToolError("the patch names no files")
+    for path in paths:
+        _safe(ws, path)  # jail first, git second (ADR-0008 defense in depth)
+
+    strip = "-p1" if prefixed else "-p0"
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".patch", delete=False, encoding="utf-8", newline="\n"
+    ) as handle:
+        handle.write(patch)
+        patch_file = handle.name
+    try:
+        try:
+            await run_git(
+                ws.path, "apply", "--check", strip, "--ignore-whitespace", "--", patch_file
+            )
+            await run_git(ws.path, "apply", strip, "--ignore-whitespace", "--", patch_file)
+        except WorkspaceError as exc:
+            raise ToolError(
+                f"the patch does not apply: {exc} — re-read the file and "
+                "regenerate the diff against its current content"
+            ) from exc
+    finally:
+        Path(patch_file).unlink(missing_ok=True)
+    names = ", ".join(paths[:5]) + ("…" if len(paths) > 5 else "")
+    return f"patched {len(paths)} file(s): {names}"
 
 
 async def search(ws: Workspace, text: str, path: str = ".") -> str:
@@ -310,12 +372,31 @@ TOOLS: dict[str, tuple[Any, dict]] = {
         write_file,
         _schema(
             "write_file",
-            "Create or completely replace one file with the given content.",
+            "Create or completely replace one file with the given content. "
+            "For small edits to an existing file, prefer apply_patch.",
             {
                 "path": _PATH,
                 "content": {"type": "string", "description": "The file's entire new content."},
             },
             ["path", "content"],
+        ),
+    ),
+    "apply_patch": (
+        apply_patch,
+        _schema(
+            "apply_patch",
+            "Apply a unified diff to the workspace — the right tool for "
+            "small edits to existing files (write_file rewrites the whole "
+            "file). Include a few unchanged context lines around each "
+            "change. If it does not apply, read the file again and "
+            "regenerate the diff.",
+            {
+                "patch": {
+                    "type": "string",
+                    "description": "A unified diff (---/+++ headers, @@ hunks).",
+                }
+            },
+            ["patch"],
         ),
     ),
     "git_commit": (

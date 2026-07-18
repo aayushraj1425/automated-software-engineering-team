@@ -52,7 +52,7 @@ subset being built now.
 
 ### Workstream: Agent Tools (blocking)
 - [x] Read-side tools: list directory, read file (size-capped), search (plain-text scan; ripgrep upgrade pending)
-- [x] Write-side tools: write file — jailed (apply-patch with unified diffs still pending)
+- [x] Write-side tools: write file and apply-patch, both jailed — `apply_patch` applies a unified diff via `git apply` (dry-run first, both prefix styles, whitespace-tolerant), so an edit is the size of the change instead of the whole file — design note: [architecture/APPLY_PATCH_TOOL.md](architecture/APPLY_PATCH_TOOL.md)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
 - [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
 - [x] Task-board tools: engineers add newly discovered work with `add_task` (pending, next sequence — the supervisor merges and schedules it in the same run) and skip unnecessary pending tasks with `update_task_status` (skipped-only; refuses when unfinished work depends on the task) — design note: [architecture/TASK_BOARD_TOOLS.md](architecture/TASK_BOARD_TOOLS.md)
@@ -263,6 +263,21 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · The apply_patch tool: engineers no longer rewrite a whole
+  file for a two-line fix. The long-declared name is now bound — a unified
+  diff goes through two jails (every path in the diff through
+  `resolve_inside` before git ever sees it, then `git apply`'s own
+  outside-the-tree refusal), a `--check` dry run makes application
+  all-or-nothing, prefix detection accepts both `a/ b/` and bare-path
+  diffs, and `--ignore-whitespace` absorbs the whitespace drift models
+  introduce. A context mismatch returns guidance the model can act on
+  (re-read, regenerate) instead of a stack trace; no fuzzy or three-way
+  application by design — that is how silent corruption ships. write_file
+  stays for new and small files; the offline pipeline is untouched. The
+  schema teaches the model when to prefer which. Design note:
+  architecture/APPLY_PATCH_TOOL.md. Engine 381 passed, 1 skipped (6 new
+  tests: both prefix styles, file creation, jail escape refused, mismatch
+  guidance, non-diff rejected); web untouched.
 - 2026-07-17 · Child-table row-level security: the last tables guarded only
   by convention now carry policies of their own. All ten children —
   `messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`,
