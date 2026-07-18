@@ -23,7 +23,8 @@ flowchart LR
     A --> C[get_session peeks at the\nsame token and pins the\nsession to its subject]
     C --> D[after_begin hook:\nSET app.user_id\nper transaction]
     D --> E[(Postgres policies:\nrow visible only when\nowner = app.user_id)]
-    F[runner, webhooks,\nmigrations — no JWT] -->|no pin, GUC unset| G[(unset context =\ntrusted service,\ntoday's behavior)]
+    F[runner, webhooks,\nmigrations — no JWT] -->|session_scope sets\napp.service = 1| G[(explicit service\ncontext: full access)]
+    H[no context at all —\na forgotten pin] --> X[(zero rows,\ndeny by default)]
 ```
 
 - **Policies live on the five tables that carry ownership directly** —
@@ -71,13 +72,30 @@ targeting them by primary key, and gets a policy violation when inserting a
 row that claims to belong to A. And the full existing suite stays green,
 proving no code path silently depended on cross-user reads.
 
+## Deny by default *(added 2026-07-17)*
+
+The original slice trusted an *unset* context: a session that never pinned
+saw everything. That kept internal paths working but meant a forgotten pin
+was a silent leak. The policies now require an explicit assertion:
+
+- **API sessions** pin `app.user_id` (+ `app.org_id`) as before.
+- **Internal paths** — the runner, webhooks, workers, backups — go through
+  `session_scope()`, which now sets `app.service='1'`: the explicit service
+  context. The alembic connection asserts it too, so data migrations work.
+- **A session with neither** — a raw connection outside the helpers, the
+  exact shape of a forgotten pin — reads zero rows, updates zero rows even
+  by primary key, and cannot insert. Forgetting context is loud, not a leak.
+
+`pg_restore` keeps working because policies are recreated *after* the data
+loads (post-data section) — proven by the restore-from-a-real-dump test.
+
 ## Honest boundaries
 
-- **Unset context is trusted.** A session that never pins sees everything —
-  that keeps the runner, webhooks, and migrations working unchanged, but it
-  means RLS guards the API seam, not a compromised engine process. True
-  deny-by-default needs a separate, non-owner database role for the API and
-  an explicit service context for internal paths — logged in the backlog.
+- **The service flag guards against our own bugs, not a database attacker.**
+  Anyone who can already run arbitrary SQL on the connection can also run
+  `set_config('app.service','1',…)`. True privilege separation needs a
+  separate, non-owner database role for the API with no policy escape hatch
+  — that remains on the backlog as its own slice.
 - **Child tables are guarded through their parents.** `messages`,
   `agent_tasks`, `agent_events`, `code_chunks`, `work_items` carry no
   ownership column; the API reaches them only after an owner check on the

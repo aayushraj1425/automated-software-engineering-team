@@ -96,14 +96,46 @@ async def test_pinned_session_cannot_insert_rows_for_someone_else(prepared_db):
             await session.commit()
 
 
-async def test_unpinned_session_is_the_trusted_internal_context(prepared_db):
-    """The runner, webhooks, and migrations set no pin and see everything —
-    the documented boundary (design note: 'unset context is trusted')."""
+async def test_session_scope_asserts_the_explicit_service_context(prepared_db):
+    """The runner, webhooks, and workers go through session_scope(), which
+    sets app.service='1' — the *explicit* internal context that sees
+    everything. (Unset context is no longer trusted — see the deny test.)"""
     alice, bob = await _seed_two_owners("svc")
 
     async with session_scope() as session:
         owners = (await session.execute(select(Repository.owner_id))).scalars().all()
     assert alice in owners and bob in owners
+
+
+async def test_a_session_with_no_context_is_denied_everything(prepared_db):
+    """Deny by default: a raw session outside the engine's helpers — the
+    shape of a forgotten pin — reads zero rows, updates zero rows even by
+    primary key, and cannot insert."""
+    from sqlalchemy.exc import ProgrammingError as _ProgrammingError
+
+    from engine.db.session import get_sessionmaker
+
+    alice, bob = await _seed_two_owners("deny")
+    async with session_scope() as session:
+        target_id = (
+            await session.execute(select(Repository.id).where(Repository.owner_id == alice))
+        ).scalar_one()
+
+    async with get_sessionmaker()() as bare:  # no pin, no service flag
+        owners = (await bare.execute(select(Repository.owner_id))).scalars().all()
+        assert owners == []
+
+        result = await bare.execute(
+            text("UPDATE repositories SET status = 'tampered' WHERE id = :id"),
+            {"id": target_id},
+        )
+        await bare.commit()
+        assert getattr(result, "rowcount", None) == 0
+
+    async with get_sessionmaker()() as bare:
+        bare.add(Repository(owner_id=bob, url="https://github.com/deny/insert"))
+        with pytest.raises(_ProgrammingError, match="row-level security policy"):
+            await bare.commit()
 
 
 async def test_pin_survives_a_mid_request_commit(prepared_db):

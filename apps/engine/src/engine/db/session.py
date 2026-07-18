@@ -21,6 +21,7 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 _RLS_USER_KEY = "rls_user_id"
 _RLS_ORG_KEY = "rls_org_id"
+_RLS_SERVICE_KEY = "rls_service"
 
 
 def get_engine() -> AsyncEngine:
@@ -50,6 +51,14 @@ def bind_session_to_user(session: AsyncSession, user_id: str, org_id: str | None
     session.info[_RLS_ORG_KEY] = org_id
 
 
+def bind_session_to_service(session: AsyncSession) -> None:
+    """The explicit internal context (runner, webhooks, workers): every
+    transaction sets ``app.service='1'`` and the policies open fully. Since
+    deny-by-default (db/rls.py), a session that binds *neither* a user nor
+    the service sees zero rows — forgetting context is loud, not a leak."""
+    session.info[_RLS_SERVICE_KEY] = True
+
+
 @event.listens_for(Session, "after_begin")
 def _apply_rls_context(
     session: Session, transaction: SessionTransaction, connection: Connection
@@ -63,6 +72,8 @@ def _apply_rls_context(
         org_id: Any = session.info.get(_RLS_ORG_KEY)
         if org_id:
             connection.exec_driver_sql("SELECT set_config('app.org_id', %s, true)", (org_id,))
+    elif session.info.get(_RLS_SERVICE_KEY):
+        connection.exec_driver_sql("SELECT set_config('app.service', '1', true)")
 
 
 @asynccontextmanager
@@ -73,11 +84,15 @@ async def session_scope(
     inside streaming generators — FastAPI tears down yield-dependencies before
     a StreamingResponse body finishes. Pass ``user_id`` to pin the session to
     that user's rows (plus ``org_id`` for the active organization's shared
-    rows); without it the session runs in the trusted internal context (see
-    bind_session_to_user)."""
+    rows); without it the session asserts the explicit service context — this
+    function is the documented entry point for internal work (the runner,
+    webhooks, workers), and only sessions created outside these helpers end
+    up with no context at all (which, under deny-by-default, see nothing)."""
     async with get_sessionmaker()() as session:
         if user_id is not None:
             bind_session_to_user(session, user_id, org_id)
+        else:
+            bind_session_to_service(session)
         yield session
 
 

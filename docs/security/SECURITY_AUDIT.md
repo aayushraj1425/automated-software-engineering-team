@@ -31,7 +31,7 @@ flowchart LR
 | 4 | Clone/push URL hygiene | User-controlled repository URLs cannot become code execution or leak tokens | `engine/workspace/manager.py:40` — only `https://` or existing local paths reach `git clone`, always after `--`; push errors scrub the GitHub token before logs/UI (`manager.py:143`) | **Holds** |
 | 5 | Sandbox isolation | Agent-written code runs its tests with no network, bounded memory/CPU, on a *copy* of the workspace | `engine/sandbox/runner.py` — `docker network disconnect` before the test phase, `--memory`/`--cpus` flags, copy-not-mount; install phase runs with network on **by design** (package downloads) | **Holds** (accepted: install phase is online) |
 | 6 | Secrets at rest | BYO provider keys and integration configs are ciphertext in the database; the API never returns a stored secret | `engine/security/crypto.py` — AES-GCM, random nonce, authenticated; `api/provider_keys.py` returns `last4` only | **Holds**, with finding 2 on the dev key fallback |
-| 7 | Row-level security | Postgres refuses a pinned session another user's rows; the engine role is NOSUPERUSER | audited in its own slice — [ROW_LEVEL_SECURITY.md](../architecture/ROW_LEVEL_SECURITY.md); suite runs under FORCE RLS; superuser fails the suite loudly | **Holds** (known boundary: unset context is trusted — logged) |
+| 7 | Row-level security | Postgres refuses a pinned session another user's rows; the engine role is NOSUPERUSER | audited in its own slice — [ROW_LEVEL_SECURITY.md](../architecture/ROW_LEVEL_SECURITY.md); suite runs under FORCE RLS; superuser fails the suite loudly | **Holds** (2026-07-17: deny-by-default closed the unset-context boundary; a non-owner API role remains logged) |
 | 8 | Rate limiting | Per-caller token bucket keyed by the *verified* JWT subject, IP fallback, 429 + `Retry-After` | `engine/ratelimit.py`; off by default | **Holds** (known: per-replica buckets — logged) |
 | 9 | PR gates | The secrets scanner and dependency scanner block a run's pull request | Phase 3 exit criteria; `engine/security/secrets_scanner.py`, `dependency_scanner.py` and their tests | **Holds** |
 | 10 | CORS | Only configured origins may call the engine from a browser context | `engine/main.py` — explicit `ENGINE_CORS_ORIGINS` list, no wildcard | **Holds** (defence in depth — browsers shouldn't reach the engine at all) |
@@ -62,8 +62,13 @@ flowchart LR
 
 - Sandbox dependency-install phase runs with the network on; tests run with
   it off (the design's stated contract).
-- Unset RLS context is the trusted internal path (runner, webhooks,
-  migrations) — true deny-by-default is a logged follow-up.
+- ~~Unset RLS context is the trusted internal path~~ — **closed 2026-07-17**:
+  the policies now deny a context-free session outright; internal paths
+  assert an explicit `app.service` context via `session_scope()`
+  ([ROW_LEVEL_SECURITY.md](../architecture/ROW_LEVEL_SECURITY.md)). The
+  remaining, narrower boundary: a database attacker who can run arbitrary
+  SQL can set the flag themselves — a separate non-owner API role stays on
+  the backlog.
 - Rate-limit buckets are per replica until the Redis-backed shared window.
 - BFF→engine mTLS/NetworkPolicy waits for a real cluster rollout (ADR-0002
   debt, logged).

@@ -37,6 +37,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # Migrations run in the explicit service context: under deny-by-default
+    # row-level security (engine/db/rls.py) a data migration would otherwise
+    # read and write zero rows. Session-scoped (false), so it lasts for every
+    # migration on this connection.
+    connection.exec_driver_sql("SELECT set_config('app.service', '1', false)")
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()

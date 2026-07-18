@@ -1,11 +1,13 @@
 """Row-level security: Postgres itself refuses to leak another user's rows.
 
-The policy on each ownership-carrying table makes a row visible and writable
-only when the transaction-local ``app.user_id`` setting matches the owner
-column — or when the setting is unset, the trusted internal context (the
-runner, webhooks, migrations), which behaves exactly as before RLS existed.
-``FORCE`` matters: the engine connects as the table owner, and owners bypass
-RLS without it.
+Deny by default: a session sees a row only when it asserts a context — the
+transaction-local ``app.user_id`` matching the owner column (API sessions),
+or the explicit ``app.service`` flag the internal entry point sets (the
+runner, webhooks, workers, migrations — everything that goes through
+``session_scope()`` without a user). A session that asserts *nothing* — a
+forgotten pin, a connection outside the helpers — reads and writes zero
+rows instead of everything. ``FORCE`` matters: the engine connects as the
+table owner, and owners bypass RLS without it.
 
 Org-shared tables (repositories, agent_runs) additionally open a row to
 sessions whose ``app.org_id`` — the JWT's membership-checked active
@@ -39,9 +41,10 @@ ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs"})
 
 
 def _policy_predicate(table: str, owner_column: str) -> str:
-    """Visible when: trusted context, owner, or (shared tables) active org."""
+    """Visible when: explicit service context, owner, or (shared tables) the
+    active org. No context at all sees nothing — deny by default."""
     predicate = f"""
-                NULLIF(current_setting('app.user_id', true), '') IS NULL
+                current_setting('app.service', true) = '1'
                 OR {owner_column} = current_setting('app.user_id', true)"""
     if table in ORG_SHARED_TABLES:
         predicate += """
@@ -61,9 +64,9 @@ def rls_statements() -> list[str]:
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
             f"DROP POLICY IF EXISTS {table}_owner_rows ON {table}",
-            # Unset (NULL or empty) app.user_id = trusted internal context;
-            # set = the owner's rows plus the active organization's shared
-            # rows, for reads and writes alike.
+            # app.service='1' = the explicit internal context; app.user_id =
+            # the owner's rows plus the active organization's shared rows,
+            # for reads and writes alike. Neither set = zero rows.
             f"""
             CREATE POLICY {table}_owner_rows ON {table} FOR ALL
             USING ({predicate}

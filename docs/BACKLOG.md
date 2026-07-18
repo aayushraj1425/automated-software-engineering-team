@@ -229,7 +229,8 @@ phase (alerting, benchmarks, K8s probes) leans on.
 ### Workstream: RBAC & Row-Level Security
 - [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
 - [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)
-- [ ] True deny-by-default: a separate non-owner database role for the API and an explicit service context for internal paths (unset context is currently trusted)
+- [x] Deny-by-default policies with an explicit service context: a session that asserts neither a user pin nor `app.service='1'` reads and writes zero rows; `session_scope()` is the documented internal entry point and the alembic connection asserts the context for data migrations — a forgotten pin is now loud, not a leak
+- [ ] Separate non-owner database role for the API (the service flag guards against our own bugs; an attacker with raw SQL can set it — role separation removes that escape hatch)
 - [ ] Subquery policies for the child tables (`messages`, `agent_tasks`, `agent_events`, `code_chunks`, `work_items`) — today they are guarded through their parents at the API layer
 
 ### Workstream: Deploy
@@ -262,6 +263,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-17 · Row-level security is now deny-by-default: the audit's
+  biggest accepted boundary — "unset context is trusted" — is closed. The
+  policies require an explicit assertion: API sessions pin `app.user_id`
+  (+ `app.org_id`) as before, internal paths get `app.service='1'` set by
+  `session_scope()` (the documented entry point the runner, webhooks, and
+  workers already use — zero call-site churn), and the alembic connection
+  asserts the context so data migrations keep working. A session with no
+  context at all — the exact shape of a forgotten pin — reads zero rows,
+  updates zero rows even by primary key, and cannot insert; forgetting
+  context is loud, not a leak. `pg_restore` still works because policies
+  are recreated after the data loads (proven by the restore-from-a-real-
+  dump test in the suite). Honest boundary kept: the flag guards against
+  our own bugs, not a database attacker who can run arbitrary SQL — the
+  separate non-owner API role stays on the backlog as its own item.
+  Migration `0018_rls_deny_by_default` (downgrade restores 0017's
+  trusted-unset policies); audit report and design note updated in place.
+  Engine 371 passed, 1 skipped; web untouched.
 - 2026-07-17 · Bitbucket as the third source host, behind the seam GitLab
   cut: `parse_bitbucket_repo` recognizes `bitbucket.org/workspace/repo`,
   the settings page connects a username + app password (encrypted at rest,
