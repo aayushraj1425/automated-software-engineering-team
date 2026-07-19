@@ -173,6 +173,30 @@ def _rows_for(user_id: str) -> tuple[Repository, list]:
     ]
 
 
+async def test_the_api_role_cannot_claim_the_service_context(prepared_db):
+    """Privilege separation: the service clause requires the *role*, not just
+    the GUC — an attacker with raw SQL on an API session who sets
+    app.service='1' still reads zero rows. The service engine (the owner
+    role) with the same GUC sees everything, proving the clause splits on
+    the role alone."""
+    from engine.config import get_settings
+    from engine.db.session import get_api_sessionmaker
+
+    assert get_settings().database_url_api, "the suite runs in two-role mode"
+    alice, bob = await _seed_two_owners("role")
+
+    async with get_api_sessionmaker()() as session:  # connected as asep_api
+        who = (await session.execute(text("SELECT current_user"))).scalar_one()
+        assert who == "asep_api"
+        await session.execute(text("SELECT set_config('app.service', '1', true)"))
+        owners = (await session.execute(select(Repository.owner_id))).scalars().all()
+        assert owners == []  # the flag alone is worthless to the wrong role
+
+    async with session_scope() as session:  # the owner role, same flag
+        owners = (await session.execute(select(Repository.owner_id))).scalars().all()
+    assert alice in owners and bob in owners
+
+
 # ── Child tables: visible exactly when the parent is ────────────────────────
 
 

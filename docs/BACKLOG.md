@@ -230,7 +230,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
 - [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)
 - [x] Deny-by-default policies with an explicit service context: a session that asserts neither a user pin nor `app.service='1'` reads and writes zero rows; `session_scope()` is the documented internal entry point and the alembic connection asserts the context for data migrations — a forgotten pin is now loud, not a leak
-- [ ] Separate non-owner database role for the API (the service flag guards against our own bugs; an attacker with raw SQL can set it — role separation removes that escape hatch)
+- [x] Separate non-owner database role for the API: the policies' service clause requires *being* the `asep` role, and user-pinned sessions connect as the DML-only `asep_api` (`DATABASE_URL_API`) — an attacker with raw SQL on an API session cannot claim the service context or touch a policy; the whole test suite runs in two-role mode
 - [x] Subquery policies for the child tables — all ten (`messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`, `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, `generated_documents`) are now visible exactly when their parent row is, via an `EXISTS` that runs under the parent's own policy; org sharing flows through automatically and retrieval latency is unchanged
 
 ### Workstream: Deploy
@@ -263,6 +263,25 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-19 · The non-owner API database role — the RLS story's final
+  piece, closing the audit's last logged boundary. The policies' service
+  clause now requires *being* the service role, not just setting a GUC:
+  `app.service='1' AND current_user='asep'`. User-pinned sessions (the
+  request dependency and `session_scope(user_id=…)`) connect as `asep_api`
+  when `DATABASE_URL_API` is set — a plain NOSUPERUSER login role with
+  DML-only grants that cannot drop or disable a policy and gains nothing
+  from the flag; an attacker with raw SQL on an API session is confined to
+  the pinned user's rows, full stop. Proven directly: an `asep_api`
+  session that sets the flag reads zero rows while the owner role with the
+  same flag reads everything. Operationally seamless: fresh volumes create
+  the role (postgres-init), CI creates it beside `asep`, the *entire test
+  suite now runs in two-role mode* (conftest creates the role and routes
+  every pinned session through it — 400+ existing tests re-verify the
+  separation for free), migration `0022` applies grants (skipped quietly
+  without the role — single-role mode keeps working), and `.env.example`
+  documents the second URL. Design note: architecture/ROW_LEVEL_SECURITY.md
+  (privilege separation); audit updated in place. Engine 403 passed,
+  1 skipped; web untouched.
 - 2026-07-19 · The in-browser terminal — the last Phase 6 item, and the
   phase is complete. A command console, not a PTY: one command in, its
   output back, on finished runs only (the same 409 as every write panel).

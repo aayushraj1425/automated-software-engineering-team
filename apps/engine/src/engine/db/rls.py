@@ -29,6 +29,18 @@ Design note: docs/architecture/ROW_LEVEL_SECURITY.md.
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+# Privilege separation: the owner role (the runner, workers, migrations —
+# everything internal) and the non-owner role user-pinned API sessions
+# connect as when DATABASE_URL_API is set. The service clause below requires
+# *being* the service role, so the API role gains nothing by setting the
+# app.service GUC — and as a non-owner it cannot drop or disable a policy.
+SERVICE_ROLE = "asep"
+API_ROLE = "asep_api"
+
+_SERVICE_CONTEXT = (
+    f"(current_setting('app.service', true) = '1' AND current_user = '{SERVICE_ROLE}')"
+)
+
 # Table → the column naming the owning better-auth user.
 USER_OWNED_TABLES: dict[str, str] = {
     "repositories": "owner_id",
@@ -63,10 +75,10 @@ ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs", "pr
 
 
 def _policy_predicate(table: str, owner_column: str) -> str:
-    """Visible when: explicit service context, owner, or (shared tables) the
-    active org. No context at all sees nothing — deny by default."""
+    """Visible when: explicit service context (flag AND role), owner, or
+    (shared tables) the active org. No context sees nothing."""
     predicate = f"""
-                current_setting('app.service', true) = '1'
+                {_SERVICE_CONTEXT}
                 OR {owner_column} = current_setting('app.user_id', true)"""
     if table in ORG_SHARED_TABLES:
         predicate += """
@@ -81,7 +93,7 @@ def _child_predicate(parent: str, fk_column: str) -> str:
     """Visible when: explicit service context, or the parent row is visible
     to this session (the subquery runs under the parent's own policy)."""
     return f"""
-                current_setting('app.service', true) = '1'
+                {_SERVICE_CONTEXT}
                 OR EXISTS (
                     SELECT 1 FROM {parent} parent WHERE parent.id = {fk_column}
                 )"""
@@ -142,7 +154,33 @@ def rls_teardown_statements() -> list[str]:
     return statements
 
 
+def api_role_grants() -> list[str]:
+    """DML-only grants for the API role, runnable by the owner. No DDL, no
+    ownership — the API role cannot drop a policy or disable RLS, and the
+    role check in the service clause makes the GUC worthless to it. Grants
+    are skipped quietly when the role does not exist (single-role mode)."""
+    grants = [
+        f"GRANT USAGE ON SCHEMA public TO {API_ROLE}",
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {API_ROLE}",
+        f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {API_ROLE}",
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {API_ROLE}",
+        f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {API_ROLE}",
+    ]
+    body = "\n".join(f"        EXECUTE '{grant}';" for grant in grants)
+    return [
+        f"""
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{API_ROLE}') THEN
+{body}
+            END IF;
+        END $$
+        """
+    ]
+
+
 async def apply_row_level_security(conn: AsyncConnection) -> None:
-    """Apply the policies over an open connection (tests, tooling)."""
-    for statement in rls_statements():
+    """Apply the policies (and API-role grants) over an open connection
+    (tests, tooling)."""
+    for statement in rls_statements() + api_role_grants():
         await conn.exec_driver_sql(statement)

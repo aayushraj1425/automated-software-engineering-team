@@ -89,13 +89,31 @@ was a silent leak. The policies now require an explicit assertion:
 `pg_restore` keeps working because policies are recreated *after* the data
 loads (post-data section) — proven by the restore-from-a-real-dump test.
 
-## Honest boundaries
+## Privilege separation *(added 2026-07-19)*
 
-- **The service flag guards against our own bugs, not a database attacker.**
-  Anyone who can already run arbitrary SQL on the connection can also run
-  `set_config('app.service','1',…)`. True privilege separation needs a
-  separate, non-owner database role for the API with no policy escape hatch
-  — that remains on the backlog as its own slice.
+The last escape hatch is closed. The service clause now requires **being
+the service role**, not just setting a GUC:
+
+    app.service = '1'  AND  current_user = 'asep'
+
+- **Two roles.** `asep` (the owner) runs everything internal — the runner,
+  workers, migrations, backups. `asep_api` is a plain NOSUPERUSER login
+  role with DML-only grants; when `DATABASE_URL_API` is set, every
+  user-pinned session (the request dependency and `session_scope(user_id=…)`)
+  connects as it.
+- **What the API role cannot do:** drop or disable a policy (not the owner,
+  no DDL), and claim the service context — `set_config('app.service','1')`
+  on an API connection changes nothing, because the role check fails. An
+  attacker with raw SQL on an API session is confined to the pinned user's
+  rows, full stop.
+- **Operationally:** fresh compose volumes create the role
+  (`postgres-init`), CI creates it beside `asep`, the test suite creates it
+  and runs *entirely* in two-role mode, and migration `0022` applies the
+  grants (skipped quietly when the role is absent — single-role mode keeps
+  working, just without the separation). Existing dev volumes run the one
+  `CREATE ROLE` line from the init script once.
+
+## Honest boundaries
 - **Child tables carry their own policies** *(closed 2026-07-17)* —
   `messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`,
   `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, and

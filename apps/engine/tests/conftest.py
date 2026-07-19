@@ -8,6 +8,13 @@ import time
 os.environ["LLM_FAKE"] = "1"
 os.environ["ENGINE_SERVICE_SECRET"] = "test-service-secret-0123456789abcdef"
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://asep:asep@localhost:5433/asep_test")
+# The whole suite runs in two-role mode: user-pinned sessions connect as the
+# non-owner asep_api role (created in _ensure_test_database), so every
+# owner-scoped test also exercises the privilege separation (db/rls.py).
+os.environ.setdefault(
+    "DATABASE_URL_API",
+    os.environ["DATABASE_URL"].replace("//asep:asep@", "//asep_api:asep_api@"),
+)
 # Tests must never reach the real Docker daemon; sandbox tests opt back in
 # with a monkeypatched settings object and a fake docker call.
 os.environ["SANDBOX_ENABLED"] = "0"
@@ -59,6 +66,20 @@ def _ensure_test_database() -> None:
         row = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,)).fetchone()
         if row is None:
             conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname)))
+    _ensure_api_role(base)
+
+
+def _ensure_api_role(base: str) -> None:
+    """Create the non-owner asep_api role (needs the postgres superuser —
+    the same credentials compose and CI both bootstrap with)."""
+    hostport = base.rpartition("@")[2]
+    superuser = os.environ.get(
+        "POSTGRES_SUPERUSER_URL", f"postgresql://postgres:postgres@{hostport}/postgres"
+    )
+    with psycopg.connect(superuser, autocommit=True) as conn:
+        row = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = 'asep_api'").fetchone()
+        if row is None:
+            conn.execute("CREATE ROLE asep_api LOGIN PASSWORD 'asep_api' NOSUPERUSER")
 
 
 @pytest.fixture(scope="session")

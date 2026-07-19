@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "postgresql+psycopg://asep:asep@localhost:5433/asep"
+    # Privilege separation (ROW_LEVEL_SECURITY.md): user-pinned sessions
+    # connect as a non-owner role that cannot touch policies or claim the
+    # service context. Empty = single-role mode (everything on database_url).
+    database_url_api: str = ""
     redis_url: str = "redis://localhost:6379/0"
 
     engine_service_secret: str = "dev-only-service-secret-change-me-00"

@@ -18,6 +18,8 @@ from engine.config import get_settings
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+_api_engine: AsyncEngine | None = None
+_api_sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 _RLS_USER_KEY = "rls_user_id"
 _RLS_ORG_KEY = "rls_org_id"
@@ -36,6 +38,22 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     get_engine()
     assert _sessionmaker is not None
     return _sessionmaker
+
+
+def get_api_sessionmaker() -> async_sessionmaker[AsyncSession]:
+    """Sessions for user-pinned work. With DATABASE_URL_API set they connect
+    as the non-owner API role — which cannot drop a policy, disable RLS, or
+    claim the service context (the policies check the role, not just the
+    GUC — db/rls.py). Without it, single-role mode: the service engine."""
+    global _api_engine, _api_sessionmaker
+    url = get_settings().database_url_api
+    if not url:
+        return get_sessionmaker()
+    if _api_engine is None:
+        _api_engine = create_async_engine(url, pool_pre_ping=True)
+        _api_sessionmaker = async_sessionmaker(_api_engine, expire_on_commit=False)
+    assert _api_sessionmaker is not None
+    return _api_sessionmaker
 
 
 def bind_session_to_user(session: AsyncSession, user_id: str, org_id: str | None = None) -> None:
@@ -88,11 +106,13 @@ async def session_scope(
     function is the documented entry point for internal work (the runner,
     webhooks, workers), and only sessions created outside these helpers end
     up with no context at all (which, under deny-by-default, see nothing)."""
-    async with get_sessionmaker()() as session:
-        if user_id is not None:
+    if user_id is not None:
+        async with get_api_sessionmaker()() as session:
             bind_session_to_user(session, user_id, org_id)
-        else:
-            bind_session_to_service(session)
+            yield session
+        return
+    async with get_sessionmaker()() as session:
+        bind_session_to_service(session)
         yield session
 
 
@@ -100,8 +120,9 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency for plain (non-streaming) endpoints. Pins the
     session to the verified bearer token's subject — the same token
     require_service_auth checks — so every route's queries are confined to
-    the caller's rows at the database level."""
-    async with get_sessionmaker()() as session:
+    the caller's rows at the database level (and, with DATABASE_URL_API,
+    run as the non-owner API role)."""
+    async with get_api_sessionmaker()() as session:
         principal = peek_principal(request)
         if principal is not None:
             bind_session_to_user(session, principal.user_id, principal.org_id)
@@ -109,8 +130,12 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 async def dispose_engine() -> None:
-    global _engine, _sessionmaker
+    global _engine, _sessionmaker, _api_engine, _api_sessionmaker
     if _engine is not None:
         await _engine.dispose()
         _engine = None
         _sessionmaker = None
+    if _api_engine is not None:
+        await _api_engine.dispose()
+        _api_engine = None
+        _api_sessionmaker = None
