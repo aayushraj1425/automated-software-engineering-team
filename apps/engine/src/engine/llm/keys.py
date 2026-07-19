@@ -10,7 +10,7 @@ docs/architecture/PROVIDER_KEYS.md.
 from contextvars import ContextVar
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.db.models import ProviderKey
@@ -24,11 +24,24 @@ ALLOWED_PROVIDERS = ("anthropic", "openai", "gemini")
 provider_keys_var: ContextVar[dict[str, str] | None] = ContextVar("provider_keys", default=None)
 
 
-async def load_provider_keys(db: AsyncSession, user_id: str) -> dict[str, str]:
-    """The user's decrypted keys, provider → plaintext. A key that no longer
-    decrypts (rotated encryption key) is skipped with a warning, never fatal."""
+async def load_provider_keys(
+    db: AsyncSession, user_id: str, org_id: str | None = None
+) -> dict[str, str]:
+    """The caller's decrypted keys, provider → plaintext.
+
+    Resolution order: the user's personal key outranks the active
+    organization's shared key, which outranks the server's `.env` key
+    (PROVIDER_KEYS.md). A key that no longer decrypts (rotated encryption
+    key) is skipped with a warning, never fatal."""
+    personal = and_(ProviderKey.user_id == user_id, ProviderKey.org_id.is_(None))
+    visible = or_(personal, ProviderKey.org_id == org_id) if org_id else personal
     rows = (
-        (await db.execute(select(ProviderKey).where(ProviderKey.user_id == user_id)))
+        (
+            await db.execute(
+                # Org keys first, personal second — later dict writes win.
+                select(ProviderKey).where(visible).order_by(ProviderKey.org_id.is_(None))
+            )
+        )
         .scalars()
         .all()
     )

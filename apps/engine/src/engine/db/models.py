@@ -18,6 +18,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -327,18 +328,36 @@ class WorkItem(Base, TimestampMixin):
 
 
 class ProviderKey(Base, TimestampMixin):
-    """One user's encrypted LLM provider key (bring-your-own keys).
+    """One encrypted LLM provider key (bring-your-own keys).
 
-    Only the AES-GCM ciphertext and the last four characters (for the settings
-    page) are stored — the plaintext key exists in memory only, decrypted at a
-    request or run's entry point and carried to the ModelRouter by a context
-    variable."""
+    Personal (`org_id` NULL, one per user+provider) or shared with an
+    organization (`org_id` set, one per org+provider — the partial unique
+    indexes live in migration 0021). Only the AES-GCM ciphertext and the
+    last four characters (for the settings page) are stored — the plaintext
+    key exists in memory only, decrypted at a request or run's entry point
+    and carried to the ModelRouter by a context variable."""
 
     __tablename__ = "provider_keys"
-    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_provider_keys_user"),)
+    __table_args__ = (
+        Index(
+            "uq_provider_keys_user",
+            "user_id",
+            "provider",
+            unique=True,
+            postgresql_where=text("org_id IS NULL"),
+        ),
+        Index(
+            "uq_provider_keys_org",
+            "org_id",
+            "provider",
+            unique=True,
+            postgresql_where=text("org_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)  # owner or contributor
+    org_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     provider: Mapped[str] = mapped_column(String(32))  # anthropic | openai | gemini
     encrypted_key: Mapped[str] = mapped_column(Text)
     last4: Mapped[str] = mapped_column(String(8))

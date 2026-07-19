@@ -53,6 +53,7 @@ async def test_set_list_delete_a_key(client):
         "provider": "anthropic",
         "last4": "1234",
         "updated_at": resp.json()["updated_at"],
+        "shared": False,
     }
 
     listed = (await client.get("/v1/provider-keys", headers=headers)).json()
@@ -105,6 +106,87 @@ async def test_keys_are_owner_scoped(client):
 
 
 # ── Resolution: the caller's key reaches the model call ─────────────────────
+
+
+# ── Organization-shared keys ─────────────────────────────────────────────────
+
+
+def _org_ids() -> tuple[str, str, str]:
+    tag = uuid.uuid4().hex[:8]
+    return f"alice_{tag}", f"bob_{tag}", f"org_{tag}"
+
+
+async def test_shared_key_is_visible_to_and_replaceable_by_members(client):
+    alice, bob, org = _org_ids()
+
+    resp = await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-team-key-1234", "share_with_organization": True},
+        headers=auth_headers(alice, org_id=org),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["shared"] is True
+
+    # Bob sees the team key with the org active, and not without it.
+    with_org = (await client.get("/v1/provider-keys", headers=auth_headers(bob, org_id=org))).json()
+    assert [(k["provider"], k["shared"], k["last4"]) for k in with_org] == [
+        ("anthropic", True, "1234")
+    ]
+    without_org = (await client.get("/v1/provider-keys", headers=auth_headers(bob))).json()
+    assert without_org == []
+
+    # Any member may replace it — one org key per provider, last write wins.
+    resp = await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-team-key-5678", "share_with_organization": True},
+        headers=auth_headers(bob, org_id=org),
+    )
+    assert resp.json()["last4"] == "5678"
+    listed = (await client.get("/v1/provider-keys", headers=auth_headers(alice, org_id=org))).json()
+    assert [k["last4"] for k in listed if k["shared"]] == ["5678"]
+
+    # And any member may remove it.
+    resp = await client.delete(
+        "/v1/provider-keys/anthropic?shared=true", headers=auth_headers(bob, org_id=org)
+    )
+    assert resp.status_code == 204
+
+
+async def test_sharing_needs_an_active_organization(client):
+    resp = await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-lonely-key", "share_with_organization": True},
+        headers=_headers(),
+    )
+    assert resp.status_code == 400
+    assert "active organization" in resp.json()["detail"]
+
+
+async def test_personal_and_shared_keys_coexist_and_personal_wins(client):
+    """Resolution order: personal → organization → .env (PROVIDER_KEYS.md)."""
+    from engine.llm.keys import load_provider_keys
+
+    alice, bob, org = _org_ids()
+    await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-team-key-1234", "share_with_organization": True},
+        headers=auth_headers(alice, org_id=org),
+    )
+    await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-bobs-own-key"},
+        headers=auth_headers(bob, org_id=org),
+    )
+
+    # Bob's list shows both rows; resolution prefers his own key.
+    listed = (await client.get("/v1/provider-keys", headers=auth_headers(bob, org_id=org))).json()
+    assert sorted(k["shared"] for k in listed) == [False, True]
+    async with session_scope() as db:
+        assert (await load_provider_keys(db, bob, org))["anthropic"] == "sk-ant-bobs-own-key"
+        # Alice has no personal key — the team key applies for her…
+        assert (await load_provider_keys(db, alice, org))["anthropic"] == "sk-ant-team-key-1234"
+        # …but only while that organization is active.
+        assert "anthropic" not in await load_provider_keys(db, alice)
 
 
 def test_api_key_for_model_prefers_the_callers_key():

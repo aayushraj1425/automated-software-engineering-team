@@ -123,7 +123,7 @@ async def chat(
             history = [{"role": "system", "content": preamble}, *history]
         # The caller's own provider keys, for the streamed model call below
         # (PROVIDER_KEYS.md); no keys means the .env keys apply.
-        user_keys = await load_provider_keys(db, principal.user_id)
+        user_keys = await load_provider_keys(db, principal.user_id, principal.org_id)
         await db.commit()
 
     structlog.contextvars.bind_contextvars(

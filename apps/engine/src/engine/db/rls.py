@@ -56,8 +56,10 @@ CHILD_TABLES: dict[str, tuple[str, str]] = {
 }
 
 # The subset whose rows the active organization shares. Every table here
-# carries a nullable ``org_id`` column stamped at creation time.
-ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs"})
+# carries a nullable ``org_id`` column. For provider keys the org clause
+# opens *explicitly shared* keys only — personal keys have org_id NULL and
+# stay behind the owner clause (PROVIDER_KEYS.md).
+ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs", "provider_keys"})
 
 
 def _policy_predicate(table: str, owner_column: str) -> str:

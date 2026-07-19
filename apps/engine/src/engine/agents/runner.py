@@ -202,7 +202,7 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         request = run.request
         # The run owner's provider keys ride this task's context to the
         # ModelRouter (PROVIDER_KEYS.md); no keys means the .env keys apply.
-        provider_keys_var.set(await load_provider_keys(session, run.user_id))
+        provider_keys_var.set(await load_provider_keys(session, run.user_id, run.org_id))
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
@@ -285,7 +285,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         branch = run.branch_name or ""
         base_sha = run.base_sha or ""
         # The run owner's provider keys, for every model call this task makes.
-        provider_keys_var.set(await load_provider_keys(session, run.user_id))
+        provider_keys_var.set(await load_provider_keys(session, run.user_id, run.org_id))
         rows = (
             (
                 await session.execute(

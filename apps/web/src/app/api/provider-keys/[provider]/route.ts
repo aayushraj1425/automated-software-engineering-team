@@ -43,8 +43,10 @@ export async function DELETE(
   }
   const { provider } = await params;
   const token = await signServiceToken(session);
+  // Forward the shared flag so the org's key (not the personal one) is removed.
+  const shared = new URL(req.url).searchParams.get("shared") === "true";
   const upstream = await fetch(
-    `${env.ENGINE_URL}/v1/provider-keys/${encodeURIComponent(provider)}`,
+    `${env.ENGINE_URL}/v1/provider-keys/${encodeURIComponent(provider)}${shared ? "?shared=true" : ""}`,
     { method: "DELETE", headers: { authorization: `Bearer ${token}` } },
   );
   if (upstream.status === 204) {

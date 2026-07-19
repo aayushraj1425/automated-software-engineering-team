@@ -263,6 +263,26 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-19 · Organization-shared provider keys: a team no longer needs
+  every member to paste the same key. Sharing is opt-in per key — a secret
+  is never shared by default: the settings page gained a "share with your
+  active organization" checkbox, `PUT /v1/provider-keys/{provider}` takes
+  `share_with_organization` (400 without an active org), and
+  `DELETE ?shared=true` removes the team key. One org key per
+  (organization, provider) and one personal key per (user, provider) —
+  partial unique indexes replace the old constraint (migration `0021`,
+  which also gives `provider_keys` the org-shared RLS policy, so Postgres
+  itself scopes a shared key to whoever has that organization active).
+  Resolution order: personal → organization → `.env` — your own key
+  always outranks the team's — carried by the JWT's `org` claim at the
+  API entry points and the run's own `org_id` in the runner. Members are
+  equal collaborators: any member sees the team key (last four + a
+  "team key" tag, never the value), replaces it, or removes it. Design
+  note: architecture/PROVIDER_KEYS.md (organization-shared keys);
+  ORGANIZATION_SHARING.md's table updated. Engine 394 passed, 1 skipped
+  (3 new tests: member visibility/replace/remove, the no-org 400, and
+  personal-beats-team resolution incl. the org-inactive fallback); web
+  20 passed.
 - 2026-07-18 · In-place plan editing, closing the approval gate's oldest
   pending note: a nearly-right plan no longer forces a reject-and-replan
   round trip. `PUT /v1/runs/{id}/plan` — only while `awaiting_approval`

@@ -378,7 +378,7 @@ async def generate_repository_roadmap(
     context = await _repository_context(db, repository_id)
     memory = format_memories(await recall_memories(db, repository_id, body.goal))
     # The caller's own provider keys for the roadmap call (PROVIDER_KEYS.md).
-    provider_keys_var.set(await load_provider_keys(db, principal.user_id))
+    provider_keys_var.set(await load_provider_keys(db, principal.user_id, principal.org_id))
     roadmap = await generate_roadmap(body.goal, context, memory)
     created = await persist_roadmap(db, repository_id, roadmap)
     return [_work_item_out(item) for item in created]

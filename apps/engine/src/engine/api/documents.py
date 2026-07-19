@@ -124,7 +124,7 @@ async def generate_repository_document(
         await recall_memories(db, repository_id, _RECALL_QUERIES[str(body.kind)])
     )
     # The caller's own provider keys for the writer call (PROVIDER_KEYS.md).
-    provider_keys_var.set(await load_provider_keys(db, principal.user_id))
+    provider_keys_var.set(await load_provider_keys(db, principal.user_id, principal.org_id))
     document = await generate_document(body.kind, file_map, code_excerpts, memory, history)
     doc = await persist_document(
         db, repository_id, body.kind, document, created_by=principal.user_id

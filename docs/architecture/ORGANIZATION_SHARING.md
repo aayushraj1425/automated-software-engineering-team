@@ -41,7 +41,8 @@ query forgets its WHERE clause — the same defense-in-depth split
 | Repositories (and everything under them: documents, knowledge, work items, search, graph) | **shared** with the active organization | connecting a repo under an org means the team works on it |
 | Agent runs (timeline, tasks, diff, files, approval) | **shared** with the active organization | the team watches — and can approve — the team's runs |
 | Conversations (chat) | personal | a chat with the assistant is a private notebook; `org_id` is recorded for the future but grants nothing |
-| Provider keys, integrations | personal | secrets stay with the person who pasted them (PROVIDER_KEYS.md boundary) |
+| Provider keys | personal by default; **explicitly shareable** *(since 2026-07-19)* | a secret is never shared automatically — the owner opts in per key, and a personal key always outranks the team's (PROVIDER_KEYS.md) |
+| Integrations | personal | secrets stay with the person who pasted them |
 
 ## Trust: where the membership check lives
 
