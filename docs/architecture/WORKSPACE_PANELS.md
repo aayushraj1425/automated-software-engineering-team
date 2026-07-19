@@ -94,8 +94,9 @@ the host; editing an in-flight run is refused.
 
 ## Boundaries (kept out)
 
-- **No terminal.** A terminal means running commands, which is the arbitrary-shell
-  boundary ADR-0008 draws at the Phase 3 sandbox; it is deliberately deferred.
+- ~~No terminal~~ — *shipped 2026-07-19 as its own slice*: a sandboxed
+  command console that goes **through** ADR-0008's boundary, not around it
+  ([IN_BROWSER_TERMINAL.md](IN_BROWSER_TERMINAL.md)).
 - **Push updates the branch, never opens a pull request.** A finished run
   either already has its PR (the push updates it) or the pipeline chose not
   to open one — that decision is not re-made by hand here.

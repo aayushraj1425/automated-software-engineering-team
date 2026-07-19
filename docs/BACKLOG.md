@@ -194,7 +194,7 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
 - [x] In-browser editor + git status/commit panel: on a *finished* run (completed/failed) a file can be edited (jailed write) and the working tree committed; editing an in-flight run is a `409` so a human write never races the agent loop
 - [x] Push a manual workspace commit back to the host: `POST /v1/runs/{id}/push` sends the run branch with the pipeline's own credential logic (GitLab connection, GitHub env token, plain otherwise), the git panel gained a Push branch button, and every push lands on the timeline as `branch.pushed` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
-- [ ] In-browser terminal wired to the Phase 3 sandbox (raises the ADR-0008 arbitrary-shell boundary — needs a security review)
+- [x] In-browser terminal wired to the Phase 3 sandbox: a command console (not a PTY) on finished runs — every command executes in a hardened session container with `--network none` from birth and the workspace *copied* in, so ADR-0008's line does not move — design note: [architecture/IN_BROWSER_TERMINAL.md](architecture/IN_BROWSER_TERMINAL.md)
 
 ### Workstream: External Integrations (planned)
 - [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md)
@@ -263,6 +263,27 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-19 · The in-browser terminal — the last Phase 6 item, and the
+  phase is complete. A command console, not a PTY: one command in, its
+  output back, on finished runs only (the same 409 as every write panel).
+  ADR-0008's line does not move — every command executes inside a session
+  container with the QA sandbox's hardening (caps dropped,
+  no-new-privileges, memory/CPU/pids limits) plus one stricter choice:
+  `--network none` from birth — the terminal has no install phase and no
+  egress, ever (installing dependencies is the pipeline sandbox's job).
+  The workspace is *copied* in, never mounted: the terminal is a scratch
+  copy, and the panel says so — edits there never reach the real files.
+  Sessions are lazy (created on the first command), persistent between
+  commands, and reaped lazily after 30 minutes or an explicit Reset; a
+  timed-out command discards the session rather than leaving it wedged;
+  containers carry `asep.terminal=1` so orphans are one docker command
+  away. `SANDBOX_ENABLED=0` or no Docker refuses with a plain-language
+  reason, never host execution. Design note:
+  architecture/IN_BROWSER_TERMINAL.md. Engine 402 passed, 1 skipped (8
+  new tests over a scripted fake docker: hardening flags asserted on the
+  actual run call, session reuse, TTL refresh, timeout reset, the
+  disabled-sandbox refusal, and the API's 409/404 guards — the auth sweep
+  covers the new routes automatically); web 20 passed.
 - 2026-07-19 · Organization-shared provider keys: a team no longer needs
   every member to paste the same key. Sharing is opt-in per key — a secret
   is never shared by default: the settings page gained a "share with your

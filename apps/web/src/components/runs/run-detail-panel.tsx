@@ -50,6 +50,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [commitMessage, setCommitMessage] = useState("");
   const [committing, setCommitting] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [terminalInput, setTerminalInput] = useState("");
+  const [terminalHistory, setTerminalHistory] = useState<
+    { command: string; output: string; exit_code: number; fresh_session: boolean }[]
+  >([]);
+  const [terminalBusy, setTerminalBusy] = useState(false);
+  const [terminalNote, setTerminalNote] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState(false);
   const [planDrafts, setPlanDrafts] = useState<
     Record<string, { title: string; description: string; drop: boolean }>
@@ -139,6 +145,41 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       setWorkspaceNote(err instanceof Error ? err.message : "Push failed");
     } finally {
       setPushing(false);
+    }
+  }
+
+  async function runTerminalCommand(e: React.FormEvent) {
+    e.preventDefault();
+    const command = terminalInput.trim();
+    if (!command || terminalBusy) return;
+    setTerminalBusy(true);
+    setTerminalNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/terminal`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ command }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.detail ?? `Command failed (${res.status})`);
+      setTerminalHistory((prev) => [...prev, { command, ...body }]);
+      setTerminalInput("");
+    } catch (err) {
+      setTerminalNote(err instanceof Error ? err.message : "Command failed");
+    } finally {
+      setTerminalBusy(false);
+    }
+  }
+
+  async function resetTerminal() {
+    setTerminalBusy(true);
+    setTerminalNote(null);
+    try {
+      await fetch(`/api/runs/${runId}/terminal`, { method: "DELETE" });
+      setTerminalHistory([]);
+      setTerminalNote("Session reset — the next command starts from a fresh copy.");
+    } finally {
+      setTerminalBusy(false);
     }
   }
 
@@ -555,6 +596,63 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               )}
             </div>
           </div>
+
+          {editable && (
+            <div className="space-y-2 rounded-md border border-zinc-800 p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-zinc-400">Terminal</h3>
+                <button
+                  type="button"
+                  onClick={() => void resetTerminal()}
+                  disabled={terminalBusy}
+                  className="text-xs text-zinc-600 hover:text-zinc-300 disabled:opacity-50"
+                >
+                  reset session
+                </button>
+              </div>
+              <p className="text-xs text-zinc-600">
+                Commands run in a sandboxed scratch copy of the workspace — no network, and
+                changes here never reach the real files.
+              </p>
+              {terminalHistory.length > 0 && (
+                <div className="max-h-80 space-y-2 overflow-auto rounded-md bg-zinc-950 p-3 font-mono text-xs">
+                  {terminalHistory.map((entry, index) => (
+                    <div key={index}>
+                      <p className="text-zinc-300">
+                        <span className="text-emerald-400">$</span> {entry.command}
+                        {entry.fresh_session && (
+                          <span className="ml-2 text-zinc-600">(fresh session)</span>
+                        )}
+                      </p>
+                      <pre className="whitespace-pre-wrap text-zinc-400">
+                        {entry.output || "(no output)"}
+                      </pre>
+                      {entry.exit_code !== 0 && (
+                        <p className="text-red-400">exit code {entry.exit_code}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={(e) => void runTerminalCommand(e)} className="flex gap-2">
+                <input
+                  value={terminalInput}
+                  onChange={(e) => setTerminalInput(e.target.value)}
+                  placeholder="e.g. python -m pytest -q, ls -la, cat README.md"
+                  spellCheck={false}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 font-mono text-xs outline-none focus:border-zinc-500"
+                />
+                <button
+                  type="submit"
+                  disabled={terminalBusy || !terminalInput.trim()}
+                  className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
+                >
+                  {terminalBusy ? "Running…" : "Run"}
+                </button>
+              </form>
+              {terminalNote && <p className="text-xs text-zinc-500">{terminalNote}</p>}
+            </div>
+          )}
 
           {editable && (
             <div className="space-y-2 rounded-md border border-zinc-800 p-4">

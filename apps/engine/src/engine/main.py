@@ -16,6 +16,7 @@ from engine.api import (
     provider_keys,
     repositories,
     runs,
+    terminal,
     webhooks,
     work_items,
 )
@@ -83,6 +84,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(runs.router)
+app.include_router(terminal.router)
 app.include_router(repositories.router)
 app.include_router(webhooks.router)
 app.include_router(work_items.router)
