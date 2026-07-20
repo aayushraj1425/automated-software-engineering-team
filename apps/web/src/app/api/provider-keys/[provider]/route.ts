@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { activeOrgRole } from "@/lib/org-role";
 import { signServiceToken } from "@/lib/service-token";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +43,13 @@ export async function DELETE(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { provider } = await params;
-  const token = await signServiceToken(session);
   // Forward the shared flag so the org's key (not the personal one) is removed.
   const shared = new URL(req.url).searchParams.get("shared") === "true";
+  // Destructive route: removing the team's key is gated on the caller's org
+  // role (ORGANIZATION_ROLES.md) — only fetched when it matters.
+  const token = await signServiceToken(session, {
+    orgRole: shared ? await activeOrgRole(req.headers) : null,
+  });
   const upstream = await fetch(
     `${env.ENGINE_URL}/v1/provider-keys/${encodeURIComponent(provider)}${shared ? "?shared=true" : ""}`,
     { method: "DELETE", headers: { authorization: `Bearer ${token}` } },

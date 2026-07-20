@@ -33,4 +33,24 @@ describe("signServiceToken", () => {
     expect(payload.sub).toBe("user_1");
     expect(payload.org).toBeUndefined();
   });
+
+  it("signs the org role only when asked — and never without an org", async () => {
+    const gated = await signServiceToken(
+      { user: { id: "user_1" }, session: { activeOrganizationId: "org_42" } },
+      { orgRole: "admin" },
+    );
+    expect((await jwtVerify(gated, secret)).payload.org_role).toBe("admin");
+
+    const plain = await signServiceToken({
+      user: { id: "user_1" },
+      session: { activeOrganizationId: "org_42" },
+    });
+    expect((await jwtVerify(plain, secret)).payload.org_role).toBeUndefined();
+
+    const personal = await signServiceToken(
+      { user: { id: "user_1" }, session: { activeOrganizationId: null } },
+      { orgRole: "admin" },
+    );
+    expect((await jwtVerify(personal, secret)).payload.org_role).toBeUndefined();
+  });
 });

@@ -128,6 +128,55 @@ async def test_api_lists_the_org_mates_repository(client):
 
 
 @pytest.mark.usefixtures("prepared_db")
+async def test_destroying_a_shared_repository_takes_an_admin(client):
+    """Members create and work; destroying a teammate's shared thing takes
+    an admin — the org_role claim gates it (ORGANIZATION_ROLES.md)."""
+    alice, bob, org = _ids("role")
+    repo_id = await _seed_shared_repository(alice, org)
+
+    # A plain member cannot disconnect a teammate's shared repository…
+    member = await client.delete(
+        f"/v1/repositories/{repo_id}", headers=auth_headers(bob, org_id=org, org_role="member")
+    )
+    assert member.status_code == 403
+    assert "admin" in member.json()["detail"]
+
+    # …an admin can — and the connector always could (their own repository).
+    admin = await client.delete(
+        f"/v1/repositories/{repo_id}", headers=auth_headers(bob, org_id=org, org_role="admin")
+    )
+    assert admin.status_code == 204
+
+    own_id = await _seed_shared_repository(alice, org)
+    owner = await client.delete(
+        f"/v1/repositories/{own_id}", headers=auth_headers(alice, org_id=org, org_role="member")
+    )
+    assert owner.status_code == 204
+
+
+@pytest.mark.usefixtures("prepared_db")
+async def test_removing_the_team_key_takes_its_contributor_or_an_admin(client):
+    alice, bob, org = _ids("keyrole")
+    await client.put(
+        "/v1/provider-keys/anthropic",
+        json={"key": "sk-ant-team-key-1234", "share_with_organization": True},
+        headers=auth_headers(alice, org_id=org),
+    )
+
+    member = await client.delete(
+        "/v1/provider-keys/anthropic?shared=true",
+        headers=auth_headers(bob, org_id=org, org_role="member"),
+    )
+    assert member.status_code == 403
+
+    contributor = await client.delete(
+        "/v1/provider-keys/anthropic?shared=true",
+        headers=auth_headers(alice, org_id=org, org_role="member"),
+    )
+    assert contributor.status_code == 204
+
+
+@pytest.mark.usefixtures("prepared_db")
 async def test_api_point_lookup_follows_the_same_rule(client):
     alice, bob, org = _ids("apiget")
     repo_id = await _seed_shared_repository(alice, org)

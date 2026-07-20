@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { OrganizationMembers } from "@/components/settings/organization-members";
 import { authClient } from "@/lib/auth-client";
 
 /** Organizations: list them, create one, and pick the active one. The active
@@ -10,7 +11,7 @@ import { authClient } from "@/lib/auth-client";
  * builds on (docs/architecture/SIGN_IN_AND_ORGANIZATIONS.md). */
 export function OrganizationsPanel() {
   const { data: organizations, refetch } = authClient.useListOrganizations();
-  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const { data: activeOrganization, refetch: refetchActive } = authClient.useActiveOrganization();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +114,14 @@ export function OrganizationsPanel() {
         </form>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
+
+        {activeOrganization && (
+          <OrganizationMembers
+            members={activeOrganization.members ?? []}
+            invitations={activeOrganization.invitations ?? []}
+            onChanged={() => void refetchActive()}
+          />
+        )}
       </section>
     </div>
   );

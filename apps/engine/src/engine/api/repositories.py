@@ -175,8 +175,19 @@ async def disconnect_repository(
 ) -> None:
     """Disconnect: the repository's data (index, work items, knowledge,
     documents) goes with it; run history survives detached — the FK is
-    SET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md)."""
+    SET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md).
+    Destroying a teammate's shared repository takes an admin
+    (ORGANIZATION_ROLES.md); your own stays yours to disconnect."""
     repo = await _visible_repository(db, repository_id, principal)
+    if (
+        repo.org_id is not None
+        and repo.owner_id != principal.user_id
+        and not principal.is_org_admin
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Disconnecting a teammate's shared repository takes an organization admin",
+        )
     active = (
         await db.execute(
             select(func.count())

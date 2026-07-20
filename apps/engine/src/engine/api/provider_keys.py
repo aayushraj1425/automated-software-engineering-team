@@ -133,5 +133,13 @@ async def delete_provider_key(
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="No key stored for that provider")
+    # Removing the team's key takes its contributor or an admin — replacing
+    # it stays open to every member (work vs. destruction,
+    # ORGANIZATION_ROLES.md).
+    if shared and row.user_id != principal.user_id and not principal.is_org_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Removing the team's key takes its contributor or an organization admin",
+        )
     await db.delete(row)
     await db.commit()

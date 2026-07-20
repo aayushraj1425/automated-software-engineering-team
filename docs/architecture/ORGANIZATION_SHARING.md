@@ -79,10 +79,12 @@ existing suite stays green: personal resources behave exactly as before.
 
 ## Honest boundaries
 
-- **Members are equal collaborators.** Any member of the active organization
-  can read *and write* shared rows — approve a run, delete a repository.
-  Roles (admin/member/viewer) are better-auth plugin territory and a later
-  slice.
+- **Members are equal collaborators for creating and working.** Any member
+  of the active organization can read *and write* shared rows — approve a
+  run, edit a plan. One refinement landed later: *destroying* a shared thing
+  you did not create (disconnecting a teammate's repository, removing the
+  team's provider key) takes an organization admin — see
+  [ORGANIZATION_ROLES.md](ORGANIZATION_ROLES.md).
 - **Sharing follows the *active* organization, not all memberships.** A row
   shared with org A is invisible while org B is active — switch to see it.
   One GUC, one clause; all-memberships visibility would need engine-side

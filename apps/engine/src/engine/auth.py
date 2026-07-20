@@ -12,6 +12,14 @@ class Principal:
 
     user_id: str
     org_id: str | None = None
+    # The caller's role in the active organization (owner/admin/member).
+    # Signed in only by the destructive routes that need it
+    # (ORGANIZATION_ROLES.md); absent everywhere else.
+    org_role: str | None = None
+
+    @property
+    def is_org_admin(self) -> bool:
+        return self.org_role in ("owner", "admin")
 
 
 def _decode_bearer(request: Request) -> dict | None:
@@ -34,7 +42,11 @@ def require_service_auth(request: Request) -> Principal:
     payload = _decode_bearer(request)
     if payload is None:
         raise HTTPException(status_code=401, detail="Missing or invalid service token")
-    return Principal(user_id=str(payload["sub"]), org_id=payload.get("org"))
+    return Principal(
+        user_id=str(payload["sub"]),
+        org_id=payload.get("org"),
+        org_role=payload.get("org_role"),
+    )
 
 
 def peek_principal(request: Request) -> Principal | None:

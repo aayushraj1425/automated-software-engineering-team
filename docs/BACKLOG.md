@@ -232,6 +232,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Deny-by-default policies with an explicit service context: a session that asserts neither a user pin nor `app.service='1'` reads and writes zero rows; `session_scope()` is the documented internal entry point and the alembic connection asserts the context for data migrations — a forgotten pin is now loud, not a leak
 - [x] Separate non-owner database role for the API: the policies' service clause requires *being* the `asep` role, and user-pinned sessions connect as the DML-only `asep_api` (`DATABASE_URL_API`) — an attacker with raw SQL on an API session cannot claim the service context or touch a policy; the whole test suite runs in two-role mode
 - [x] Subquery policies for the child tables — all ten (`messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`, `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, `generated_documents`) are now visible exactly when their parent row is, via an `EXISTS` that runs under the parent's own policy; org sharing flows through automatically and retrieval latency is unchanged
+- [x] Organization members, invitations, and roles — the settings panel manages members (invite by email with a copyable accept link, change member/admin roles, remove) via the better-auth organization plugin, and the engine enforces one destructive rule: disconnecting a teammate's shared repository or removing the team's provider key takes an organization admin, carried as a BFF-verified `org_role` claim signed only on those routes — design note: [architecture/ORGANIZATION_ROLES.md](architecture/ORGANIZATION_ROLES.md)
 
 ### Workstream: Deploy
 - [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
@@ -262,6 +263,31 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-19 · Organization members, invitations, and roles — the follow-up
+  the org-sharing note promised ("roles are a later slice"). The settings
+  panel now manages the active organization: invite by email with a role
+  (member/admin), copy the accept link and share it yourself (no email
+  provider is wired — the note says so in the UI), a new
+  `/accept-invitation/[id]` page accepts or declines and switches the
+  workspace, owners/admins change roles or remove members — all through the
+  better-auth organization plugin, which enforces its own permission rules
+  server-side (the panel adds UI, not policy). The engine got exactly one
+  rule of its own: *members create and work; destroying a shared thing you
+  did not create takes an admin*. A new `org_role` JWT claim — signed only
+  by the two destructive BFF routes, read fresh from
+  `auth.api.getActiveMember` at request time, never cached in the session —
+  gates disconnecting a teammate's shared repository (403 for a plain
+  member, 204 for an admin or the connector) and removing the team's shared
+  provider key (its contributor or an admin). `Principal` grew
+  `org_role`/`is_org_admin`; `signServiceToken` takes an options bag and
+  refuses to sign a role without an org. Design note:
+  [architecture/ORGANIZATION_ROLES.md](architecture/ORGANIZATION_ROLES.md);
+  the org-sharing note's "equal collaborators" boundary updated in place.
+  Verified: engine 405 passed / 1 skipped (two new gate tests in
+  `test_org_sharing.py`); web lint, typecheck, and 21 tests green
+  (new service-token test: the role signs only when asked, never without
+  an org).
 
 - 2026-07-19 · The non-owner API database role — the RLS story's final
   piece, closing the audit's last logged boundary. The policies' service

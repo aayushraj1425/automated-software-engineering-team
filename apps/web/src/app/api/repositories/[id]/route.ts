@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { activeOrgRole } from "@/lib/org-role";
 import { signServiceToken } from "@/lib/service-token";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,11 @@ export async function DELETE(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const token = await signServiceToken(session);
+  // Destructive route: the engine gates a shared repository's disconnect on
+  // the caller's org role (ORGANIZATION_ROLES.md).
+  const token = await signServiceToken(session, {
+    orgRole: await activeOrgRole(req.headers),
+  });
   const upstream = await fetch(`${env.ENGINE_URL}/v1/repositories/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { authorization: `Bearer ${token}` },
