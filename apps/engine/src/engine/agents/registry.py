@@ -5,8 +5,9 @@ the table below is the single place a role's model tier and tool policy live,
 and prompts are versioned markdown assets in engine/agents/prompts/.
 
 The executor enforces that an agent may only invoke tools in its policy
-(ADR-0008 — deny by default); names without an implementation in
-engine/agents/tools.py are simply never offered to the model.
+(ADR-0008 — deny by default). Every name declared here is implemented in
+engine/agents/tools.py — the registry test asserts it, so a typo in a tool
+policy is a loud test failure, not a tool that silently never appears.
 """
 
 from dataclasses import dataclass
@@ -22,7 +23,10 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 _READ_TOOLS = ("list_dir", "read_file", "search", "search_code")
 # Write-side tools stay jailed to the per-run workspace (ADR-0008).
 _WRITE_TOOLS = ("apply_patch", "write_file")
-_GIT_TOOLS = ("git_branch", "git_commit", "git_diff")
+# No branch tool on purpose: the pipeline creates the run's branch itself
+# (workspace/manager.py) and every agent works on it — a branch tool would
+# only let an agent wander off the branch the reviewer and the PR watch.
+_GIT_TOOLS = ("git_commit", "git_diff")
 
 
 @dataclass(frozen=True)

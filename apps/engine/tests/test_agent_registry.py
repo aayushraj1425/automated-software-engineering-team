@@ -3,10 +3,11 @@
 import pytest
 
 from engine.agents.registry import all_agent_specs, get_agent_spec
+from engine.agents.tools import TOOLS
 from engine.db.enums import AgentRole
 
 VALID_TIERS = {"planner", "coder", "cheap"}
-WRITE_TOOLS = {"apply_patch", "write_file", "git_commit", "git_branch"}
+WRITE_TOOLS = {"apply_patch", "write_file", "git_commit"}
 
 
 def test_every_role_has_a_spec():
@@ -35,6 +36,14 @@ def test_read_only_roles_cannot_write():
     for role in (AgentRole.REVIEWER, AgentRole.PRODUCT_MANAGER, AgentRole.SUPERVISOR):
         tools = set(get_agent_spec(role).tools)
         assert not tools & WRITE_TOOLS, f"{role} must not hold write-side tools (ADR-0008)"
+
+
+def test_every_declared_tool_is_implemented():
+    """A typo in a tool policy must be a loud failure, not a tool that
+    silently never appears (schemas_for drops unknown names)."""
+    for spec in all_agent_specs():
+        missing = set(spec.tools) - set(TOOLS)
+        assert not missing, f"{spec.role} declares unimplemented tools: {sorted(missing)}"
 
 
 def test_engineers_share_the_jailed_toolset():

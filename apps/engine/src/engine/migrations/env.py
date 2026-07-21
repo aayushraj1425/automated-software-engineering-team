@@ -41,10 +41,18 @@ def do_run_migrations(connection: Connection) -> None:
     # row-level security (engine/db/rls.py) a data migration would otherwise
     # read and write zero rows. Session-scoped (false), so it lasts for every
     # migration on this connection.
+    #
+    # This first statement opens the connection's transaction, so alembic's
+    # begin_transaction() below joins it rather than owning it — and a joined
+    # transaction is never committed on exit. We commit it ourselves once the
+    # migrations (and their alembic_version bump) are in; without this the
+    # whole upgrade silently rolls back on close (the DDL and the service
+    # context stay in one transaction, exactly as RLS needs).
     connection.exec_driver_sql("SELECT set_config('app.service', '1', false)")
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
+    connection.commit()
 
 
 async def run_async_migrations() -> None:

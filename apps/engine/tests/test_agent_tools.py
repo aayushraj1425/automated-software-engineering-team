@@ -195,9 +195,11 @@ async def test_search_code_without_an_index_guides_the_agent(ws, prepared_db):
 
 
 def test_schemas_only_cover_implemented_tools():
-    schemas = schemas_for(("read_file", "git_branch", "apply_patch", "git_diff"))
+    # Unknown names are dropped, not offered — the registry test asserts no
+    # declared name is ever unknown, so this guards runtime inputs only.
+    schemas = schemas_for(("read_file", "brew_coffee", "apply_patch", "git_diff"))
     names = [s["function"]["name"] for s in schemas]
-    assert names == ["read_file", "apply_patch", "git_diff"]  # git_branch not built
+    assert names == ["read_file", "apply_patch", "git_diff"]
 
 
 # ── apply_patch: the edit is the size of the change ─────────────────────────

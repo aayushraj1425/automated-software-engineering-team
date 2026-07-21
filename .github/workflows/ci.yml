@@ -82,6 +82,43 @@ jobs:
       - run: uv run alembic upgrade head
       - run: uv run pytest
 
+  e2e:
+    name: End-to-end smoke (Playwright, fake model)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      # setup-uv publishes no floating major tag — pin the exact release
+      - uses: astral-sh/setup-uv@v8.3.0
+        with:
+          enable-cache: true
+      # The dev compose stack on a fresh volume: postgres-init creates the
+      # NOSUPERUSER asep role, asep_api, and the database — the same bed a
+      # developer runs `pnpm e2e` against (CI_END_TO_END_SMOKE.md)
+      - run: docker compose -f infra/docker/docker-compose.dev.yml up -d --wait
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/engine
+      - run: pnpm db:migrate
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      # Every default already points at the stack (localhost:5433, asep:asep);
+      # the fake model needs no provider key and streams a canned reply
+      - run: pnpm e2e
+        env:
+          LLM_FAKE: "1"
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-test-results
+          path: apps/web/test-results/
+          if-no-files-found: ignore
+
   compose:
     name: Compose config check
     runs-on: ubuntu-latest

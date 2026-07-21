@@ -248,7 +248,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Beyond Phase 3 (headlines only)
 
-- Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack).
+- ~~Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack)~~ — landed 2026-07-19 ([CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md)).
 - LiteLLM proxy-server evaluation if callers beyond the engine appear (ADR-0006).
 - Langfuse in compose plus a ModelRouter trace exporter (ADR-0010).
 
@@ -259,10 +259,43 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | pnpm hoisted linker (phantom dependencies possible) | OneDrive junction safety (ADR-0001) | if the checkout leaves OneDrive |
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
 | Rate limiting is per engine replica (in-process buckets), and the BFF itself is unlimited | engine ceiling covers BFF-proxied traffic; single-replica deployments | Deploy workstream (Redis-backed shared window) |
-| Playwright smoke not in CI (needs the compose stack) | CI time budget | Phase 1 |
+| ~~Playwright smoke not in CI (needs the compose stack)~~ — closed 2026-07-19: a CI job runs the smoke against the compose stack in fake-model mode ([CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md)) | — | a production-build smoke (the Docker images, not dev servers) can come with hosted multi-tenancy |
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-20 · The Playwright smoke runs in CI, it caught a migration bug on
+  its first real run, and the `git_branch` ghost is gone — two debt-register
+  rows closed plus one silent data-layer bug. A new CI job runs the existing
+  end-to-end spec (sign up → message → streamed fake-model reply → reload
+  proves persistence) the exact way a developer does: the dev compose stack
+  on a fresh volume (postgres-init creates the roles), `pnpm db:migrate`,
+  and Playwright's own `webServer` blocks booting the engine
+  (`LLM_FAKE=1`) and the web dev server — no secrets, no sleep-and-hope
+  steps, Chromium only, traces kept on failure and uploaded as an
+  artifact. The config gained `forbidOnly` and stops reusing servers on CI.
+  **The bug the smoke caught:** running it against a *real* migrated
+  database exposed that `alembic upgrade head` had been silently rolling
+  back since migration 0018. `env.py` opens the migration transaction with
+  `set_config('app.service', …)` (the DDL and the RLS service context must
+  share one transaction), which meant alembic's `begin_transaction()`
+  joined that transaction instead of owning it — and a joined transaction is
+  never committed on exit. Every upgrade ran, logged success, exited zero,
+  and rolled back; the test suite never noticed because `conftest` builds
+  its schema with `create_all`, not alembic. One-line fix: commit the
+  transaction we left open. Separately, the agent registry no longer
+  declares `git_branch` — never implemented, and rightly so: the pipeline
+  creates the run's branch itself (`workspace/manager.py`) and a branch
+  tool would only let an agent wander off the branch the reviewer and the
+  PR watch. The registry test now asserts the stronger property: every tool
+  a role declares is implemented, so a policy typo is a loud failure instead
+  of a tool that silently never appears. Design note:
+  [architecture/CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md).
+  Verified: engine ruff/pyright clean, full engine suite 406 passed /
+  1 skipped (including the new declared-tools-are-implemented test); the
+  smoke passes locally against the compose stack the same way the CI job
+  runs it (1 passed), and `alembic current` now reports `0022 (head)` after
+  an upgrade.
 
 - 2026-07-19 · Organization members, invitations, and roles — the follow-up
   the org-sharing note promised ("roles are a later slice"). The settings
