@@ -45,8 +45,8 @@ subset being built now.
 - [x] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work (`RUN_QUEUE=arq` + `uv run arq engine.worker.WorkerSettings`; design note: [architecture/BACKGROUND_WORKER.md](architecture/BACKGROUND_WORKER.md))
 
 ### Workstream: Repository Connection & Workspaces (blocking)
-- [ ] GitHub connection: personal access token first (encrypted at rest), OAuth app flow next
-- [ ] Repositories API (create/list/status) and the connect screen
+- [x] Repository connection with credentials encrypted at rest: GitLab, Bitbucket, and Jira store a per-user token (AES-GCM, `integration_connections`); GitHub authenticates through the environment token (`GITHUB_TOKEN`) and public/local URLs need none — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md). (A *per-user* GitHub personal-access token and the OAuth *app* flow for repo access stayed a later refinement — the env token covers the single-tenant case, and GitHub OAuth *sign-in* already ships.)
+- [x] Repositories API (connect, list with index status and chunk counts) and the connect screen — `POST`/`GET /v1/repositories` plus the indexing, search, and dependency-graph endpoints, and the repositories page's connect form with live index status
 - [x] Workspace manager: clone into `.workspaces/<run>`, one branch per run, cleanup policy
 - [x] Path-jail module with symlink/UNC/traversal tests (security-critical, ADR-0008); paths validated under both Windows and POSIX semantics
 
@@ -264,6 +264,18 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · Board honesty pass + operator handoff. Every self-contained
+  engineering item is now shipped, so the board was reconciled against the
+  code: two stale-open checkboxes in the Repository Connection workstream are
+  corrected — the Repositories API and connect screen have shipped since
+  Phase 2, and repository *connection* works end to end (GitLab/Bitbucket/Jira
+  store an encrypted per-user token, GitHub uses the environment token; a
+  per-user GitHub PAT and the OAuth *app* flow stayed a deliberate later
+  refinement). What genuinely remains is all operator-gated — a secret, a
+  running piece of infrastructure, or a decision only the operator can make —
+  so it is gathered into one handoff note with each item's prerequisite spelled
+  out: [OPERATOR_HANDOFF.md](OPERATOR_HANDOFF.md).
 
 - 2026-07-21 · The rate-limiter's window can span every replica —
   `RATE_LIMIT_SHARED=1` moves the token bucket into Redis. The in-process
