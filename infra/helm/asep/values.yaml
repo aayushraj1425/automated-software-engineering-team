@@ -71,6 +71,18 @@ worker:
       storageClass: ""  # "" uses the cluster's default StorageClass
       accessMode: ReadWriteOnce
       mountPath: /var/backups/asep
+  # In-cluster QA sandbox: run agent-written tests in Docker before opening a PR.
+  # Pods have no host Docker daemon, so this adds a Docker-in-Docker sidecar and
+  # points the worker's DOCKER_HOST at it (SANDBOX_ENABLED=1). Off by default —
+  # the sidecar runs *privileged*, a real security tradeoff (Kata, gVisor, or
+  # sysbox are hardening options), so opt in deliberately. Design note:
+  # docs/architecture/SANDBOX_EXECUTION.md.
+  sandbox:
+    enabled: false
+    dindImage: docker:27-dind
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "2", memory: 2Gi }
 
 # Name of an operator-managed Secret holding the environment (same keys as
 # .env.example). Leave empty to render one from `env` below instead.

@@ -239,7 +239,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 ### Workstream: Deploy
 - [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
 - [ ] Revisit the chart's placeholder resource limits once the benchmarks measure the hot paths
-- [ ] In-cluster QA sandbox (pods have no Docker daemon; needs DinD, Kata, or a remote builder — `SANDBOX_ENABLED=0` in chart defaults until then)
+- [x] In-cluster QA sandbox via a Docker-in-Docker sidecar (`worker.sandbox.enabled=true`): the engine image carries the `docker` client, the chart adds a privileged `docker:dind` sidecar, and the worker's `DOCKER_HOST` points at it — the sandbox code is unchanged (it already follows `DOCKER_HOST`). Off by default (the sidecar is privileged). Design note: [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md)
 - [x] Persistent volume template for `BACKUP_DIR` on the worker: `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce` PVC, mounts it, and points `BACKUP_DIR` at it (off by default; the volume-based alternative to `BACKUP_S3_BUCKET` off-host shipping) — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
 
 ### Workstream: Benchmarks & Security Audit
@@ -265,6 +265,25 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · The QA sandbox can run in-cluster — a Docker-in-Docker sidecar,
+  and it needed no engine change. The sandbox shells out to the `docker` CLI,
+  which follows `DOCKER_HOST`; that is the whole trick. `worker.sandbox.enabled=true`
+  adds a privileged `docker:dind` sidecar to the worker pod, sets
+  `SANDBOX_ENABLED=1`, and points `DOCKER_HOST` at the sidecar over the pod's
+  shared network namespace; the engine image now carries the `docker` client
+  (client only, fetched as Docker's static binary in the Dockerfile). Off by
+  default because DinD is privileged — a real node-escape tradeoff, documented
+  with Kata/gVisor/sysbox as the hardening path. The sandbox's own guarantees
+  (workspace copied not mounted, network unplugged for the test phase,
+  capabilities dropped) are untouched. Design note updated:
+  [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md).
+  Verified beyond rendering: the sandbox runs a workspace to `passed` against a
+  real `docker:dind` daemon over `DOCKER_HOST` (the exact sidecar wiring, proven
+  locally); the engine image builds with the `docker` client present and no
+  daemon; and `helm lint`/`template` show no sidecar by default and the full
+  sidecar (privileged, DOCKER_HOST, ephemeral storage) when enabled, with every
+  optional feature on rendering exit-0.
 
 - 2026-07-21 · A validated OTel Collector config completes the alerting story.
   The alerting rules' one soft spot was the metric-naming assumption — the rule

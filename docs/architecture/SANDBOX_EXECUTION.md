@@ -94,6 +94,41 @@ When the QA agent ships (next slice), the sandbox moves earlier and failures
 route back to the engineers for a bounded number of fixes instead of failing
 the run outright.
 
+## Running it in Kubernetes (`worker.sandbox.enabled`)
+
+The sandbox shells out to the `docker` CLI, which follows `DOCKER_HOST`. That is
+the whole trick to running it in-cluster, where a pod has no host Docker daemon:
+give the worker a daemon to talk to and point `DOCKER_HOST` at it. Nothing in
+the engine changes.
+
+```mermaid
+flowchart LR
+    subgraph pod["worker pod (shared network namespace)"]
+        W["worker container\ndocker CLI + DOCKER_HOST=tcp://localhost:2375"]
+        D["dind sidecar\ndockerd on :2375, privileged"]
+        W -->|run / cp / exec| D
+    end
+    D -->|pulls images, runs\nthe sandbox container| D
+```
+
+- **`worker.sandbox.enabled=true`** adds a `docker:dind` sidecar to the worker
+  pod, sets `SANDBOX_ENABLED=1`, and points `DOCKER_HOST` at the sidecar over
+  the pod's shared network namespace (`tcp://localhost:2375`). The engine image
+  already carries the `docker` client (client only — no daemon).
+- **The sidecar is privileged.** Docker-in-Docker needs it, and that is a real
+  security tradeoff: a privileged container can escape to the node. It is off by
+  default for exactly this reason; treat turning it on as a deliberate decision,
+  and consider a hardened runtime (Kata, gVisor, sysbox) if the isolation
+  matters. The sandbox's own guarantees are unchanged — the workspace is copied
+  not mounted, the network is unplugged for the test phase, capabilities are
+  dropped — but they now sit inside a privileged sidecar.
+- **Storage is ephemeral** (`emptyDir`): the sandbox copies the workspace in and
+  keeps nothing, so the daemon's `/var/lib/docker` needs no persistence.
+- **Verified against a real Docker-in-Docker daemon**, not just rendered: the
+  sandbox runs a workspace to `passed` through a remote `docker:dind` over
+  `DOCKER_HOST`, exactly the sidecar wiring — the in-cluster path is the same
+  code the local sandbox already exercises.
+
 ## What this slice does not do
 
 - No QA self-correction loop yet — a test failure fails the run.

@@ -24,7 +24,7 @@ flowchart LR
 | **Alerting rules — load and tune them** | The rules are *built* (`infra/monitoring/alerting-rules.yml`: error rate, p95 latency, LLM spend) and the cost metric they need is emitted | A Prometheus-compatible backend to load them into, an alert manager to route to, and real traffic to calibrate the starting thresholds |
 | **BFF → engine mutual TLS** | The stronger half of ADR-0002 (the *network-policy* half is built — `engine.networkPolicy.enabled=true` isolates the engine to the web pods) | A certificate authority — cert-manager or a service mesh — in a real cluster rollout |
 | **Off-host backups — turn it on** | The upload itself is *built* (`BACKUP_S3_BUCKET` ships each dump to S3/MinIO/R2) | Only a production bucket and its credentials (or an IAM role on the pod) — no code left to write |
-| **In-cluster QA sandbox** | Lets the QA step run tests in a real sandbox inside Kubernetes (pods have no Docker daemon, so it's off by default there) | An infrastructure choice: Docker-in-Docker, Kata containers, or a remote builder |
+| **In-cluster QA sandbox — decide on the privilege** | Built as a Docker-in-Docker sidecar (`worker.sandbox.enabled=true`), proven against a real DinD daemon | A decision to accept the privileged sidecar, or to harden it (Kata / gVisor / sysbox) per your cluster's policy |
 | **Helm resource limits** | Sizes each pod's CPU/memory requests and limits so the cluster schedules them well | Benchmark numbers on the hot paths under your expected load, to size against real figures instead of guesses |
 
 ## How to pick one up

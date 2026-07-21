@@ -69,9 +69,12 @@ checked in CI on every push, so the chart cannot rot silently.
 
 ## Boundaries (kept out of this slice)
 
-- **The sandbox is off in-cluster** (`SANDBOX_ENABLED=0` in chart defaults).
-  The QA sandbox shells out to a Docker daemon, which pods don't have; giving
-  them one safely (DinD, Kata, or a remote builder) is its own follow-up.
+- **The QA sandbox can run in-cluster via a DinD sidecar**
+  (`worker.sandbox.enabled=true`). Pods have no host Docker daemon, so the chart
+  adds a `docker:dind` sidecar and points the worker's `DOCKER_HOST` at it; the
+  engine image ships the `docker` client. Off by default because the sidecar is
+  privileged — a real security tradeoff (Kata/gVisor/sysbox harden it). Details
+  and the caveat: [SANDBOX_EXECUTION.md](SANDBOX_EXECUTION.md).
 - **Engine network isolation is available, mTLS is not yet.**
   `engine.networkPolicy.enabled=true` renders a NetworkPolicy that allows
   ingress to the engine only from the web pods — the network-isolation half of
