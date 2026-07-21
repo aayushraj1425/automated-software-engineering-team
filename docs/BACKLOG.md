@@ -82,7 +82,7 @@ subset being built now.
 - [x] Fixture repository (small Python service + static web page, seeded bug) committed under `fixtures/demo-service/` — how-to: [EVALUATION.md](EVALUATION.md)
 - [x] Three golden tasks (add an endpoint, fix the seeded bug, add a config flag) with a four-check scoring rubric
 - [x] `apps/engine/scripts/eval_agent_team.py`: runs the team against the golden tasks and prints the scorecard (offline mode scores mechanics only; a real model adds the diff check)
-- [ ] CI job running the real-model evaluation behind a provider-key gate
+- [x] CI job running the real-model evaluation behind a provider-key gate — a manual `workflow_dispatch` workflow (`.github/workflows/evaluation.yml`) that stands up Postgres, migrates, and runs the golden tasks against a real model; it requires the `ANTHROPIC_API_KEY` secret and fails with a clear message without it, so it never runs (or spends) unarmed (design note: [EVALUATION.md](EVALUATION.md))
 
 ## Phase 2 — Repository Intelligence
 
@@ -264,6 +264,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · The real-model evaluation has a CI job — armed by a secret, not
+  by a push. `.github/workflows/evaluation.yml` is a manual `workflow_dispatch`
+  workflow: it stands up Postgres with the NOSUPERUSER roles, migrates, and runs
+  the three golden tasks (`scripts/eval_agent_team.py`) against a real model,
+  scoring the diff as well as the mechanics. It is manual on purpose — a
+  real-model run spends tokens — and a first step fails loudly with a one-line
+  fix message when the `ANTHROPIC_API_KEY` secret is absent, so it never runs or
+  spends unarmed (Gemini is an optional passthrough for semantic search; the
+  per-task cost cap in the harness stops a runaway). The offline scorecard
+  already runs on every push inside the engine job, so this closes the gap
+  between "mechanics work" and "the team actually writes the change". Design
+  note updated: [EVALUATION.md](EVALUATION.md). Verified: the offline harness
+  runs end to end locally (3/3 golden tasks pass against a real Postgres — the
+  exact command the job invokes), and `actionlint` (which shellchecks the run
+  steps too) passes clean across every workflow. The real-model path itself
+  waits on the operator's key — the one thing that cannot be exercised here.
 
 - 2026-07-21 · The Helm chart can give the worker's backups a durable home —
   `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce`

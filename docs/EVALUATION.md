@@ -40,3 +40,24 @@ count, and the score tells you how good the team really is.
 
 The eval runs appear in the `/runs` page like any other run, so you can watch
 them and read their timelines afterwards.
+
+## Run it in CI
+
+The offline scorecard runs on every push already (it is part of the engine test
+job). The **real-model** scorecard is a separate, manual workflow —
+`.github/workflows/evaluation.yml` — because a real run spends tokens and should
+never fire on its own.
+
+```mermaid
+flowchart LR
+    A[Add the ANTHROPIC_API_KEY\nrepository secret] --> B[Actions tab →\nRun workflow]
+    B --> C[Postgres + migrations,\nreal-model golden tasks]
+    C --> D[scorecard in the log;\nexit 0 = all passed]
+```
+
+To arm it: add an `ANTHROPIC_API_KEY` repository secret (and `GEMINI_API_KEY`
+only if you want semantic code search available to the agents), then trigger
+**Real-model evaluation** from the Actions tab. Without the secret the job fails
+immediately with a one-line message saying what to add — it never silently
+passes. The three tiers all run on the one Anthropic key; the run stops any
+single task that exceeds a small cost cap, so a runaway cannot rack up spend.

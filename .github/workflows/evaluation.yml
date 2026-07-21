@@ -1,0 +1,72 @@
+name: Real-model evaluation
+
+# Manual only. A real-model run spends tokens (a few US$ across the three golden
+# tasks), so it never runs on a push or schedule — you arm it by adding the
+# ANTHROPIC_API_KEY repository secret and trigger it from the Actions tab. The
+# *offline* harness (mechanics only, no spend) already runs on every push as
+# part of the engine test job; this job adds the real-model diff scoring.
+# Design note: docs/EVALUATION.md.
+on:
+  workflow_dispatch:
+
+jobs:
+  evaluation:
+    name: Golden tasks against a real model
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/engine
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://asep:asep@localhost:5432/asep
+      ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
+      # Inline so the run executes in this process — no worker, no Redis needed.
+      RUN_QUEUE: inline
+      # The provider keys. Anthropic drives all three model tiers and is
+      # required; Gemini is only read if an agent reaches for semantic code
+      # search, so it is an optional passthrough.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      # Fail loudly and early when the secret is missing — you triggered this
+      # run, so the fix (add the key) belongs in the log, not a cryptic crash.
+      - name: Require the provider key
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::Add the ANTHROPIC_API_KEY repository secret to run the real-model evaluation."
+            exit 1
+          fi
+      # Mirrors infra/docker/postgres-init and the engine CI job: a NOSUPERUSER
+      # engine role (RLS is bypassed by superusers) and pgvector in template1,
+      # so every database inherits the extension.
+      - name: Create the non-superuser engine role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE asep LOGIN PASSWORD 'asep' NOSUPERUSER CREATEDB"
+          psql -h localhost -U postgres -c "CREATE ROLE asep_api LOGIN PASSWORD 'asep_api' NOSUPERUSER"
+          psql -h localhost -U postgres -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h localhost -U postgres -c "CREATE DATABASE asep OWNER asep"
+      # setup-uv publishes no floating major tag — pin the exact release
+      - uses: astral-sh/setup-uv@v8.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run alembic upgrade head
+      # Exit code 0 means every golden task passed (mechanics + diff match).
+      - name: Run the golden-task evaluation
+        run: uv run python scripts/eval_agent_team.py

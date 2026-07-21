@@ -20,7 +20,7 @@ flowchart LR
 
 | Item | What it does | What it needs from you |
 |---|---|---|
-| **Real-model eval in CI** | Runs the agent team against the golden tasks with a *real* model and scores the diff (the offline mechanics score already runs) | A provider-key secret in CI (Anthropic or OpenAI) and the go-ahead to spend tokens on each run |
+| **Real-model eval in CI — arm it** | The workflow is *built* (manual **Real-model evaluation** in the Actions tab) and runs the golden tasks against a real model | Only the `ANTHROPIC_API_KEY` repository secret; then trigger it when you want to spend a few US$ on a run |
 | **Alerting rules** | Pages someone when error rate, p95 latency, or token spend crosses a line | A monitoring backend to send to, and real traffic to calibrate the thresholds so they don't cry wolf |
 | **BFF → engine mutual TLS** | Stops anything but the web app's BFF from calling the engine, even inside the cluster (today the engine trusts a signed JWT — ADR-0002 debt) | A certificate authority (or a Kubernetes network policy) and the call on which approach fits your cluster |
 | **Off-host backups — turn it on** | The upload itself is *built* (`BACKUP_S3_BUCKET` ships each dump to S3/MinIO/R2) | Only a production bucket and its credentials (or an IAM role on the pod) — no code left to write |
