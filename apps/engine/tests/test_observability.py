@@ -13,7 +13,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from engine.llm.router import model_router
-from engine.observability import configure_telemetry
+from engine.observability import configure_telemetry, record_llm_call
 from tests.conftest import auth_headers
 
 # The first configuration wins process-wide, so it happens at import — every
@@ -110,3 +110,30 @@ async def test_request_metrics_count_by_route(client):
     # A counter's points are NumberDataPoints; getattr keeps pyright happy
     # about the histogram members of the data-point union.
     assert getattr(points[0], "value", 0) >= 1
+
+
+def _counter_points(name: str) -> list:
+    data = metric_reader.get_metrics_data()
+    assert data is not None
+    return [
+        point
+        for resource_metrics in data.resource_metrics
+        for scope_metrics in resource_metrics.scope_metrics
+        for metric in scope_metrics.metrics
+        if metric.name == name
+        for point in metric.data.data_points
+    ]
+
+
+def test_llm_cost_and_token_metrics_record_spend():
+    """record_llm_call feeds the token-spend alert's series (ALERTING.md)."""
+    record_llm_call(
+        "planner", "anthropic/claude-opus-4-8", cost_usd=0.5, input_tokens=100, output_tokens=40
+    )
+
+    cost = [p for p in _counter_points("llm.cost.usd") if p.attributes.get("llm.tier") == "planner"]
+    assert cost and getattr(cost[0], "value", 0) >= 0.5
+
+    tokens = _counter_points("llm.tokens")
+    directions = {p.attributes.get("llm.token_type") for p in tokens}
+    assert {"input", "output"} <= directions

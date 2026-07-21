@@ -21,7 +21,7 @@ flowchart LR
 | Item | What it does | What it needs from you |
 |---|---|---|
 | **Real-model eval in CI — arm it** | The workflow is *built* (manual **Real-model evaluation** in the Actions tab) and runs the golden tasks against a real model | Only the `ANTHROPIC_API_KEY` repository secret; then trigger it when you want to spend a few US$ on a run |
-| **Alerting rules** | Pages someone when error rate, p95 latency, or token spend crosses a line | A monitoring backend to send to, and real traffic to calibrate the thresholds so they don't cry wolf |
+| **Alerting rules — load and tune them** | The rules are *built* (`infra/monitoring/alerting-rules.yml`: error rate, p95 latency, LLM spend) and the cost metric they need is emitted | A Prometheus-compatible backend to load them into, an alert manager to route to, and real traffic to calibrate the starting thresholds |
 | **BFF → engine mutual TLS** | Stops anything but the web app's BFF from calling the engine, even inside the cluster (today the engine trusts a signed JWT — ADR-0002 debt) | A certificate authority (or a Kubernetes network policy) and the call on which approach fits your cluster |
 | **Off-host backups — turn it on** | The upload itself is *built* (`BACKUP_S3_BUCKET` ships each dump to S3/MinIO/R2) | Only a production bucket and its credentials (or an IAM role on the pod) — no code left to write |
 | **In-cluster QA sandbox** | Lets the QA step run tests in a real sandbox inside Kubernetes (pods have no Docker daemon, so it's off by default there) | An infrastructure choice: Docker-in-Docker, Kata containers, or a remote builder |

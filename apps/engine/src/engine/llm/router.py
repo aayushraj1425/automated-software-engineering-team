@@ -13,6 +13,7 @@ from opentelemetry import trace
 
 from engine.config import EMBEDDING_DIM, get_settings
 from engine.llm.keys import api_key_for_model
+from engine.observability import record_llm_call
 
 Tier = Literal["planner", "coder", "cheap"]
 
@@ -152,8 +153,16 @@ class ModelRouter:
             )
             content = response.choices[0].message.content  # type: ignore[union-attr]
             usage = getattr(response, "usage", None)
-            span.set_attribute("llm.input_tokens", getattr(usage, "prompt_tokens", 0) or 0)
-            span.set_attribute("llm.output_tokens", getattr(usage, "completion_tokens", 0) or 0)
+            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(usage, "completion_tokens", 0) or 0
+            try:
+                cost = float(litellm.completion_cost(completion_response=response))
+            except Exception:  # cost tables lag behind new models; tokens still count
+                cost = 0.0
+            span.set_attribute("llm.input_tokens", input_tokens)
+            span.set_attribute("llm.output_tokens", output_tokens)
+            span.set_attribute("llm.cost_usd", cost)
+            record_llm_call(tier, model, cost, input_tokens, output_tokens)
             log.info(
                 "llm.complete",
                 tier=tier,
@@ -206,10 +215,13 @@ class ModelRouter:
                 cost = float(litellm.completion_cost(completion_response=response))
             except Exception:  # cost tables lag behind new models; usage still counts
                 cost = 0.0
-            span.set_attribute("llm.input_tokens", getattr(usage, "prompt_tokens", 0) or 0)
-            span.set_attribute("llm.output_tokens", getattr(usage, "completion_tokens", 0) or 0)
+            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(usage, "completion_tokens", 0) or 0
+            span.set_attribute("llm.input_tokens", input_tokens)
+            span.set_attribute("llm.output_tokens", output_tokens)
             span.set_attribute("llm.cost_usd", cost)
             span.set_attribute("llm.tool_calls", len(calls))
+            record_llm_call(tier, model, cost, input_tokens, output_tokens)
             log.info(
                 "llm.tools",
                 tier=tier,
@@ -223,8 +235,8 @@ class ModelRouter:
             content=message.content,
             tool_calls=tuple(calls),
             message=message.model_dump(exclude_none=True),
-            input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            output_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             cost_usd=cost,
         )
 

@@ -1,0 +1,50 @@
+# Prometheus alerting rules for the ASEP engine.
+#
+# Load these into Prometheus (rule_files:) or your alert manager of choice. The
+# metric names follow the standard OpenTelemetry → Prometheus convention (dots
+# become underscores, counters gain _total, the histogram's ms unit becomes
+# _milliseconds); if your collector is configured to drop unit or _total
+# suffixes, adjust the names to match. The thresholds are deliberate starting
+# points — tune them once real traffic shows the shape (docs/architecture/ALERTING.md).
+groups:
+  - name: asep-availability
+    rules:
+      - alert: ASEPHighErrorRate
+        # Share of engine responses that are 5xx, over five minutes.
+        expr: |
+          sum(rate(http_server_requests_total{http_response_status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_server_requests_total[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Engine 5xx error rate above 5%"
+          description: "More than 5% of engine responses have been 5xx for 5 minutes."
+
+      - alert: ASEPHighRequestLatencyP95
+        # 95th-percentile request duration across all routes, in milliseconds.
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_server_duration_milliseconds_bucket[5m]))
+          ) > 2000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Engine p95 request latency above 2s"
+          description: "The 95th-percentile request duration has exceeded 2000ms for 10 minutes."
+
+  - name: asep-cost
+    rules:
+      - alert: ASEPHighLLMSpend
+        # Projected hourly LLM spend (per-second rate × 3600), in US dollars.
+        expr: sum(rate(llm_cost_usd_total[1h])) * 3600 > 20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM spend above $20/hour"
+          description: "Projected LLM spend has exceeded $20/hour for 15 minutes — check for a runaway run."

@@ -216,7 +216,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] OpenTelemetry SDK wired per ADR-0010: instrumentation through the OTel API unconditionally (no-op by default), `OTEL_ENABLED=1` + `OTEL_EXPORTER_OTLP_ENDPOINT` install the SDK and export via OTLP/HTTP
 - [x] Request spans (route template + status, `/healthz` excluded) and request count/duration metrics from a pure-ASGI middleware
 - [x] LLM spans on every ModelRouter call (tier, model, tokens, cost) and `run.plan` / `run.execute` spans tying an agent run together
-- [ ] Alerting rules (error rate, p95 latency, token spend) once real traffic calibrates them
+- [x] Alerting rules (error rate, p95 latency, token spend): three Prometheus rules in `infra/monitoring/alerting-rules.yml`; the `ModelRouter` now emits `llm.cost.usd`/`llm.tokens` counters so spend is a real series. Thresholds are documented starting points to tune on real traffic — design note: [architecture/ALERTING.md](architecture/ALERTING.md)
 
 ### Workstream: Hardening the Seams (planned)
 - [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
@@ -264,6 +264,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · Alerting rules — and the cost metric they needed. The engine
+  exported traces and request metrics but nobody watched them, and token spend
+  lived only in spans and logs, so a "spend" alert had no series to read.
+  Two parts: the `ModelRouter` now records `llm.cost.usd` and `llm.tokens`
+  counters (by tier and model) on every completed call, computing cost the same
+  way the run budget does; and `infra/monitoring/alerting-rules.yml` ships three
+  Prometheus rules — 5xx error rate over 5%, p95 request latency over 2s, and
+  projected LLM spend over $20/hour. The rules target the standard
+  OTel → Prometheus metric names and carry deliberately-tunable starting
+  thresholds, both called out in the design note so nobody mistakes them for
+  calibrated values. Design note: [architecture/ALERTING.md](architecture/ALERTING.md).
+  Verified: engine ruff/pyright clean, full suite 416 passed / 1 skipped (a new
+  test reads the cost/token counters back from an in-memory metric reader), and
+  `promtool check rules` passes (3 rules found). Routing a fired alert to a
+  pager and calibrating the thresholds are the operator's side — the signal is
+  built; the delivery and tuning need real traffic.
 
 - 2026-07-21 · The real-model evaluation has a CI job — armed by a secret, not
   by a push. `.github/workflows/evaluation.yml` is a manual `workflow_dispatch`

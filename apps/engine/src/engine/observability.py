@@ -35,6 +35,28 @@ request_counter = _meter.create_counter(
 request_duration = _meter.create_histogram(
     "http.server.duration", unit="ms", description="Request duration, by route and status code"
 )
+# LLM spend, so the token-spend alert (docs/architecture/ALERTING.md) has a real
+# series to watch. No unit on the cost counter, so its Prometheus name stays a
+# clean llm_cost_usd_total rather than gaining a unit suffix.
+llm_cost_counter = _meter.create_counter(
+    "llm.cost.usd", description="LLM spend in USD, by model tier and model"
+)
+llm_tokens_counter = _meter.create_counter(
+    "llm.tokens", description="LLM tokens used, by model tier, model, and direction (input/output)"
+)
+
+
+def record_llm_call(
+    tier: str, model: str, cost_usd: float, input_tokens: int, output_tokens: int
+) -> None:
+    """One LLM call's spend and token counts. A no-op until the SDK is
+    configured, like every instrument here; the ModelRouter calls it once per
+    completed request (fake-mode calls record nothing — there is no spend)."""
+    attributes = {"llm.tier": tier, "llm.model": model}
+    llm_cost_counter.add(cost_usd, attributes)
+    llm_tokens_counter.add(input_tokens, {**attributes, "llm.token_type": "input"})
+    llm_tokens_counter.add(output_tokens, {**attributes, "llm.token_type": "output"})
+
 
 _configured = False
 
