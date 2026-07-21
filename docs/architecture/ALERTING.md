@@ -38,10 +38,12 @@ real series to watch and not just a number in the logs.
 - **Metric names follow the OTel → Prometheus convention.** OpenTelemetry
   instrument names (`http.server.requests`, `llm.cost.usd`) become Prometheus
   names by the standard mapping: dots to underscores, counters gain `_total`,
-  the histogram's `ms` unit becomes `_milliseconds`. That is what a default OTel
-  Collector Prometheus exporter (or Prometheus's own OTLP receiver) produces. If
-  your collector is set to drop unit or `_total` suffixes, rename to match — the
-  rules are a template, not a lock-in.
+  the histogram's `ms` unit becomes `_milliseconds`. The reference collector
+  config `infra/monitoring/otel-collector.yaml` pins exactly that mapping
+  (`add_metric_suffixes: true`), so with it the rule names line up out of the
+  box — receive the engine's OTLP, scrape the collector's `:9464/metrics`, and
+  the series exist. If your pipeline drops unit or `_total` suffixes, rename in
+  the rules to match — they are a template, not a lock-in.
 - **The thresholds are starting points.** 5%, 2 seconds, $20/hour are
   reasonable opening values, not tuned ones. Real traffic is what calibrates a
   threshold so it catches trouble without crying wolf; treat the first weeks as

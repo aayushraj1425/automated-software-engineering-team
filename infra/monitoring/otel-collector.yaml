@@ -1,0 +1,48 @@
+# Reference OpenTelemetry Collector config for the ASEP engine.
+#
+# It receives the engine's OTLP telemetry and exposes the metrics for Prometheus
+# to scrape with exactly the names infra/monitoring/alerting-rules.yml expects —
+# so the alerting rules "just work" against this pipeline. This is one standard
+# wiring, not the only one; adapt it to your stack.
+#
+# Wire the engine to it with OTEL_ENABLED=1 and
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://<collector-host>:4318
+# and point Prometheus at <collector-host>:9464/metrics.
+#
+# Validate: otelcol validate --config=otel-collector.yaml
+# (docs/architecture/ALERTING.md).
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318  # the engine exports OTLP over HTTP
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch: {}
+
+exporters:
+  # Prometheus scrapes this endpoint. add_metric_suffixes (the default) is what
+  # turns http.server.requests into http_server_requests_total and the ms
+  # histogram into http_server_duration_milliseconds — the exact names the
+  # alerting rules read. Flip it off only if you also rename the rules.
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    add_metric_suffixes: true
+  # Traces go to your tracing backend; debug just prints them to the collector's
+  # own log. Swap in otlp/jaeger/etc. for a real destination.
+  debug:
+    verbosity: normal
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

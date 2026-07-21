@@ -266,6 +266,16 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ## Done
 
+- 2026-07-21 · A validated OTel Collector config completes the alerting story.
+  The alerting rules' one soft spot was the metric-naming assumption — the rule
+  names only line up if the operator's OTLP→Prometheus pipeline uses the
+  standard suffix mapping. `infra/monitoring/otel-collector.yaml` pins exactly
+  that: receive the engine's OTLP, export via the Prometheus exporter with
+  `add_metric_suffixes: true`, so `http.server.requests` becomes
+  `http_server_requests_total` and the rules match out of the box. It is a
+  reference wiring, not a lock-in, and `ALERTING.md`'s caveat now points at it.
+  Verified: `otelcol validate` passes against the contrib collector.
+
 - 2026-07-21 · The engine can be network-isolated to the web BFF —
   `engine.networkPolicy.enabled=true` renders a NetworkPolicy whose only ingress
   rule allows the web pods to reach the engine on 8000, closing the gap the
