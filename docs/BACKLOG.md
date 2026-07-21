@@ -221,7 +221,8 @@ phase (alerting, benchmarks, K8s probes) leans on.
 ### Workstream: Hardening the Seams (planned)
 - [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
 - [x] Redis-backed shared rate window (`RATE_LIMIT_SHARED=1`): one token bucket across replicas, taken by an atomic Lua script, degrading to the per-replica bucket if Redis is down — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
-- [ ] BFF→engine trust: mutual TLS or network policy (ADR-0002 debt)
+- [x] BFF→engine trust, network-policy half: `engine.networkPolicy.enabled=true` renders a NetworkPolicy allowing ingress to the engine only from the web pods (off by default; enforcement is CNI-dependent, kubelet probes must be allowed) — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
+- [ ] BFF→engine trust, mutual TLS: the stronger half of ADR-0002 — needs cert-manager (or a service mesh) in a real cluster rollout
 
 ### Workstream: Backups & Disaster Recovery
 - [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
@@ -264,6 +265,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · The engine can be network-isolated to the web BFF —
+  `engine.networkPolicy.enabled=true` renders a NetworkPolicy whose only ingress
+  rule allows the web pods to reach the engine on 8000, closing the gap the
+  ClusterIP-only Service leaves (any *pod* could still call it). It is the
+  network-isolation half of the BFF→engine trust debt (ADR-0002); mutual TLS
+  stays the stronger, separate half that needs cert-manager. Off by default and
+  honestly bounded in the design note: enforcement needs a CNI that implements
+  NetworkPolicy, and kubelet health probes (node-sourced) must be allowed to the
+  engine pods — most CNIs do this by default, but it is the operator's to
+  confirm, so it ships opt-in like the backup PVC. New template
+  `engine-networkpolicy.yaml`. Design note boundary updated:
+  [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md).
+  Verified with `helm lint` (clean) and `helm template`: no NetworkPolicy by
+  default; with it on, the policy selects the engine pods and allows ingress
+  only from the web pods on 8000, and the full chart renders exit-0 with ingress
+  and the policy both enabled.
 
 - 2026-07-21 · Alerting rules — and the cost metric they needed. The engine
   exported traces and request metrics but nobody watched them, and token spend

@@ -1,0 +1,29 @@
+{{- if .Values.engine.networkPolicy.enabled }}
+# Only the web BFF may reach the engine API inside the cluster (ADR-0002): the
+# engine Service is already ClusterIP-only, and this closes the gap so no other
+# pod can call it either. Off by default — see values.yaml and the design note
+# for the CNI and health-probe caveats. mTLS is the stronger, separate step.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "asep.fullname" . }}-engine
+  labels:
+    {{- include "asep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: engine
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: web
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}

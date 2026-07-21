@@ -38,6 +38,16 @@ engine:
   resources:
     requests: { cpu: 250m, memory: 512Mi }
     limits: { cpu: "1", memory: 1Gi }
+  # Restrict who may reach the engine inside the cluster: with this on, a
+  # NetworkPolicy allows ingress to the engine only from the web pods — the BFF
+  # is the sole legitimate caller (ADR-0002). Off by default because
+  # enforcement needs a CNI that implements NetworkPolicy, and kubelet health
+  # probes must be allowed to the engine pods (most CNIs allow node-sourced
+  # probes by default — verify on yours). This is the network-isolation half of
+  # the BFF→engine trust story; mutual TLS is the stronger, separate follow-up
+  # (needs cert-manager). Design note: docs/architecture/KUBERNETES_DEPLOY.md.
+  networkPolicy:
+    enabled: false
 
 worker:
   # Runs agent jobs from the Redis queue (set RUN_QUEUE=arq) and the nightly

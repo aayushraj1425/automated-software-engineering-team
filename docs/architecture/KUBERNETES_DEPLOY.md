@@ -72,9 +72,14 @@ checked in CI on every push, so the chart cannot rot silently.
 - **The sandbox is off in-cluster** (`SANDBOX_ENABLED=0` in chart defaults).
   The QA sandbox shells out to a Docker daemon, which pods don't have; giving
   them one safely (DinD, Kata, or a remote builder) is its own follow-up.
-- **No autoscaling, no NetworkPolicy, no mTLS yet** — the BFF→engine trust
-  upgrade (ADR-0002 debt) belongs with a real cluster rollout, alongside
-  cert-manager and an ingress controller, which are operator choices.
+- **Engine network isolation is available, mTLS is not yet.**
+  `engine.networkPolicy.enabled=true` renders a NetworkPolicy that allows
+  ingress to the engine only from the web pods — the network-isolation half of
+  the BFF→engine trust story (ADR-0002). It is off by default: enforcement needs
+  a CNI that implements NetworkPolicy, and the cluster must allow kubelet health
+  probes to reach the engine pods (node-sourced, exempt by default on most
+  CNIs — verify on yours). Mutual TLS is the stronger, separate follow-up and
+  needs cert-manager. No autoscaling yet either.
 - **No telemetry stack.** The engine exports OTLP when pointed at a collector
   (`OTEL_EXPORTER_OTLP_ENDPOINT`); running one is the operator's side of the
   contract, as the observability slice already established.
