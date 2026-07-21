@@ -1,0 +1,23 @@
+{{- if and .Values.worker.enabled .Values.worker.backup.persistence.enabled }}
+# Durable home for the worker's nightly backups (BACKUP_DIR). The volume-based
+# alternative to off-host shipping (BACKUP_S3_BUCKET) — see
+# docs/architecture/BACKUPS_AND_RECOVERY.md. ReadWriteOnce, so it pairs with a
+# single worker replica; the worker deployment mounts it at
+# worker.backup.persistence.mountPath and points BACKUP_DIR there.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "asep.fullname" . }}-worker-backups
+  labels:
+    {{- include "asep.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  accessModes:
+    - {{ .Values.worker.backup.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.worker.backup.persistence.size }}
+  {{- with .Values.worker.backup.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

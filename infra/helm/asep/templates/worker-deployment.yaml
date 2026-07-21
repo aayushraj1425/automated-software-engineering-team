@@ -28,6 +28,21 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "asep.secretName" . }}
+          {{- if .Values.worker.backup.persistence.enabled }}
+          # Override BACKUP_DIR to the mounted volume so nightly dumps are durable.
+          env:
+            - name: BACKUP_DIR
+              value: {{ .Values.worker.backup.persistence.mountPath | quote }}
+          volumeMounts:
+            - name: backups
+              mountPath: {{ .Values.worker.backup.persistence.mountPath }}
+          {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
+      {{- if .Values.worker.backup.persistence.enabled }}
+      volumes:
+        - name: backups
+          persistentVolumeClaim:
+            claimName: {{ include "asep.fullname" . }}-worker-backups
+      {{- end }}
 {{- end }}

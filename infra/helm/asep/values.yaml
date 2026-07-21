@@ -41,13 +41,26 @@ engine:
 
 worker:
   # Runs agent jobs from the Redis queue (set RUN_QUEUE=arq) and the nightly
-  # backup cron (BACKUP_ENABLED=1 additionally needs a persistent volume for
-  # BACKUP_DIR — not templated yet, see the design note's boundaries).
+  # backup cron (set BACKUP_ENABLED=1 in env). Nightly dumps land in BACKUP_DIR;
+  # give that a durable home with either the persistent volume below or
+  # off-host shipping (BACKUP_S3_BUCKET — BACKUPS_AND_RECOVERY.md).
   enabled: true
   replicas: 1
   resources:
     requests: { cpu: 250m, memory: 512Mi }
     limits: { cpu: "1", memory: 1Gi }
+  # Durable local backups: when enabled the chart creates a PersistentVolumeClaim
+  # and mounts it at mountPath, and points BACKUP_DIR there so nightly dumps
+  # survive a pod restart. Off by default — a single worker replica keeps its
+  # ReadWriteOnce volume. Prefer off-host shipping (BACKUP_S3_BUCKET) for
+  # durability against a lost node; this is the volume-based alternative.
+  backup:
+    persistence:
+      enabled: false
+      size: 10Gi
+      storageClass: ""  # "" uses the cluster's default StorageClass
+      accessMode: ReadWriteOnce
+      mountPath: /var/backups/asep
 
 # Name of an operator-managed Secret holding the environment (same keys as
 # .env.example). Leave empty to render one from `env` below instead.

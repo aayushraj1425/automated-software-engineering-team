@@ -78,9 +78,12 @@ checked in CI on every push, so the chart cannot rot silently.
 - **No telemetry stack.** The engine exports OTLP when pointed at a collector
   (`OTEL_EXPORTER_OTLP_ENDPOINT`); running one is the operator's side of the
   contract, as the observability slice already established.
-- **Backups need a disk.** `BACKUP_ENABLED=1` on the worker requires a
-  persistent volume for `BACKUP_DIR`; the chart leaves persistence off by
-  default and documents the follow-up (off-host backup shipping is already on
-  the backlog).
+- **Backups need a durable home.** `BACKUP_ENABLED=1` on the worker writes
+  nightly dumps to `BACKUP_DIR`. Two ways to make that survive a pod restart,
+  both shipped: set `worker.backup.persistence.enabled=true` to have the chart
+  create a `ReadWriteOnce` PVC, mount it, and point `BACKUP_DIR` at it (off by
+  default, pairs with a single worker replica); or ship dumps off-host with
+  `BACKUP_S3_BUCKET` (BACKUPS_AND_RECOVERY.md). The S3 path survives a lost
+  node too, so it is the stronger default.
 - **No registry/publish pipeline** — images build locally or in CI; pushing
   them somewhere is part of the operator rollout.

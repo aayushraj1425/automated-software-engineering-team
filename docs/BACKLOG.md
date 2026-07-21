@@ -239,7 +239,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
 - [ ] Revisit the chart's placeholder resource limits once the benchmarks measure the hot paths
 - [ ] In-cluster QA sandbox (pods have no Docker daemon; needs DinD, Kata, or a remote builder — `SANDBOX_ENABLED=0` in chart defaults until then)
-- [ ] Persistent volume template for `BACKUP_DIR` when `BACKUP_ENABLED=1` on the worker (pairs with shipping dumps off-host)
+- [x] Persistent volume template for `BACKUP_DIR` on the worker: `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce` PVC, mounts it, and points `BACKUP_DIR` at it (off by default; the volume-based alternative to `BACKUP_S3_BUCKET` off-host shipping) — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
 
 ### Workstream: Benchmarks & Security Audit
 - [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/BENCHMARKS.md](architecture/BENCHMARKS.md)
@@ -264,6 +264,23 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · The Helm chart can give the worker's backups a durable home —
+  `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce`
+  PersistentVolumeClaim, mounts it on the worker, and overrides `BACKUP_DIR` to
+  the mount so nightly dumps survive a pod restart. Off by default (a
+  single-node dev cluster keeps rendering exactly as before), it is the
+  volume-based alternative to shipping dumps off-host with `BACKUP_S3_BUCKET` —
+  the design note points at the S3 path as the stronger default since it also
+  survives a lost node. `storageClass` is omitted when empty (the cluster's
+  default StorageClass), `size`/`accessMode`/`mountPath` are values. New
+  template `worker-backup-pvc.yaml`. Design note boundary updated:
+  [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md).
+  Verified with `helm lint` (clean) and `helm template`: no PVC and no mount by
+  default; with persistence on, the PVC (10Gi, ReadWriteOnce), the claim mount,
+  and `BACKUP_DIR=/var/backups/asep` all render, and a set `storageClass`
+  appears as `storageClassName` — the full chart renders exit-0 with ingress
+  and persistence both on.
 
 - 2026-07-21 · Backups can leave the machine — `BACKUP_S3_BUCKET` ships each
   verified dump off-host. A dump on the same disk as the database survives a
