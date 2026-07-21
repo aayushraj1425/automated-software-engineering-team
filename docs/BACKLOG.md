@@ -88,7 +88,8 @@ subset being built now.
 
 Design note: [architecture/REPOSITORY_INTELLIGENCE.md](architecture/REPOSITORY_INTELLIGENCE.md).
 Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07-08
-(exit criteria met). Java/Kotlin AST grammar remains a later, non-blocking item.
+(exit criteria met). Java/Kotlin AST chunking and import resolution landed
+2026-07-08 — see the checked items below.
 
 ### Workstream: Indexing Pipeline (blocking)
 - [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
@@ -219,7 +220,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ### Workstream: Hardening the Seams (planned)
 - [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
-- [ ] Redis-backed shared rate window once replica counts grow (the bucket is per replica)
+- [x] Redis-backed shared rate window (`RATE_LIMIT_SHARED=1`): one token bucket across replicas, taken by an atomic Lua script, degrading to the per-replica bucket if Redis is down — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
 - [ ] BFF→engine trust: mutual TLS or network policy (ADR-0002 debt)
 
 ### Workstream: Backups & Disaster Recovery
@@ -258,11 +259,34 @@ phase (alerting, benchmarks, K8s probes) leans on.
 |---|---|---|
 | pnpm hoisted linker (phantom dependencies possible) | OneDrive junction safety (ADR-0001) | if the checkout leaves OneDrive |
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
-| Rate limiting is per engine replica (in-process buckets), and the BFF itself is unlimited | engine ceiling covers BFF-proxied traffic; single-replica deployments | Deploy workstream (Redis-backed shared window) |
+| Rate limiting's shared window closed 2026-07-21 (`RATE_LIMIT_SHARED` puts one bucket in Redis across replicas, degrading to per-replica if Redis is down — [RATE_LIMITING.md](architecture/RATE_LIMITING.md)); the BFF itself stays unlimited | engine ceiling covers BFF-proxied traffic | per-route tiers if real traffic shows the shape |
 | ~~Playwright smoke not in CI (needs the compose stack)~~ — closed 2026-07-19: a CI job runs the smoke against the compose stack in fake-model mode ([CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md)) | — | a production-build smoke (the Docker images, not dev servers) can come with hosted multi-tenancy |
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · The rate-limiter's window can span every replica —
+  `RATE_LIMIT_SHARED=1` moves the token bucket into Redis. The in-process
+  buckets meant the effective ceiling was `limit × replicas`; once the chart
+  scales the engine out, that is the wrong number. The shared path runs the
+  same refill-then-take arithmetic as the in-process bucket, but as one atomic
+  Lua script inside Redis (the wall clock is passed in, so it does not depend
+  on Redis's own clock), keyed the same way — `user:<sub>` for a verified
+  token, `ip:<client>` otherwise — with a TTL just past a full refill so idle
+  callers expire on their own and the shared path needs no pruning sweep. A
+  Redis outage degrades to the same in-process bucket the default path uses
+  and warns once: the ceiling drops back to per-replica, never a hard
+  dependency and never a 429 storm. Off by default, so dev and the suite touch
+  Redis only in the tests that opt in. `ratelimit.py` split into a
+  `LocalLimiter` and a `SharedLimiter` behind the same async `take`; the
+  middleware picks one per request. Design note:
+  [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md); debt-register
+  row struck; `.env.example` gained `RATE_LIMIT_SHARED`. Verified: engine
+  ruff/pyright clean, full suite 409 passed / 1 skipped — three new tests (the
+  shared window enforced through a live Redis, separate callers, and the
+  degrade-to-local path with a stubbed dead Redis so it runs in CI without one;
+  the live tests build their client on the test's own loop, since the default
+  fixture loop scope is the session).
 
 - 2026-07-20 · The Playwright smoke runs in CI, it caught a migration bug on
   its first real run, and the `git_branch` ghost is gone — two debt-register

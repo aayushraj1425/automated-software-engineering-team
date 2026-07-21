@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # `burst` tokens and refills at per_minute/60 per second.
     rate_limit_per_minute: int = 0
     rate_limit_burst: int = 30
+    # Share one bucket across replicas via Redis (RATE_LIMITING.md). Off keeps
+    # the bucket in-process (effective limit is per replica); on, a Redis
+    # outage degrades back to per-replica, never to a hard dependency.
+    rate_limit_shared: bool = False
     # Postgres backups (BACKUPS_AND_RECOVERY.md): enabling adds a nightly
     # pg_dump cron to the arq worker; the CLI (`python -m engine.backup`)
     # works regardless. pg_bin_dir points at pg_dump/pg_restore when they

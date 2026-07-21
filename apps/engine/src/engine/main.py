@@ -26,7 +26,7 @@ from engine.events.bus import dispose_bus
 from engine.jobs import dispose_jobs
 from engine.logging import setup_logging
 from engine.observability import TracingMiddleware, configure_telemetry
-from engine.ratelimit import RateLimitMiddleware
+from engine.ratelimit import RateLimitMiddleware, dispose_ratelimit
 from engine.security.crypto import warn_if_derived_key
 
 
@@ -53,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await recovery
     await dispose_jobs()
     await dispose_bus()
+    await dispose_ratelimit()
     await dispose_engine()
 
 
