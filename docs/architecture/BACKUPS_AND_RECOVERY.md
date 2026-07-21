@@ -54,18 +54,55 @@ flowchart LR
   server is the supported direction, so a local PostgreSQL 18 install backs up
   the dockerized Postgres 16 fine.
 
+## Off-host copies (`BACKUP_S3_BUCKET`)
+
+A dump on the same disk as the database survives a bad migration, not a dead
+machine. Setting `BACKUP_S3_BUCKET` adds one step to `create`: after the local
+dump is written, verified, renamed, and locally pruned, it is uploaded to
+S3-compatible object storage, and the remote copies are pruned to the same
+`BACKUP_RETENTION` count.
+
+```mermaid
+flowchart LR
+    E[local dump verified,\nrenamed, pruned] --> S{BACKUP_S3_BUCKET set?}
+    S -->|no| L[local only\n(unchanged)]
+    S -->|yes| U[upload asep-*.dump\nto the bucket]
+    U --> P[prune remote copies\nto BACKUP_RETENTION]
+```
+
+- **Any S3-compatible store.** `boto3` talks to AWS S3, MinIO, Cloudflare R2,
+  or Backblaze the same way; `BACKUP_S3_ENDPOINT_URL` points it at a
+  non-AWS endpoint (the dev compose MinIO, or a self-hosted one). The dev
+  stack already runs MinIO, so off-host backups can be exercised locally.
+- **Credentials the standard way.** When `BACKUP_S3_ACCESS_KEY_ID` /
+  `BACKUP_S3_SECRET_ACCESS_KEY` are set they are used explicitly (dev MinIO);
+  when they are empty `boto3` falls back to its default chain, so a production
+  pod uses its IAM role and no secret is stored at all.
+- **Local first, always.** The upload runs only after the local dump is safe on
+  disk. If the upload fails the local backup is already kept and the error is
+  raised so the nightly job surfaces it — a network blip never costs a backup.
+- **Off by default.** No bucket configured means the behaviour above is exactly
+  the previous local-only flow; nothing changes for a single-machine
+  deployment until it opts in.
+
+The Kubernetes side of this — a persistent volume for `BACKUP_DIR` on the
+worker, for deployments that prefer a mounted volume over object storage — is
+the remaining Deploy-workstream piece.
+
 ## Exit criterion
 
 The test suite — offline, in CI — writes a row, takes a backup, restores it
 into a scratch database, and reads the row back from the copy. The restore
-path is exercised on every push, not discovered during an outage.
+path is exercised on every push, not discovered during an outage. The off-host
+upload is exercised against the dev MinIO when it is running, and skipped in CI
+(which has no object store), so it never blocks a build.
 
 ## Honest boundaries
 
-- **The backup directory is a local disk.** If the machine burns down, the
-  backups burn with it. Shipping dumps off-host (S3/MinIO or the K8s
-  CronJob's volume) belongs to the Deploy workstream and is logged in the
-  backlog.
+- **Off-host copies are opt-in.** Left unconfigured, the backup directory is a
+  local disk and burns down with the machine. `BACKUP_S3_BUCKET` (above) ships
+  each dump to object storage; a mounted persistent volume for `BACKUP_DIR` is
+  the alternative for volume-based deployments and remains on the backlog.
 - **A dump is useless without `ENGINE_ENCRYPTION_KEY`.** Provider keys and
   integration configs are AES-GCM encrypted at rest; the runbook's first rule
   is that the encryption key is stored separately from the backups.

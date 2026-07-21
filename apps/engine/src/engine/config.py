@@ -70,6 +70,17 @@ class Settings(BaseSettings):
     backup_dir: str = ".backups"
     backup_retention: int = 14
     pg_bin_dir: str = ""
+    # Off-host backups (BACKUPS_AND_RECOVERY.md): set backup_s3_bucket to also
+    # upload each verified dump to S3-compatible storage (empty = local only).
+    # endpoint_url points boto3 at a non-AWS store (the dev MinIO); the two
+    # keys are used explicitly when set, else boto3's default chain (an IAM
+    # role in production, so no secret is stored).
+    backup_s3_bucket: str = ""
+    backup_s3_endpoint_url: str = ""
+    backup_s3_prefix: str = "asep"
+    backup_s3_region: str = "us-east-1"
+    backup_s3_access_key_id: str = ""
+    backup_s3_secret_access_key: str = ""
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"

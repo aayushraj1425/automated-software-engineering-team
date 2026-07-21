@@ -225,7 +225,7 @@ phase (alerting, benchmarks, K8s probes) leans on.
 
 ### Workstream: Backups & Disaster Recovery
 - [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
-- [ ] Ship dumps off-host (S3/MinIO or a volume the K8s CronJob mounts) — a local backup directory burns down with the machine (Deploy workstream)
+- [x] Ship dumps off-host to S3-compatible storage (`BACKUP_S3_BUCKET`): each verified dump is uploaded and the remote copies pruned to `BACKUP_RETENTION`, off by default, degrading to local-only; works against AWS S3, MinIO, or R2 (design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md)). The volume-mounted alternative for the K8s CronJob is the separate PVC item below.
 
 ### Workstream: RBAC & Row-Level Security
 - [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
@@ -264,6 +264,28 @@ phase (alerting, benchmarks, K8s probes) leans on.
 | ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
+
+- 2026-07-21 · Backups can leave the machine — `BACKUP_S3_BUCKET` ships each
+  verified dump off-host. A dump on the same disk as the database survives a
+  bad migration, not a dead machine; the design note had named this the missing
+  piece since Phase 7. `create_backup` gained one step after the local dump is
+  written, verified, renamed, and locally pruned: upload it to S3-compatible
+  storage and prune the remote copies to the same `BACKUP_RETENTION`. It goes
+  through `boto3`, so it speaks to AWS S3, MinIO, or Cloudflare R2 the same way;
+  `BACKUP_S3_ENDPOINT_URL` points it at the dev compose MinIO or a self-hosted
+  store. Credentials are explicit when set (dev) and boto3's default chain when
+  not — a production pod uses its IAM role and stores no secret. Local first
+  always: the upload runs only once the local dump is safe, and a failed upload
+  raises so the nightly job surfaces it without ever costing a backup. Off by
+  default, so a single-machine deployment is unchanged until it opts in. New
+  module `engine/backup_remote.py`; `boto3` added. Design note updated:
+  [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md);
+  `.env.example` gained the `BACKUP_S3_*` keys; the debt/backlog off-host row is
+  struck (the volume-mounted PVC alternative stays as its own item). Verified:
+  engine ruff/pyright clean, full suite 415 passed / 1 skipped — six new tests:
+  the pure logic (runs in CI), the upload/list/prune round trip against the dev
+  MinIO (skips without it), and the create_backup wiring proving the upload
+  fires exactly when configured.
 
 - 2026-07-21 · Board honesty pass + operator handoff. Every self-contained
   engineering item is now shipped, so the board was reconciled against the

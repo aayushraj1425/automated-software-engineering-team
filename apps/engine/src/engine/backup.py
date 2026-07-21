@@ -134,6 +134,17 @@ def create_backup(backup_dir: str | None = None, database_url: str | None = None
         bytes=dump_path.stat().st_size,
         pruned=[p.name for p in removed],
     )
+
+    # Ship the verified dump off-host (S3/MinIO) when configured. The local
+    # backup is already safe on disk, so a failed upload surfaces loudly
+    # without costing a backup. Imported here to keep boto3 off the CLI's
+    # verify/restore paths (backup_remote.py, BACKUPS_AND_RECOVERY.md).
+    from engine.backup_remote import prune_remote_backups, remote_enabled, upload_backup
+
+    if remote_enabled():
+        upload_backup(dump_path)
+        prune_remote_backups(keep=settings.backup_retention)
+
     return dump_path
 
 
