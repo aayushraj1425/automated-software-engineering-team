@@ -143,7 +143,9 @@ async def test_shared_limiter_degrades_to_local_when_redis_is_down():
     """A Redis outage drops the ceiling to the per-replica bucket — never a
     hard dependency, never a 429 storm."""
     local = LocalLimiter()
-    limiter = SharedLimiter(_DeadRedis(), fallback=local)
+    # A structural stand-in for a Redis client whose script always fails; only
+    # register_script is ever reached before the outage surfaces.
+    limiter = SharedLimiter(_DeadRedis(), fallback=local)  # type: ignore[arg-type]
     key = f"test:{uuid.uuid4().hex}"
 
     assert await limiter.take(key, capacity=1.0, per_second=1.0) == 0.0  # local allows
