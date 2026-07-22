@@ -29,6 +29,7 @@ from engine.events.bus import RunEventSubscription, publish_run_ping
 from engine.integrations.hosts import host_connection, push_credential
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
+from engine.reporting import build_run_report
 from engine.workspace.jail import JailViolation, resolve_inside
 from engine.workspace.manager import (
     Workspace,
@@ -451,6 +452,35 @@ async def get_run(
             for t in tasks
         ],
     )
+
+
+class RunReportOut(BaseModel):
+    markdown: str
+    filename: str
+
+
+@router.get("/v1/runs/{run_id}/report")
+async def get_run_report(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunReportOut:
+    """A shareable plain-English markdown summary of the run — request, plan,
+    per-task outcome, cost, and result (RUN_REPORT.md). Built from the run
+    record, so it works even after the workspace is gone."""
+    run = await _visible_run(db, run_id, principal)
+    repo = await _run_repository(db, run)
+    tasks = (
+        (
+            await db.execute(
+                select(AgentTask).where(AgentTask.run_id == run_id).order_by(AgentTask.sequence)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    markdown = build_run_report(run, list(tasks), repo.url if repo else None)
+    return RunReportOut(markdown=markdown, filename=f"run-{run_id.hex[:8]}.md")
 
 
 def _load_run_workspace(run: AgentRun) -> Workspace:

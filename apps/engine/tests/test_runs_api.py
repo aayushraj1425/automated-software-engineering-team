@@ -42,6 +42,28 @@ async def _decide(client, headers, run_id: str, approved: bool):
     )
 
 
+async def test_run_report_summarizes_the_run(client):
+    headers = _headers()
+    run = await _create_run(client, headers, request="Add a /stats endpoint")
+
+    resp = await client.get(f"/v1/runs/{run['id']}/report", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["filename"].endswith(".md")
+    assert body["markdown"].startswith("# Run report")
+    assert "Add a /stats endpoint" in body["markdown"]
+    assert "## Tasks" in body["markdown"]  # the offline plan seeded tasks
+
+
+async def test_run_report_is_owner_scoped(client):
+    owner = _headers()
+    intruder = _headers()
+    run = await _create_run(client, owner)
+
+    resp = await client.get(f"/v1/runs/{run['id']}/report", headers=intruder)
+    assert resp.status_code == 404  # missing and not-yours look the same
+
+
 async def test_run_plans_then_waits_for_approval(client):
     headers = _headers()
     created = await _create_run(client, headers)

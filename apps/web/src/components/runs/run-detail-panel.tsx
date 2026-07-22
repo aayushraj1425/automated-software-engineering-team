@@ -356,6 +356,22 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   // A finished run's workspace is idle — safe for a human to edit and commit.
   const editable = run.status === "completed" || run.status === "failed";
 
+  // Download a shareable markdown summary of the run (built server-side).
+  async function downloadReport() {
+    const res = await fetch(`/api/runs/${runId}/report`);
+    if (!res.ok) return;
+    const { markdown, filename } = (await res.json()) as {
+      markdown: string;
+      filename: string;
+    };
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
       <header className="space-y-2">
@@ -373,16 +389,25 @@ export function RunDetailPanel({ runId }: { runId: string }) {
             {run.total_cost_usd.toFixed(4)}
           </p>
         )}
-        {run.pr_url && (
-          <a
-            href={run.pr_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block rounded-md border border-emerald-800 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40"
+        <div className="flex flex-wrap gap-3">
+          {run.pr_url && (
+            <a
+              href={run.pr_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block rounded-md border border-emerald-800 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-950/40"
+            >
+              View the pull request ↗
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => void downloadReport()}
+            className="inline-block rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-zinc-400"
           >
-            View the pull request ↗
-          </a>
-        )}
+            Download report
+          </button>
+        </div>
       </header>
 
       {run.status === "awaiting_approval" && (
