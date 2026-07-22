@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-13
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-22
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -247,6 +247,13 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] Checklist audit of the security boundaries — every boundary verified with code evidence, one finding fixed inline (the route-table auth sweep test), the rest logged: [security/SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)
 - [x] Loud startup warning when `ENGINE_ENCRYPTION_KEY` is unset and secrets fall back to the key derived from `ENGINE_SERVICE_SECRET` — API lifespan and worker both warn at boot (audit finding 2)
 - [x] Webhook replay/dedupe guard — queued `X-GitHub-Delivery` ids are remembered (bounded, in-process) and a redelivery is ignored instead of re-reviewed (audit finding 3)
+
+## Phase 8 — Deliberate Reasoning
+
+The project's wrap-up phase: make every role reason before it acts.
+
+### Workstream: Reasoning Prompts (blocking)
+- [x] Chain-of-thought and simulation in every role prompt — a short, uniform "think → simulate → act" directive added to all nine role prompts (Product Manager, Backend, Frontend, DevOps, Reviewer, QA, Scrum Master, Technical Writer, Supervisor): reason through the task, then predict the outcome of the intended change (and what could break) before touching the workspace. Prompt-level by design — no extra LLM calls, no pipeline change — captured by the prompt-snapshot contract. Design note: [architecture/DELIBERATE_REASONING.md](architecture/DELIBERATE_REASONING.md)
 
 ## Beyond Phase 3 (headlines only)
 

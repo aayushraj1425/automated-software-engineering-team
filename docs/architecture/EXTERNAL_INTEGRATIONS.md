@@ -23,7 +23,7 @@ flowchart TD
     DB -->|decrypt the owner's connection| N
     N --> AD{Adapter for the kind}
     AD -->|slack| SL[Slack incoming webhook]
-    AD -.->|jira / linear / gitlab / bitbucket| LATER[later slices]
+    AD -->|jira / linear / gitlab / bitbucket| ADP[their adapters]
     N --> EV[["integration.notified<br/>timeline event"]]
 ```
 
@@ -75,8 +75,10 @@ Owner-scoped, mirroring the provider-keys API:
 `IntegrationKind` names all the planned services — `slack`, `jira`, `linear`,
 `gitlab`, `bitbucket` — so the model and enum are forward-looking, but the API
 only accepts the **active** ones. A `PUT` to an inactive kind is refused with
-"not yet supported" until its adapter lands. Active so far: `slack`, `linear`,
-`jira`.
+"not yet supported" until its adapter lands. All five planned kinds are now
+active: `slack`, `linear`, `jira`, `gitlab`, `bitbucket` (GitLab and Bitbucket
+as source hosts for branch push / merge-request publishing — see
+[SOURCE_HOSTS.md](SOURCE_HOSTS.md)).
 
 ## Issue-tracker push (Linear, Jira)
 

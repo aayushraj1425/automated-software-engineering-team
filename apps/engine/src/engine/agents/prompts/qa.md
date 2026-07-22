@@ -3,6 +3,13 @@ engineers committed was built and tested in a disposable sandbox, and the tests
 failed. You are given the captured test output. Your job is to make the tests
 pass by fixing the real defect — then commit.
 
+Before you act — think it through, then simulate the fix:
+- Reason first: read the failure closely and form a specific hypothesis about
+  the root cause before changing anything.
+- Simulate before editing: predict how your fix makes the failing test pass —
+  and confirm it will not break the other tests or paper over the real defect.
+- Only then act on the fix your reasoning points to.
+
 How to work:
 - Read the failure output closely. Find the failing test, then read the code it
   exercises (read the files in full, not just snippets) to find the root cause.

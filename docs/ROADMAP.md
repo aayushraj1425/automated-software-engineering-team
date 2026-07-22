@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** Living document · **Last updated:** 2026-07-16
+**Status:** Living document · **Last updated:** 2026-07-22
 Effort is relative (small / medium / large). Every phase ships the full engineering
 loop: architecture note → API spec → schema migration → UI/UX → implementation →
 unit + integration tests → docs → performance/security pass (enforced by the PR
@@ -15,7 +15,8 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **4** | **Planning Suite** *(complete 2026-07-10)* | medium | Roadmap generation, estimation, blocker detection, priority recommendations; Scrum Master agent; task manager UI | project planning |
 | **5** | **Knowledge & Memory** *(complete 2026-07-11)* | medium | Knowledge graph (decisions, meeting notes, PR history, preferences); long-term team/repo memory feeding agent context | knowledge system; AI memory |
 | **6** | **Workspace & Integrations** *(complete 2026-07-19 — documentation suite with git-history changelog and in-place editing; Slack / Linear / Jira / GitLab / Bitbucket integrations; run-workspace file browser + editor + git commit/push panel; and the sandboxed in-browser terminal)* | large | Editor / terminal / git panels; Jira, Linear, Slack; GitLab, Bitbucket; documentation generation suite (API docs, READMEs, changelogs, guides) | intelligent coding; workflow integrations |
-| **7** | **Production Hardening** *(started 2026-07-13 — observability, rate limiting, backups/DR, row-level security with organization sharing, and the Kubernetes deploy shipped; the rest of the phase plan is in [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md))* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **7** | **Production Hardening** *(complete 2026-07-22 — observability + alerting with LLM cost metrics, Redis-shared rate limiting, off-host backups + PVC, row-level security with organization sharing and roles, the Kubernetes deploy with engine NetworkPolicy isolation, the DinD-capable in-cluster QA sandbox, a secret-gated real-model eval workflow, benchmarks, and the security audit; only certificate-manager mTLS and load-calibrated resource limits stay operator-gated)* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
+| **8** | **Deliberate Reasoning** *(complete 2026-07-22)* | small | Every agent role reasons through an explicit chain of thought and *simulates* — predicts the outcome of its intended action — before acting, via the role prompts; the project's wrap-up quality pass | AI software engineer quality; deliberate, auditable decisions |
 
 ## Phase exit criteria
 
@@ -70,8 +71,11 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   *finished* run a file can be edited and the change committed from a git panel
   (editing an in-flight run is refused, so a human write never races the agent
   loop). ✅ *File-browser + editor/commit slices met 2026-07-13.* Design note:
-  [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md). The terminal (deferred
-  by ADR-0008), pushing a manual commit, and Bitbucket remain.
+  [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md). The remaining slices
+  then landed: a manual branch push from the workspace panel, Bitbucket as a
+  second non-GitHub host behind the same dispatch, and the sandboxed in-browser
+  terminal (a lazy `--network none` container, workspace copied not mounted,
+  30-minute idle TTL) — closing the phase. ✅ *Phase 6 complete 2026-07-19.*
 - **Phase 7 — Production Hardening** *(in progress)*: observability opened the
   phase, wiring the OTel SDK the way ADR-0010 planned — with telemetry enabled,
   one chat request produces a request span (route + status) and an LLM span
@@ -120,10 +124,27 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   once for the route filters and once inside Postgres (`app.org_id`
   alongside `app.user_id`), with conversations and provider keys staying
   personal. ✅ *Organization-sharing slice met 2026-07-16*
-  ([ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)). What
-  remains in the phase needs real traffic or a real cluster (alerting rules,
-  mTLS, the shared rate window):
-  [PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+  ([ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)). The
+  remaining hardening then shipped in a run of focused slices: organization
+  members/invitations/roles with a destructive-action admin gate; the CI
+  end-to-end smoke (which caught a latent alembic-commit bug); the Redis-shared
+  rate-limit window; off-host backups to S3/MinIO and a backup PersistentVolume;
+  a secret-gated real-model evaluation workflow; alerting rules with the LLM
+  cost metric they watch, plus a validated OTel Collector config; engine
+  network isolation via a NetworkPolicy; and the in-cluster QA sandbox via a
+  Docker-in-Docker sidecar (proven against a real DinD daemon). ✅ *Phase 7
+  complete 2026-07-22.* Only two items stay open, each needing infrastructure
+  that cannot be stood up and verified from the code alone — certificate-manager
+  **mutual TLS** and **load-calibrated resource limits** — tracked in
+  [OPERATOR_HANDOFF.md](OPERATOR_HANDOFF.md).
+- **Phase 8 — Deliberate Reasoning** *(complete 2026-07-22)*: every agent role
+  now reasons before it acts. Each role prompt gained a short, uniform
+  "think → simulate → act" directive — reason through the task as a chain of
+  thought, then *simulate* (predict the outcome of the intended change, and what
+  could break) before touching the workspace. Prompt-level by design: no extra
+  LLM calls, no pipeline change; the reasoning rides in the model's own first
+  turn and is captured by the prompt-snapshot contract. ✅ *Met 2026-07-22.*
+  Design note: [DELIBERATE_REASONING.md](architecture/DELIBERATE_REASONING.md).
 
 ## Standing tracks (every phase)
 

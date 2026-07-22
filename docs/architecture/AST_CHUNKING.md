@@ -63,5 +63,6 @@ crosses the 200-line cap); for Java and Kotlin, where methods live inside
 classes, a whole top-level type is one chunk. The dependency graph and
 incremental re-indexing are covered by their own design notes
 ([DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md),
-[INCREMENTAL_INDEXING.md](INCREMENTAL_INDEXING.md)); the dependency graph does
-not yet resolve Java/Kotlin imports.
+[INCREMENTAL_INDEXING.md](INCREMENTAL_INDEXING.md)); the dependency graph
+resolves Java/Kotlin imports by a fully-qualified `package` + declared-type
+map (landed 2026-07-08).
