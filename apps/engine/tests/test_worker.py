@@ -82,11 +82,11 @@ async def test_cancelled_run_checkpoints_and_the_worker_finishes_it(client, monk
     original_execute_task = runner_module.execute_task
     calls = {"count": 0}
 
-    async def hang_on_first_call(task, request, ws, usage, on_tool=None):
+    async def hang_on_first_call(task, request, ws, usage, on_tool=None, on_reasoning=None):
         calls["count"] += 1
         if calls["count"] == 1:
             await asyncio.sleep(60)
-        return await original_execute_task(task, request, ws, usage, on_tool)
+        return await original_execute_task(task, request, ws, usage, on_tool, on_reasoning)
 
     monkeypatch.setattr(runner_module, "execute_task", hang_on_first_call)
 

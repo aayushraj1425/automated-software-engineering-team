@@ -9,7 +9,13 @@ offline pipeline completes deterministically.
 
 from typing import Any
 
-from engine.agents.loop import LlmUsage, ToolObserver, parse_json_object, run_tool_loop
+from engine.agents.loop import (
+    LlmUsage,
+    ReasoningObserver,
+    ToolObserver,
+    parse_json_object,
+    run_tool_loop,
+)
 from engine.agents.product_manager import ENGINEER_ROLES
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
@@ -42,6 +48,7 @@ async def review_run(
     ws: Workspace,
     usage: LlmUsage,
     on_tool: ToolObserver | None = None,
+    on_reasoning: ReasoningObserver | None = None,
 ) -> dict[str, Any]:
     if get_settings().llm_fake:
         return {"verdict": APPROVE, "findings": []}
@@ -59,7 +66,7 @@ async def review_run(
             ),
         },
     ]
-    reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
+    reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
     try:
         return validate_verdict(parse_verdict(reply))
     except ReviewError as exc:
@@ -67,7 +74,7 @@ async def review_run(
         messages.append(
             {"role": "user", "content": f"That verdict was rejected: {exc}\n\n{VERDICT_FORMAT}"}
         )
-        reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
+        reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
         return validate_verdict(parse_verdict(reply))
 
 

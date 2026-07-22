@@ -9,7 +9,13 @@ pipeline runs offline.
 
 from typing import Any
 
-from engine.agents.loop import LlmUsage, ToolObserver, parse_json_object, run_tool_loop
+from engine.agents.loop import (
+    LlmUsage,
+    ReasoningObserver,
+    ToolObserver,
+    parse_json_object,
+    run_tool_loop,
+)
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
 from engine.db.enums import AgentRole
@@ -69,6 +75,7 @@ async def create_plan(
     usage: LlmUsage,
     on_tool: ToolObserver | None = None,
     memory: str = "",
+    on_reasoning: ReasoningObserver | None = None,
 ) -> dict[str, Any]:
     if get_settings().llm_fake:
         return validate_plan(_OFFLINE_PLAN)
@@ -81,7 +88,7 @@ async def create_plan(
         {"role": "system", "content": spec.system_prompt},
         {"role": "user", "content": f"{memory_block}Feature request:\n{request}\n\n{PLAN_FORMAT}"},
     ]
-    reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
+    reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
     try:
         return validate_plan(parse_plan(reply))
     except PlanError as exc:
@@ -89,7 +96,7 @@ async def create_plan(
         messages.append(
             {"role": "user", "content": f"That plan was rejected: {exc}\n\n{PLAN_FORMAT}"}
         )
-        reply = await run_tool_loop(spec, ws, messages, usage, on_tool)
+        reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
         return validate_plan(parse_plan(reply))
 
 

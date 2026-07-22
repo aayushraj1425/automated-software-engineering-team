@@ -24,6 +24,9 @@ MAX_TURNS = 24
 
 # Audit callback: (tool name, arguments, result) after every tool call.
 ToolObserver = Callable[[str, dict[str, Any], str], Awaitable[None]]
+# Reasoning callback: the text a model turn wrote alongside its tool calls —
+# the agent's "why" before it acts (docs/architecture/AGENT_REASONING_TIMELINE.md).
+ReasoningObserver = Callable[[str], Awaitable[None]]
 
 
 class AgentLoopError(Exception):
@@ -67,6 +70,7 @@ async def run_tool_loop(
     messages: list[dict[str, Any]],
     usage: LlmUsage,
     on_tool: ToolObserver | None = None,
+    on_reasoning: ReasoningObserver | None = None,
 ) -> str:
     tools = schemas_for(spec.tools)
     for _ in range(MAX_TURNS):
@@ -75,6 +79,10 @@ async def run_tool_loop(
         messages.append(turn.message)
         if not turn.tool_calls:
             return turn.content or ""
+        # The text on a tool-calling turn is the agent's reasoning before it
+        # acts; the final (no-tool) turn is its summary, recorded elsewhere.
+        if on_reasoning is not None and (turn.content or "").strip():
+            await on_reasoning(turn.content or "")
         for call in turn.tool_calls:
             result = await call_tool(ws, spec.tools, call.name, call.arguments)
             log.info("agent.tool_call", role=spec.role, tool=call.name)

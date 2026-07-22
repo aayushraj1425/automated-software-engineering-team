@@ -6,7 +6,7 @@ executed deterministically through the same tools — a file is written and
 committed — so the pipeline is testable end to end without a model.
 """
 
-from engine.agents.loop import LlmUsage, ToolObserver, run_tool_loop
+from engine.agents.loop import LlmUsage, ReasoningObserver, ToolObserver, run_tool_loop
 from engine.agents.registry import AgentSpec, get_agent_spec
 from engine.agents.supervisor import TaskState
 from engine.agents.tools import call_tool
@@ -24,6 +24,7 @@ async def execute_task(
     ws: Workspace,
     usage: LlmUsage,
     on_tool: ToolObserver | None = None,
+    on_reasoning: ReasoningObserver | None = None,
 ) -> str:
     spec = get_agent_spec(task["role"])
     if get_settings().llm_fake:
@@ -42,7 +43,7 @@ async def execute_task(
             ),
         },
     ]
-    return await run_tool_loop(spec, ws, messages, usage, on_tool)
+    return await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
 
 
 async def execute_revision(
@@ -52,6 +53,7 @@ async def execute_revision(
     ws: Workspace,
     usage: LlmUsage,
     on_tool: ToolObserver | None = None,
+    on_reasoning: ReasoningObserver | None = None,
 ) -> str:
     """One revision round: the engineer addresses the Reviewer's findings."""
     spec = get_agent_spec(role)
@@ -84,7 +86,7 @@ async def execute_revision(
             ),
         },
     ]
-    return await run_tool_loop(spec, ws, messages, usage, on_tool)
+    return await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
 
 
 async def _execute_offline(

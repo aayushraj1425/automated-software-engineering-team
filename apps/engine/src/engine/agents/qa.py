@@ -8,7 +8,7 @@ a deterministic commit so the loop is testable without a model. Design note:
 docs/architecture/QA_AGENT.md.
 """
 
-from engine.agents.loop import LlmUsage, ToolObserver, run_tool_loop
+from engine.agents.loop import LlmUsage, ReasoningObserver, ToolObserver, run_tool_loop
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
 from engine.db.enums import AgentRole
@@ -26,6 +26,7 @@ async def fix_failing_tests(
     attempt: int,
     max_attempts: int,
     on_tool: ToolObserver | None = None,
+    on_reasoning: ReasoningObserver | None = None,
 ) -> str:
     """One QA fix-and-commit round against the current sandbox failure."""
     spec = get_agent_spec(AgentRole.QA)
@@ -47,7 +48,7 @@ async def fix_failing_tests(
             ),
         },
     ]
-    return await run_tool_loop(spec, ws, messages, usage, on_tool)
+    return await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
 
 
 async def _fix_offline(ws: Workspace, attempt: int, on_tool: ToolObserver | None) -> str:

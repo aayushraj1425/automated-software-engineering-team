@@ -44,6 +44,11 @@ export function describeEvent(event: RunEvent): string {
       const failed = p.ok === false ? " (failed)" : "";
       return `${agentName(event.agent)} used ${String(p.tool)}${suffix}${failed}`;
     }
+    case "agent.reasoning": {
+      const text = String(p.text ?? "").trim();
+      const shown = text.length > 140 ? `${text.slice(0, 140)}…` : text;
+      return `${agentName(event.agent)} is thinking: ${shown}`;
+    }
     case "review.verdict":
       return p.verdict === "approve"
         ? "Reviewer approved the changes"

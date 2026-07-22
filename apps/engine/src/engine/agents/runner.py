@@ -145,6 +145,30 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
     return _record
 
 
+# How much reasoning text to keep on a timeline event — enough to read the
+# rationale, capped like other event payloads (docs/architecture/AGENT_REASONING_TIMELINE.md).
+_REASONING_MAX = 2000
+
+
+def _reasoning_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | None = None):
+    """The agent's 'why': one agent.reasoning event per tool-calling turn that
+    carried reasoning text (AGENT_REASONING_TIMELINE.md)."""
+
+    async def _record(text: str) -> None:
+        async with session_scope() as session:
+            _emit(
+                session,
+                run_id,
+                "agent.reasoning",
+                {"text": text[:_REASONING_MAX]},
+                agent=agent,
+                task_id=task_id,
+            )
+            await _commit_and_ping(session, run_id)
+
+    return _record
+
+
 async def plan_run(run_id: uuid.UUID) -> None:
     """Background entrypoint after POST /v1/runs: plan, then wait for approval."""
     # The span ties every LLM call in the phase to the run (ADR-0010 post-mortems).
@@ -212,7 +236,12 @@ async def _plan_run(run_id: uuid.UUID) -> None:
     ws = await _open_workspace(run_id, repo_url)
     usage = LlmUsage()
     plan = await create_plan(
-        request, ws, usage, _tool_observer(run_id, AgentRole.PRODUCT_MANAGER), memory=memory
+        request,
+        ws,
+        usage,
+        _tool_observer(run_id, AgentRole.PRODUCT_MANAGER),
+        memory=memory,
+        on_reasoning=_reasoning_observer(run_id, AgentRole.PRODUCT_MANAGER),
     )
 
     async with session_scope() as session:
@@ -343,7 +372,13 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         for role, issues in findings_by_role.items():
             usage = LlmUsage()
             summary = await execute_revision(
-                role, issues, request, ws, usage, _tool_observer(run_id, role)
+                role,
+                issues,
+                request,
+                ws,
+                usage,
+                _tool_observer(run_id, role),
+                _reasoning_observer(run_id, role),
             )
             async with session_scope() as session:
                 run = await session.get(AgentRun, run_id)
@@ -391,7 +426,12 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
 async def _review(run_id: uuid.UUID, request: str, plan_summary: str, ws: Workspace) -> dict:
     usage = LlmUsage()
     verdict = await review_run(
-        request, plan_summary, ws, usage, _tool_observer(run_id, AgentRole.REVIEWER)
+        request,
+        plan_summary,
+        ws,
+        usage,
+        _tool_observer(run_id, AgentRole.REVIEWER),
+        _reasoning_observer(run_id, AgentRole.REVIEWER),
     )
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
@@ -527,7 +567,14 @@ async def _run_qa_fix(
     """The QA agent reads the sandbox failure and commits a fix in the workspace."""
     usage = LlmUsage()
     summary = await fix_failing_tests(
-        request, failure_output, ws, usage, attempt, total, _tool_observer(run_id, AgentRole.QA)
+        request,
+        failure_output,
+        ws,
+        usage,
+        attempt,
+        total,
+        _tool_observer(run_id, AgentRole.QA),
+        _reasoning_observer(run_id, AgentRole.QA),
     )
     async with session_scope() as session:
         run = await session.get(AgentRun, run_id)
@@ -661,7 +708,12 @@ def _make_task_executor(run_id: uuid.UUID, request: str, ws: Workspace, known_id
         usage = LlmUsage()
         try:
             result = await execute_task(
-                task, request, ws, usage, _tool_observer(run_id, task["role"], task_id)
+                task,
+                request,
+                ws,
+                usage,
+                _tool_observer(run_id, task["role"], task_id),
+                _reasoning_observer(run_id, task["role"], task_id),
             )
         except Exception as exc:
             async with session_scope() as session:

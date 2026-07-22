@@ -75,6 +75,18 @@ describe("describeEvent", () => {
     ).toBe('Task "Old task" skipped: not needed');
   });
 
+  it("surfaces an agent's reasoning, truncating a long trace", () => {
+    expect(
+      describeEvent(event("agent.reasoning", { text: "I'll read the file first." }, "backend")),
+    ).toBe("Backend is thinking: I'll read the file first.");
+
+    const long = "x".repeat(200);
+    const line = describeEvent(event("agent.reasoning", { text: long }, "reviewer"));
+    expect(line.startsWith("Reviewer is thinking: ")).toBe(true);
+    expect(line.endsWith("…")).toBe(true);
+    expect(line.length).toBeLessThan(180);
+  });
+
   it("falls back to the raw type for unknown events", () => {
     expect(describeEvent(event("something.new", {}))).toBe("something.new");
   });
