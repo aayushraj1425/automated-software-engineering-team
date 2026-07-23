@@ -511,6 +511,37 @@ async def get_run(
     )
 
 
+# While a run is in one of these states a background task may still be working
+# on it — deleting the row out from under it would be a race.
+_ACTIVE_RUN_STATUSES = {
+    RunStatus.QUEUED,
+    RunStatus.PLANNING,
+    RunStatus.EXECUTING,
+    RunStatus.REVIEWING,
+}
+
+
+@router.delete("/v1/runs/{run_id}", status_code=204)
+async def delete_run(
+    run_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    """Delete a run and its history — owner-scoped. Refused while the run is
+    still working; an awaiting-approval, completed, failed, or cancelled run is
+    safe to remove. Its tasks, events, and artifacts cascade in the database,
+    and its workspace is removed from disk."""
+    run = await _visible_run(db, run_id, principal)
+    if run.status in _ACTIVE_RUN_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="This run is still working — wait for it to finish before deleting it",
+        )
+    await asyncio.to_thread(remove_workspace, run.id)
+    await db.delete(run)
+    await db.commit()
+
+
 class RunReportOut(BaseModel):
     markdown: str
     filename: str

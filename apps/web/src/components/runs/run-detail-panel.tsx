@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { agentName, describeEvent } from "./event-text";
@@ -35,6 +36,7 @@ function diffLineClass(line: string): string {
  * throttled task-board refresh); if the stream fails, falls back to the old
  * polling loop. Design note: docs/architecture/RUN_EVENT_STREAMING.md. */
 export function RunDetailPanel({ runId }: { runId: string }) {
+  const router = useRouter();
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [deciding, setDeciding] = useState(false);
@@ -372,6 +374,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     URL.revokeObjectURL(url);
   }
 
+  // A run that is not actively working can be deleted (the engine refuses the rest).
+  const deletable = !["queued", "planning", "executing", "reviewing"].includes(run.status);
+
+  async function deleteRun() {
+    if (!window.confirm("Delete this run and its history? This cannot be undone.")) return;
+    const res = await fetch(`/api/runs/${runId}`, { method: "DELETE" });
+    if (res.ok) router.push("/runs");
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
       <header className="space-y-2">
@@ -407,6 +418,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           >
             Download report
           </button>
+          {deletable && (
+            <button
+              type="button"
+              onClick={() => void deleteRun()}
+              className="inline-block rounded-md border border-red-900 px-3 py-1.5 text-sm text-red-300 hover:bg-red-950/40"
+            >
+              Delete run
+            </button>
+          )}
         </div>
       </header>
 

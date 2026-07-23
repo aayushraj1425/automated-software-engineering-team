@@ -47,3 +47,20 @@ flowchart LR
   automatically; that policy can come with hosted multi-tenancy.
 - The benchmark harness deletes its synthetic runs explicitly now that the
   cascade no longer does it.
+
+## Deleting a run explicitly (2026-07-23)
+
+Retention protects run history from *accidental* loss; a user still needs to
+remove a run *on purpose* — a failed experiment, a test run, clutter.
+`DELETE /v1/runs/{id}` does that, owner-scoped through the same `_visible_run`
+check as the rest of the runs API (missing and not-yours both 404). Two
+safeguards:
+
+- **Never mid-flight.** The run must not be in an actively-working state
+  (`queued`, `planning`, `executing`, `reviewing`) — deleting the row out from
+  under a running background task would be a race; those return **409**. An
+  awaiting-approval, completed, failed, or cancelled run is safe.
+- **Everything goes together.** The run's tasks, events, and artifacts cascade
+  in the database (the FKs the retention work left as `CASCADE` on the run's own
+  children), and the on-disk workspace is removed. The run page's **Delete run**
+  button appears only for a deletable run and returns to the list afterward.

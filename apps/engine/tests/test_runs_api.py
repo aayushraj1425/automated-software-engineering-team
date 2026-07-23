@@ -42,6 +42,42 @@ async def _decide(client, headers, run_id: str, approved: bool):
     )
 
 
+async def test_delete_run_removes_it(client):
+    headers = _headers()
+    run = await _create_run(client, headers)
+
+    resp = await client.delete(f"/v1/runs/{run['id']}", headers=headers)
+    assert resp.status_code == 204
+    assert (await client.get(f"/v1/runs/{run['id']}", headers=headers)).status_code == 404
+
+
+async def test_delete_run_refused_while_active(client, prepared_db):
+    from engine.db.enums import RunStatus
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    user = f"del_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        run = AgentRun(user_id=user, request="busy", status=RunStatus.EXECUTING)
+        session.add(run)
+        await session.commit()
+        run_id = run.id
+
+    resp = await client.delete(f"/v1/runs/{run_id}", headers=auth_headers(user))
+    assert resp.status_code == 409
+    assert (await client.get(f"/v1/runs/{run_id}", headers=auth_headers(user))).status_code == 200
+
+
+async def test_delete_run_is_owner_scoped(client):
+    owner = _headers()
+    intruder = _headers()
+    run = await _create_run(client, owner)
+
+    resp = await client.delete(f"/v1/runs/{run['id']}", headers=intruder)
+    assert resp.status_code == 404  # missing and not-yours look the same
+    assert (await client.get(f"/v1/runs/{run['id']}", headers=owner)).status_code == 200
+
+
 async def test_run_stats_aggregate_outcomes(client, prepared_db):
     from decimal import Decimal
 
