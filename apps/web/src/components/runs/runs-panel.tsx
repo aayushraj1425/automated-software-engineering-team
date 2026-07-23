@@ -8,6 +8,7 @@ import type { RunSummary } from "./types";
 
 type RunStats = {
   total: number;
+  by_status: Record<string, number>;
   completed: number;
   failed: number;
   success_rate: number | null;
@@ -28,21 +29,27 @@ export function RunsPanel() {
   const router = useRouter();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [stats, setStats] = useState<RunStats | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Stats once on mount; the run list re-fetches when the status filter changes.
   useEffect(() => {
     void (async () => {
-      const [runsRes, statsRes] = await Promise.all([
-        fetch("/api/runs"),
-        fetch("/api/runs/stats"),
-      ]);
-      if (runsRes.ok) setRuns(await runsRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
+      const res = await fetch("/api/runs/stats");
+      if (res.ok) setStats(await res.json());
     })();
   }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const query = filter ? `?status=${encodeURIComponent(filter)}` : "";
+      const res = await fetch(`/api/runs${query}`);
+      if (res.ok) setRuns(await res.json());
+    })();
+  }, [filter]);
 
   async function startRun(e: React.FormEvent) {
     e.preventDefault();
@@ -107,7 +114,34 @@ export function RunsPanel() {
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Previous runs</h2>
-        {runs.length === 0 && <p className="text-sm text-zinc-500">No runs yet.</p>}
+        {stats && stats.total > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["All", null] as const,
+              ...Object.keys(stats.by_status)
+                .sort()
+                .map((s) => [`${s.replace(/_/g, " ")} (${stats.by_status[s]})`, s] as const),
+            ].map(([label, value]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setFilter(value)}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  filter === value
+                    ? "border-zinc-300 bg-zinc-100 text-zinc-900"
+                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {runs.length === 0 && (
+          <p className="text-sm text-zinc-500">
+            {filter ? "No runs with this status." : "No runs yet."}
+          </p>
+        )}
         {runs.map((run) => (
           <button
             key={run.id}

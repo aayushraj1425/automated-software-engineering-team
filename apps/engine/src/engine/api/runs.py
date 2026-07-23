@@ -400,16 +400,18 @@ async def decide_run(
 async def list_runs(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
+    status: str | None = Query(default=None, description="Filter to one run status"),
 ) -> list[RunOut]:
-    rows = (
-        await db.execute(
-            select(AgentRun, Repository.url)
-            .outerjoin(Repository, AgentRun.repository_id == Repository.id)
-            .where(visible_clause(AgentRun.user_id, AgentRun.org_id, principal))
-            .order_by(AgentRun.created_at.desc())
-            .limit(50)
-        )
-    ).all()
+    stmt = (
+        select(AgentRun, Repository.url)
+        .outerjoin(Repository, AgentRun.repository_id == Repository.id)
+        .where(visible_clause(AgentRun.user_id, AgentRun.org_id, principal))
+    )
+    if status:
+        # An unknown status simply matches nothing — no 422 for a stale filter.
+        stmt = stmt.where(AgentRun.status == status)
+    stmt = stmt.order_by(AgentRun.created_at.desc()).limit(50)
+    rows = (await db.execute(stmt)).all()
     return [_run_out(run, url or DISCONNECTED_REPOSITORY) for run, url in rows]
 
 

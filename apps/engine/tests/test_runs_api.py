@@ -92,6 +92,37 @@ async def test_run_stats_aggregate_outcomes(client, prepared_db):
     assert stats["by_status"]["completed"] == 2
 
 
+async def test_runs_list_filters_by_status(client, prepared_db):
+    from engine.db.enums import RunStatus
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    user = f"filter_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        session.add_all(
+            [
+                AgentRun(user_id=user, request="ok one", status=RunStatus.COMPLETED),
+                AgentRun(user_id=user, request="ok two", status=RunStatus.COMPLETED),
+                AgentRun(user_id=user, request="broke", status=RunStatus.FAILED),
+            ]
+        )
+        await session.commit()
+
+    headers = auth_headers(user)
+    completed = (await client.get("/v1/runs?status=completed", headers=headers)).json()
+    assert {r["request"] for r in completed} == {"ok one", "ok two"}
+
+    failed = (await client.get("/v1/runs?status=failed", headers=headers)).json()
+    assert [r["request"] for r in failed] == ["broke"]
+
+    # An unknown status is a no-op filter, not an error.
+    unknown = await client.get("/v1/runs?status=not_a_status", headers=headers)
+    assert unknown.status_code == 200
+    assert unknown.json() == []
+
+    assert len((await client.get("/v1/runs", headers=headers)).json()) == 3
+
+
 async def test_run_stats_are_empty_for_a_new_user(client):
     stats = (await client.get("/v1/runs/stats", headers=_headers())).json()
     assert stats["total"] == 0

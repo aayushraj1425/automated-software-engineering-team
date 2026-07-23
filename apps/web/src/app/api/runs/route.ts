@@ -10,7 +10,10 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const token = await signServiceToken(session);
-  const upstream = await fetch(`${env.ENGINE_URL}/v1/runs`, {
+  // Forward a ?status= filter through to the engine (only the known param).
+  const status = new URL(req.url).searchParams.get("status");
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const upstream = await fetch(`${env.ENGINE_URL}/v1/runs${query}`, {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",
   });
