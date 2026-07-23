@@ -259,6 +259,7 @@ The project's wrap-up phase: make every role reason before it acts.
 - [x] Run statistics — `GET /v1/runs/stats` aggregates the caller's visible runs (owner/org-scoped) into the product KPI: counts by status, completed/failed, success rate (terminal-only), total spend and tokens; the runs page shows a Runs · Success-rate · Total-spend strip. Closes the "no metric for run outcomes" gap the performance analysis flagged. Design note: [architecture/RUN_STATISTICS.md](architecture/RUN_STATISTICS.md)
 - [x] Filter the runs list by status — `GET /v1/runs?status=<status>` (unknown status is a no-op, not a 422); the runs page shows clickable status chips (from the stats counts) that filter the list, with the BFF forwarding the one known param
 - [x] Delete a run — `DELETE /v1/runs/{id}` removes a run and its history (tasks, events, artifacts cascade; workspace removed), owner-scoped; refused `409` while the run is actively working (queued/planning/executing/reviewing). A **Delete run** button on the run page for deletable runs. Design note: [architecture/RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md) (§Deleting a run explicitly)
+- [x] Conversation management — `PATCH /v1/conversations/{id}` (rename; blank title → 422) and `DELETE /v1/conversations/{id}` (delete + cascade messages), owner-scoped through one `_owned_conversation` helper; the chat sidebar gains hover rename/delete affordances. Design note: [architecture/CONVERSATION_MANAGEMENT.md](architecture/CONVERSATION_MANAGEMENT.md)
 
 ## Beyond Phase 3 (headlines only)
 

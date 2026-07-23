@@ -64,6 +64,28 @@ export function ChatPanel({ userName }: { userName: string }) {
     setMessages([]);
   }
 
+  async function renameConversation(id: string, currentTitle: string) {
+    const next = window.prompt("Rename conversation", currentTitle);
+    if (next === null) return;
+    const title = next.trim();
+    if (!title) return;
+    const res = await fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (res.ok) void refreshConversations();
+  }
+
+  async function deleteConversation(id: string) {
+    if (!window.confirm("Delete this conversation and its messages?")) return;
+    const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      if (id === conversationId) newConversation();
+      void refreshConversations();
+    }
+  }
+
   async function send(text: string) {
     setBusy(true);
     const userMsg: ChatMessage = { id: `local-${Date.now()}`, role: "user", content: text };
@@ -145,15 +167,39 @@ export function ChatPanel({ userName }: { userName: string }) {
         </button>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3">
           {conversations.map((c) => (
-            <button
+            <div
               key={c.id}
-              onClick={() => void openConversation(c.id)}
-              className={`block w-full truncate rounded-md px-3 py-2 text-left text-sm ${
+              className={`group flex items-center rounded-md ${
                 c.id === conversationId ? "bg-zinc-800" : "hover:bg-zinc-900"
               }`}
             >
-              {c.title ?? "Untitled"}
-            </button>
+              <button
+                onClick={() => void openConversation(c.id)}
+                className="block flex-1 truncate px-3 py-2 text-left text-sm"
+              >
+                {c.title ?? "Untitled"}
+              </button>
+              <div className="flex shrink-0 items-center gap-1 pr-2 opacity-0 group-hover:opacity-100">
+                <button
+                  type="button"
+                  title="Rename"
+                  aria-label="Rename conversation"
+                  onClick={() => void renameConversation(c.id, c.title ?? "")}
+                  className="px-1 text-xs text-zinc-500 hover:text-zinc-200"
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  title="Delete"
+                  aria-label="Delete conversation"
+                  onClick={() => void deleteConversation(c.id)}
+                  className="px-1 text-xs text-zinc-500 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
           ))}
         </nav>
         <Link
