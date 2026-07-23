@@ -165,6 +165,11 @@ export function RepositoriesPanel() {
                   ? `${repo.chunks.toLocaleString()} indexed pieces`
                   : "not indexed yet"}
               </p>
+              {repo.status === "index_failed" && repo.status_detail && (
+                <p className="mt-1 truncate text-xs text-red-400" title={repo.status_detail}>
+                  Indexing failed: {repo.status_detail}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <StatusChip status={repo.status} />

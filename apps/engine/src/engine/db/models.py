@@ -64,6 +64,8 @@ class Repository(Base, TimestampMixin):
     url: Mapped[str] = mapped_column(String(512))
     default_branch: Mapped[str] = mapped_column(String(128), default="main")
     status: Mapped[str] = mapped_column(String(32), default="connected")
+    # A short human reason when status is index_failed; cleared on a good index.
+    status_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

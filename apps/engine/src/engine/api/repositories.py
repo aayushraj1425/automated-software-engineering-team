@@ -37,6 +37,7 @@ class RepositoryOut(BaseModel):
     id: uuid.UUID
     url: str
     status: str
+    status_detail: str | None  # why indexing failed, when status is index_failed
     default_branch: str
     last_indexed_at: datetime | None
     chunks: int
@@ -97,6 +98,7 @@ def _repository_out(repo: Repository, chunks: int) -> RepositoryOut:
         id=repo.id,
         url=repo.url,
         status=repo.status,
+        status_detail=repo.status_detail,
         default_branch=repo.default_branch,
         last_indexed_at=repo.last_indexed_at,
         chunks=chunks,
@@ -217,6 +219,7 @@ async def start_indexing(
 ) -> RepositoryOut:
     repo = await _visible_repository(db, repository_id, principal)
     repo.status = "indexing"
+    repo.status_detail = None  # clear any prior failure reason as we retry
     await db.commit()
     background.add_task(index_repository, repo.id)
     return _repository_out(repo, await _chunk_count(db, repo.id))

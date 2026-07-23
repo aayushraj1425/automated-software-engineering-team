@@ -59,6 +59,8 @@ async def index_repository(repository_id: uuid.UUID) -> None:
             repo = await session.get(Repository, repository_id)
             if repo is not None:
                 repo.status = "index_failed"
+                # A short reason the user can act on (bad URL, private repo, …).
+                repo.status_detail = str(exc)[:500] or type(exc).__name__
                 await session.commit()
         raise exc from None
 
@@ -66,6 +68,7 @@ async def index_repository(repository_id: uuid.UUID) -> None:
         repo = await session.get(Repository, repository_id)
         if repo is not None:
             repo.status = "indexed"
+            repo.status_detail = None  # a good index clears any prior failure reason
             repo.last_indexed_at = datetime.now(UTC)
             await session.commit()
     log.info(

@@ -2,6 +2,7 @@ export type RepositorySummary = {
   id: string;
   url: string;
   status: string;
+  status_detail: string | null;
   default_branch: string;
   last_indexed_at: string | null;
   chunks: number;

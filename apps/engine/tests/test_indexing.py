@@ -181,6 +181,7 @@ async def test_connect_index_and_search(client, tmp_path):
     # httpx's ASGI transport waits for background tasks — indexing is done here
     listed = (await client.get("/v1/repositories", headers=headers)).json()
     assert listed[0]["status"] == "indexed"
+    assert listed[0]["status_detail"] is None  # a good index carries no failure reason
     assert listed[0]["chunks"] > 0
     assert listed[0]["last_indexed_at"] is not None
 
@@ -194,6 +195,33 @@ async def test_connect_index_and_search(client, tmp_path):
     assert hits[0]["path"] == "app/config.py"
     assert hits[0]["score"] > 0.99
     assert hits[0]["start_line"] == 1
+
+
+async def test_indexing_failure_records_a_reason(prepared_db, tmp_path):
+    """An index that cannot even clone leaves a human reason on the repository,
+    not just a bare 'index_failed' status (INDEXING_ERROR_SURFACING.md)."""
+    from contextlib import suppress
+
+    from engine.db.models import Repository
+    from engine.db.session import session_scope
+    from engine.indexing.indexer import index_repository
+
+    user = f"idx_{uuid.uuid4().hex[:8]}"
+    bogus = str(tmp_path / "does-not-exist")
+    async with session_scope(user_id=user) as session:
+        repo = Repository(owner_id=user, url=bogus, status="indexing")
+        session.add(repo)
+        await session.commit()
+        repo_id = repo.id
+
+    with suppress(Exception):  # index_repository re-raises after recording the reason
+        await index_repository(repo_id)
+
+    async with session_scope() as session:
+        repo = await session.get(Repository, repo_id)
+        assert repo is not None
+        assert repo.status == "index_failed"
+        assert repo.status_detail  # a non-empty, human-readable reason
 
 
 async def test_incremental_reindex_only_touches_changed_files(client, tmp_path):

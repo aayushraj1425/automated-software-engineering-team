@@ -86,6 +86,88 @@
         }
       }
     },
+    "/v1/conversations/{conversation_id}": {
+      "patch": {
+        "summary": "Rename Conversation",
+        "operationId": "rename_conversation_v1_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationRename"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Conversation",
+        "description": "Delete a conversation and its messages (cascade), owner-scoped.",
+        "operationId": "delete_conversation_v1_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/conversations/{conversation_id}/messages": {
       "get": {
         "summary": "List Messages",
@@ -131,38 +213,18 @@
       }
     },
     "/v1/runs": {
-      "get": {
-        "summary": "List Runs",
-        "operationId": "list_runs_v1_runs_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/RunOut"
-                  },
-                  "type": "array",
-                  "title": "Response List Runs V1 Runs Get"
-                }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "summary": "Create Run",
         "operationId": "create_run_v1_runs_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RunCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -171,6 +233,107 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List Runs",
+        "operationId": "list_runs_v1_runs_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to one run status",
+              "title": "Status"
+            },
+            "description": "Filter to one run status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RunOut"
+                  },
+                  "title": "Response List Runs V1 Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/plan": {
+      "put": {
+        "summary": "Edit Plan",
+        "description": "Fix a nearly-right plan at the approval gate instead of rejecting it:\nretitle, re-describe, or drop tasks (PLAN_EDITING.md). Only while the\nrun awaits approval \u2014 before that there is no plan, after that it runs.",
+        "operationId": "edit_plan_v1_runs__run_id__plan_put",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanEditIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanEditOut"
                 }
               }
             }
@@ -239,6 +402,25 @@
         }
       }
     },
+    "/v1/runs/stats": {
+      "get": {
+        "summary": "Get Run Stats",
+        "description": "Aggregate outcomes across the caller's visible runs \u2014 the product KPI:\nhow many runs, how they ended, the success rate, and the spend.",
+        "operationId": "get_run_stats_v1_runs_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatsOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}": {
       "get": {
         "summary": "Get Run",
@@ -262,6 +444,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Run",
+        "description": "Delete a run and its history \u2014 owner-scoped. Refused while the run is\nstill working; an awaiting-approval, completed, failed, or cancelled run is\nsafe to remove. Its tasks, events, and artifacts cascade in the database,\nand its workspace is removed from disk.",
+        "operationId": "delete_run_v1_runs__run_id__delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/report": {
+      "get": {
+        "summary": "Get Run Report",
+        "description": "A shareable plain-English markdown summary of the run \u2014 request, plan,\nper-task outcome, cost, and result (RUN_REPORT.md). Built from the run\nrecord, so it works even after the workspace is gone.",
+        "operationId": "get_run_report_v1_runs__run_id__report_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunReportOut"
                 }
               }
             }
@@ -554,6 +809,47 @@
         }
       }
     },
+    "/v1/runs/{run_id}/push": {
+      "post": {
+        "summary": "Push Workspace",
+        "description": "Push the run's branch to its host (finished runs only) \u2014 the way a\nmanual workspace commit leaves the machine (WORKSPACE_PANELS.md). The\ncredential logic is the run pipeline's own (integrations/hosts.py): a\nGitLab or Bitbucket repository uses the run owner's encrypted\nconnection, GitHub uses the environment token, anything else pushes\nplainly.",
+        "operationId": "push_workspace_v1_runs__run_id__push_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}/events": {
       "get": {
         "summary": "List Events",
@@ -657,6 +953,89 @@
         }
       }
     },
+    "/v1/runs/{run_id}/terminal": {
+      "post": {
+        "summary": "Run Command",
+        "description": "One command in the run's sandboxed scratch copy of the workspace.",
+        "operationId": "run_command_v1_runs__run_id__terminal_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalCommandIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalCommandOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Reset",
+        "description": "Discard the session \u2014 the next command starts from a fresh copy.",
+        "operationId": "reset_v1_runs__run_id__terminal_delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/repositories": {
       "get": {
         "summary": "List Repositories",
@@ -701,6 +1080,40 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/repositories/{repository_id}": {
+      "delete": {
+        "summary": "Disconnect Repository",
+        "description": "Disconnect: the repository's data (index, work items, knowledge,\ndocuments) goes with it; run history survives detached \u2014 the FK is\nSET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md).\nDestroying a teammate's shared repository takes an admin\n(ORGANIZATION_ROLES.md); your own stays yours to disconnect.",
+        "operationId": "disconnect_repository_v1_repositories__repository_id__delete",
+        "parameters": [
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -879,6 +1292,16 @@
                 }
               ],
               "title": "X-Hub-Signature-256"
+            }
+          },
+          {
+            "name": "x-github-delivery",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Github-Delivery"
             }
           }
         ],
@@ -1473,7 +1896,7 @@
       },
       "post": {
         "summary": "Generate Repository Document",
-        "description": "Technical Writer: generate a document from the index and save it.",
+        "description": "Technical Writer: generate a document from the index and save it.\nThe changelog additionally reads the repository's real commit history\n(bounded shallow fetch \u2014 engine/docs/git_history.py); when the fetch\nfails it falls back to the snapshot summary honestly.",
         "operationId": "generate_repository_document_v1_repositories__repository_id__documents_post",
         "parameters": [
           {
@@ -1522,6 +1945,65 @@
       }
     },
     "/v1/repositories/{repository_id}/documents/{document_id}": {
+      "put": {
+        "summary": "Update Document",
+        "description": "Replace a document's content (and optionally its title) in place \u2014\nan edit is never silently overwritten: regenerating creates a new row.",
+        "operationId": "update_document_v1_repositories__repository_id__documents__document_id__put",
+        "parameters": [
+          {
+            "name": "repository_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Repository Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "summary": "Delete Document",
         "operationId": "delete_document_v1_repositories__repository_id__documents__document_id__delete",
@@ -1646,6 +2128,18 @@
               "type": "string",
               "title": "Provider"
             }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Remove the organization's shared key",
+              "default": false,
+              "title": "Shared"
+            },
+            "description": "Remove the organization's shared key"
           }
         ],
         "responses": {
@@ -1991,6 +2485,21 @@
         ],
         "title": "ConversationOut"
       },
+      "ConversationRename": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ConversationRename"
+      },
       "DecisionIn": {
         "properties": {
           "approved": {
@@ -2119,6 +2628,35 @@
           "updated_at"
         ],
         "title": "DocumentOut"
+      },
+      "DocumentUpdate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 24000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "DocumentUpdate",
+        "description": "An in-place correction: the person who knows the project fixes the\nprose. Content is required; the title only changes when sent."
       },
       "Estimate": {
         "type": "string",
@@ -2523,6 +3061,41 @@
         ],
         "title": "MessageOut"
       },
+      "PlanEditIn": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTaskEdit"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tasks"
+        ],
+        "title": "PlanEditIn"
+      },
+      "PlanEditOut": {
+        "properties": {
+          "edited": {
+            "type": "integer",
+            "title": "Edited"
+          },
+          "dropped": {
+            "type": "integer",
+            "title": "Dropped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edited",
+          "dropped"
+        ],
+        "title": "PlanEditOut"
+      },
       "PlanInsightsOut": {
         "properties": {
           "blocked": {
@@ -2550,6 +3123,45 @@
         ],
         "title": "PlanInsightsOut"
       },
+      "PlanTaskEdit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "drop": {
+            "type": "boolean",
+            "title": "Drop",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PlanTaskEdit",
+        "description": "One task's edit at the approval gate: retitle, re-describe, or drop.\nAn omitted description leaves the existing one alone; an empty string\nclears it."
+      },
       "Priority": {
         "type": "string",
         "enum": [
@@ -2567,6 +3179,11 @@
             "maxLength": 512,
             "minLength": 8,
             "title": "Key"
+          },
+          "share_with_organization": {
+            "type": "boolean",
+            "title": "Share With Organization",
+            "default": false
           }
         },
         "type": "object",
@@ -2589,6 +3206,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared",
+            "default": false
           }
         },
         "type": "object",
@@ -2609,6 +3231,24 @@
         "type": "object",
         "title": "PushIn",
         "description": "Which connected issue tracker to push the work item to."
+      },
+      "PushOut": {
+        "properties": {
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          },
+          "pushed": {
+            "type": "boolean",
+            "title": "Pushed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch",
+          "pushed"
+        ],
+        "title": "PushOut"
       },
       "ReorderIn": {
         "properties": {
@@ -2658,6 +3298,17 @@
             "type": "string",
             "title": "Status"
           },
+          "status_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Detail"
+          },
           "default_branch": {
             "type": "string",
             "title": "Default Branch"
@@ -2684,6 +3335,7 @@
           "id",
           "url",
           "status",
+          "status_detail",
           "default_branch",
           "last_indexed_at",
           "chunks"
@@ -2949,6 +3601,77 @@
         ],
         "title": "RunOut"
       },
+      "RunReportOut": {
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "title": "Markdown"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown",
+          "filename"
+        ],
+        "title": "RunReportOut"
+      },
+      "RunStatsOut": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Rate"
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "by_status",
+          "completed",
+          "failed",
+          "success_rate",
+          "total_cost_usd",
+          "total_tokens"
+        ],
+        "title": "RunStatsOut"
+      },
       "SearchHit": {
         "properties": {
           "path": {
@@ -3057,6 +3780,44 @@
           "attempts"
         ],
         "title": "TaskOut"
+      },
+      "TerminalCommandIn": {
+        "properties": {
+          "command": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Command"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "title": "TerminalCommandIn"
+      },
+      "TerminalCommandOut": {
+        "properties": {
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "exit_code": {
+            "type": "integer",
+            "title": "Exit Code"
+          },
+          "fresh_session": {
+            "type": "boolean",
+            "title": "Fresh Session"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output",
+          "exit_code",
+          "fresh_session"
+        ],
+        "title": "TerminalCommandOut"
       },
       "TestResult": {
         "properties": {

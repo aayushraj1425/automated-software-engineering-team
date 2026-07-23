@@ -55,6 +55,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Delete a conversation and its messages (cascade), owner-scoped.
+         */
+        delete: operations["delete_conversation_v1_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_v1_conversations__conversation_id__patch"];
+        trace?: never;
+    };
     "/v1/conversations/{conversation_id}/messages": {
         parameters: {
             query?: never;
@@ -90,6 +111,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit Plan
+         * @description Fix a nearly-right plan at the approval gate instead of rejecting it:
+         *     retitle, re-describe, or drop tasks (PLAN_EDITING.md). Only while the
+         *     run awaits approval — before that there is no plan, after that it runs.
+         */
+        put: operations["edit_plan_v1_runs__run_id__plan_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}/decision": {
         parameters: {
             query?: never;
@@ -110,6 +153,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Stats
+         * @description Aggregate outcomes across the caller's visible runs — the product KPI:
+         *     how many runs, how they ended, the success rate, and the spend.
+         */
+        get: operations["get_run_stats_v1_runs_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -119,6 +183,35 @@ export interface paths {
         };
         /** Get Run */
         get: operations["get_run_v1_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Run
+         * @description Delete a run and its history — owner-scoped. Refused while the run is
+         *     still working; an awaiting-approval, completed, failed, or cancelled run is
+         *     safe to remove. Its tasks, events, and artifacts cascade in the database,
+         *     and its workspace is removed from disk.
+         */
+        delete: operations["delete_run_v1_runs__run_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Report
+         * @description A shareable plain-English markdown summary of the run — request, plan,
+         *     per-task outcome, cost, and result (RUN_REPORT.md). Built from the run
+         *     record, so it works even after the workspace is gone.
+         */
+        get: operations["get_run_report_v1_runs__run_id__report_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -231,6 +324,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push Workspace
+         * @description Push the run's branch to its host (finished runs only) — the way a
+         *     manual workspace commit leaves the machine (WORKSPACE_PANELS.md). The
+         *     credential logic is the run pipeline's own (integrations/hosts.py): a
+         *     GitLab or Bitbucket repository uses the run owner's encrypted
+         *     connection, GitHub uses the environment token, anything else pushes
+         *     plainly.
+         */
+        post: operations["push_workspace_v1_runs__run_id__push_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}/events": {
         parameters: {
             query?: never;
@@ -273,6 +391,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Command
+         * @description One command in the run's sandboxed scratch copy of the workspace.
+         */
+        post: operations["run_command_v1_runs__run_id__terminal_post"];
+        /**
+         * Reset
+         * @description Discard the session — the next command starts from a fresh copy.
+         */
+        delete: operations["reset_v1_runs__run_id__terminal_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories": {
         parameters: {
             query?: never;
@@ -286,6 +428,30 @@ export interface paths {
         /** Connect Repository */
         post: operations["connect_repository_v1_repositories_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{repository_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect Repository
+         * @description Disconnect: the repository's data (index, work items, knowledge,
+         *     documents) goes with it; run history survives detached — the FK is
+         *     SET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md).
+         *     Destroying a teammate's shared repository takes an admin
+         *     (ORGANIZATION_ROLES.md); your own stays yours to disconnect.
+         */
+        delete: operations["disconnect_repository_v1_repositories__repository_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -532,6 +698,9 @@ export interface paths {
         /**
          * Generate Repository Document
          * @description Technical Writer: generate a document from the index and save it.
+         *     The changelog additionally reads the repository's real commit history
+         *     (bounded shallow fetch — engine/docs/git_history.py); when the fetch
+         *     fails it falls back to the snapshot summary honestly.
          */
         post: operations["generate_repository_document_v1_repositories__repository_id__documents_post"];
         delete?: never;
@@ -548,7 +717,12 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Update Document
+         * @description Replace a document's content (and optionally its title) in place —
+         *     an edit is never silently overwritten: regenerating creates a new row.
+         */
+        put: operations["update_document_v1_repositories__repository_id__documents__document_id__put"];
         post?: never;
         /** Delete Document */
         delete: operations["delete_document_v1_repositories__repository_id__documents__document_id__delete"];
@@ -728,6 +902,11 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ConversationRename */
+        ConversationRename: {
+            /** Title */
+            title: string;
+        };
         /** DecisionIn */
         DecisionIn: {
             /** Approved */
@@ -785,6 +964,17 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * DocumentUpdate
+         * @description An in-place correction: the person who knows the project fixes the
+         *     prose. Content is required; the title only changes when sent.
+         */
+        DocumentUpdate: {
+            /** Content */
+            content: string;
+            /** Title */
+            title?: string | null;
         };
         /**
          * Estimate
@@ -946,11 +1136,45 @@ export interface components {
              */
             created_at: string;
         };
+        /** PlanEditIn */
+        PlanEditIn: {
+            /** Tasks */
+            tasks: components["schemas"]["PlanTaskEdit"][];
+        };
+        /** PlanEditOut */
+        PlanEditOut: {
+            /** Edited */
+            edited: number;
+            /** Dropped */
+            dropped: number;
+        };
         /** PlanInsightsOut */
         PlanInsightsOut: {
             /** Blocked */
             blocked: components["schemas"]["BlockedItemOut"][];
             recommended: components["schemas"]["WorkItemOut"] | null;
+        };
+        /**
+         * PlanTaskEdit
+         * @description One task's edit at the approval gate: retitle, re-describe, or drop.
+         *     An omitted description leaves the existing one alone; an empty string
+         *     clears it.
+         */
+        PlanTaskEdit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Drop
+             * @default false
+             */
+            drop: boolean;
         };
         /**
          * Priority
@@ -961,6 +1185,11 @@ export interface components {
         ProviderKeyIn: {
             /** Key */
             key: string;
+            /**
+             * Share With Organization
+             * @default false
+             */
+            share_with_organization: boolean;
         };
         /** ProviderKeyOut */
         ProviderKeyOut: {
@@ -973,6 +1202,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Shared
+             * @default false
+             */
+            shared: boolean;
         };
         /**
          * PushIn
@@ -981,6 +1215,13 @@ export interface components {
         PushIn: {
             /** @default linear */
             kind: components["schemas"]["IntegrationKind"];
+        };
+        /** PushOut */
+        PushOut: {
+            /** Branch */
+            branch: string;
+            /** Pushed */
+            pushed: boolean;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -1003,6 +1244,8 @@ export interface components {
             url: string;
             /** Status */
             status: string;
+            /** Status Detail */
+            status_detail: string | null;
             /** Default Branch */
             default_branch: string;
             /** Last Indexed At */
@@ -1090,6 +1333,32 @@ export interface components {
             /** Finished At */
             finished_at: string | null;
         };
+        /** RunReportOut */
+        RunReportOut: {
+            /** Markdown */
+            markdown: string;
+            /** Filename */
+            filename: string;
+        };
+        /** RunStatsOut */
+        RunStatsOut: {
+            /** Total */
+            total: number;
+            /** By Status */
+            by_status: {
+                [key: string]: number;
+            };
+            /** Completed */
+            completed: number;
+            /** Failed */
+            failed: number;
+            /** Success Rate */
+            success_rate: number | null;
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Total Tokens */
+            total_tokens: number;
+        };
         /** SearchHit */
         SearchHit: {
             /** Path */
@@ -1128,6 +1397,20 @@ export interface components {
             result: string | null;
             /** Attempts */
             attempts: number;
+        };
+        /** TerminalCommandIn */
+        TerminalCommandIn: {
+            /** Command */
+            command: string;
+        };
+        /** TerminalCommandOut */
+        TerminalCommandOut: {
+            /** Output */
+            output: string;
+            /** Exit Code */
+            exit_code: number;
+            /** Fresh Session */
+            fresh_session: boolean;
         };
         /** TestResult */
         TestResult: {
@@ -1346,6 +1629,70 @@ export interface operations {
             };
         };
     };
+    delete_conversation_v1_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_conversation_v1_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_messages_v1_conversations__conversation_id__messages_get: {
         parameters: {
             query?: never;
@@ -1379,7 +1726,10 @@ export interface operations {
     };
     list_runs_v1_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Filter to one run status */
+                status?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1393,6 +1743,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1417,6 +1776,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_plan_v1_runs__run_id__plan_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanEditOut"];
                 };
             };
             /** @description Validation Error */
@@ -1465,6 +1859,26 @@ export interface operations {
             };
         };
     };
+    get_run_stats_v1_runs_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatsOut"];
+                };
+            };
+        };
+    };
     get_run_v1_runs__run_id__get: {
         parameters: {
             query?: never;
@@ -1483,6 +1897,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_run_v1_runs__run_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_report_v1_runs__run_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReportOut"];
                 };
             };
             /** @description Validation Error */
@@ -1692,6 +2166,37 @@ export interface operations {
             };
         };
     };
+    push_workspace_v1_runs__run_id__push_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_events_v1_runs__run_id__events_get: {
         parameters: {
             query?: {
@@ -1758,6 +2263,70 @@ export interface operations {
             };
         };
     };
+    run_command_v1_runs__run_id__terminal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalCommandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalCommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_v1_runs__run_id__terminal_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_repositories_v1_repositories_get: {
         parameters: {
             query?: never;
@@ -1799,6 +2368,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RepositoryOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_repository_v1_repositories__repository_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1912,6 +2510,7 @@ export interface operations {
             header?: {
                 "x-github-event"?: string;
                 "x-hub-signature-256"?: string | null;
+                "x-github-delivery"?: string;
             };
             path?: never;
             cookie?: never;
@@ -2343,6 +2942,42 @@ export interface operations {
             };
         };
     };
+    update_document_v1_repositories__repository_id__documents__document_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_document_v1_repositories__repository_id__documents__document_id__delete: {
         parameters: {
             query?: never;
@@ -2430,7 +3065,10 @@ export interface operations {
     };
     delete_provider_key_v1_provider_keys__provider__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Remove the organization's shared key */
+                shared?: boolean;
+            };
             header?: never;
             path: {
                 provider: string;
