@@ -6,9 +6,28 @@ import { useEffect, useState } from "react";
 import { StatusChip } from "./status-chip";
 import type { RunSummary } from "./types";
 
+type RunStats = {
+  total: number;
+  completed: number;
+  failed: number;
+  success_rate: number | null;
+  total_cost_usd: number;
+  total_tokens: number;
+};
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-zinc-800 px-4 py-3">
+      <p className="text-lg font-semibold text-zinc-100">{value}</p>
+      <p className="text-xs text-zinc-500">{label}</p>
+    </div>
+  );
+}
+
 export function RunsPanel() {
   const router = useRouter();
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [stats, setStats] = useState<RunStats | null>(null);
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,8 +35,12 @@ export function RunsPanel() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch("/api/runs");
-      if (res.ok) setRuns(await res.json());
+      const [runsRes, statsRes] = await Promise.all([
+        fetch("/api/runs"),
+        fetch("/api/runs/stats"),
+      ]);
+      if (runsRes.ok) setRuns(await runsRes.json());
+      if (statsRes.ok) setStats(await statsRes.json());
     })();
   }, []);
 
@@ -68,6 +91,19 @@ export function RunsPanel() {
           {busy ? "Starting…" : "Start run"}
         </button>
       </form>
+
+      {stats && stats.total > 0 && (
+        <section className="grid grid-cols-3 gap-3">
+          <Stat label="Runs" value={String(stats.total)} />
+          <Stat
+            label="Success rate"
+            value={
+              stats.success_rate === null ? "—" : `${Math.round(stats.success_rate * 100)}%`
+            }
+          />
+          <Stat label="Total spend" value={`$${stats.total_cost_usd.toFixed(2)}`} />
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Previous runs</h2>

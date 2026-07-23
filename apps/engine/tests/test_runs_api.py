@@ -42,6 +42,63 @@ async def _decide(client, headers, run_id: str, approved: bool):
     )
 
 
+async def test_run_stats_aggregate_outcomes(client, prepared_db):
+    from decimal import Decimal
+
+    from engine.db.enums import RunStatus
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    user = f"stats_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        session.add_all(
+            [
+                AgentRun(
+                    user_id=user,
+                    request="a",
+                    status=RunStatus.COMPLETED,
+                    total_cost_usd=Decimal("0.10"),
+                    total_input_tokens=100,
+                    total_output_tokens=50,
+                ),
+                AgentRun(
+                    user_id=user,
+                    request="b",
+                    status=RunStatus.COMPLETED,
+                    total_cost_usd=Decimal("0.20"),
+                    total_input_tokens=10,
+                    total_output_tokens=5,
+                ),
+                AgentRun(
+                    user_id=user,
+                    request="c",
+                    status=RunStatus.FAILED,
+                    total_cost_usd=Decimal("0.05"),
+                    total_input_tokens=1,
+                    total_output_tokens=1,
+                ),
+                AgentRun(user_id=user, request="d", status=RunStatus.QUEUED),
+            ]
+        )
+        await session.commit()
+
+    stats = (await client.get("/v1/runs/stats", headers=auth_headers(user))).json()
+    assert stats["total"] == 4
+    assert stats["completed"] == 2
+    assert stats["failed"] == 1
+    assert stats["success_rate"] == 2 / 3  # completed / (completed + failed)
+    assert stats["total_cost_usd"] == 0.35
+    assert stats["total_tokens"] == 167
+    assert stats["by_status"]["completed"] == 2
+
+
+async def test_run_stats_are_empty_for_a_new_user(client):
+    stats = (await client.get("/v1/runs/stats", headers=_headers())).json()
+    assert stats["total"] == 0
+    assert stats["success_rate"] is None
+    assert stats["by_status"] == {}
+
+
 async def test_run_report_summarizes_the_run(client):
     headers = _headers()
     run = await _create_run(client, headers, request="Add a /stats endpoint")

@@ -17,7 +17,7 @@ from typing import Any, cast
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
@@ -411,6 +411,61 @@ async def list_runs(
         )
     ).all()
     return [_run_out(run, url or DISCONNECTED_REPOSITORY) for run, url in rows]
+
+
+class RunStatsOut(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    completed: int
+    failed: int
+    success_rate: float | None  # completed / (completed + failed); None with no terminal runs
+    total_cost_usd: float
+    total_tokens: int
+
+
+# Declared before /v1/runs/{run_id} so "stats" is not parsed as a run id.
+@router.get("/v1/runs/stats")
+async def get_run_stats(
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunStatsOut:
+    """Aggregate outcomes across the caller's visible runs — the product KPI:
+    how many runs, how they ended, the success rate, and the spend."""
+    rows = (
+        await db.execute(
+            select(
+                AgentRun.status,
+                func.count(),
+                func.coalesce(func.sum(AgentRun.total_cost_usd), 0),
+                func.coalesce(
+                    func.sum(AgentRun.total_input_tokens + AgentRun.total_output_tokens), 0
+                ),
+            )
+            .where(visible_clause(AgentRun.user_id, AgentRun.org_id, principal))
+            .group_by(AgentRun.status)
+        )
+    ).all()
+
+    by_status: dict[str, int] = {}
+    total_cost = 0.0
+    total_tokens = 0
+    for status, count, cost, tokens in rows:
+        by_status[str(status)] = count
+        total_cost += float(cost)
+        total_tokens += int(tokens)
+
+    completed = by_status.get(RunStatus.COMPLETED, 0)
+    failed = by_status.get(RunStatus.FAILED, 0)
+    terminal = completed + failed
+    return RunStatsOut(
+        total=sum(by_status.values()),
+        by_status=by_status,
+        completed=completed,
+        failed=failed,
+        success_rate=(completed / terminal) if terminal else None,
+        total_cost_usd=round(total_cost, 6),
+        total_tokens=total_tokens,
+    )
 
 
 @router.get("/v1/runs/{run_id}")
