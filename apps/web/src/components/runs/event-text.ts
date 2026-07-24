@@ -25,6 +25,16 @@ export function timelineAgents(
   return order.map((agent) => ({ agent, count: counts.get(agent) ?? 0 }));
 }
 
+/** The full reasoning text an agent volunteered, for an `agent.reasoning`
+ * event; `null` for any other event. The timeline shows a preview and expands
+ * to this on demand, so following an agent's thinking isn't cut off at 140
+ * characters. Design note: docs/architecture/AGENT_REASONING_TIMELINE.md. */
+export function reasoningOf(event: RunEvent): string | null {
+  if (event.type !== "agent.reasoning") return null;
+  const text = String(event.payload.text ?? "").trim();
+  return text.length > 0 ? text : null;
+}
+
 /** One plain-English line per timeline event. */
 export function describeEvent(event: RunEvent): string {
   const p = event.payload;

@@ -280,6 +280,15 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · Read an agent's full reasoning on the timeline — reasoning lines
+  were truncated to 140 characters, so "following an agent's thinking" cut off
+  mid-thought. A reasoning line now previews to 140 characters with a **show
+  more / show less** toggle; the full trace (`reasoningOf(event)`) is already in
+  the page, so the toggle only changes what's rendered — no fetch, no schema.
+  Pairs with the per-agent filter below: narrow to one agent, then read its
+  thinking in full. Design note updated:
+  [architecture/AGENT_REASONING_TIMELINE.md](architecture/AGENT_REASONING_TIMELINE.md).
+  Web: lint + typecheck clean, 26 tests pass (event-text 10 → 12).
 - 2026-07-24 · Follow one agent on the run timeline — the chronological stream
   can now be filtered to a single role. A pure helper, `timelineAgents(events)`,
   returns the distinct agents that acted (in first-appearance order, with line

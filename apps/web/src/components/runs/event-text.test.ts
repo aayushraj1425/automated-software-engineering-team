@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agentName, describeEvent, timelineAgents } from "./event-text";
+import { agentName, describeEvent, reasoningOf, timelineAgents } from "./event-text";
 import type { RunEvent } from "./types";
 
 function event(type: string, payload: Record<string, unknown>, agent: string | null = null): RunEvent {
@@ -12,6 +12,19 @@ describe("agentName", () => {
     expect(agentName("product_manager")).toBe("Product Manager");
     expect(agentName("backend")).toBe("Backend");
     expect(agentName(null)).toBe("System");
+  });
+});
+
+describe("reasoningOf", () => {
+  it("returns the full trace for a reasoning event, untruncated", () => {
+    const long = "x".repeat(500);
+    expect(reasoningOf(event("agent.reasoning", { text: long }, "backend"))).toBe(long);
+    expect(reasoningOf(event("agent.reasoning", { text: "  trimmed  " }, "qa"))).toBe("trimmed");
+  });
+
+  it("is null for non-reasoning or empty events", () => {
+    expect(reasoningOf(event("tool.called", { tool: "write_file" }, "backend"))).toBeNull();
+    expect(reasoningOf(event("agent.reasoning", { text: "   " }, "backend"))).toBeNull();
   });
 });
 

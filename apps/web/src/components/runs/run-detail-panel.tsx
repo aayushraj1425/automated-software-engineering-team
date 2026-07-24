@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { agentName, describeEvent, timelineAgents } from "./event-text";
+import { agentName, describeEvent, reasoningOf, timelineAgents } from "./event-text";
 import { StatusChip } from "./status-chip";
 import {
   FINISHED_STATUSES,
@@ -13,6 +13,8 @@ import {
 } from "./types";
 
 const POLL_MS = 1500;
+// A reasoning trace longer than this is previewed with a "show more" toggle.
+const REASONING_PREVIEW = 140;
 
 // The diff exists once the engineers have worked (and the workspace remains).
 const DIFF_STATUSES = new Set(["reviewing", "completed", "failed"]);
@@ -41,6 +43,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [events, setEvents] = useState<RunEvent[]>([]);
   // undefined = show every agent; null = the "System" lines; a role = that agent.
   const [agentFilter, setAgentFilter] = useState<string | null | undefined>(undefined);
+  // Ids of reasoning events whose full trace the reader has expanded.
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [deciding, setDeciding] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -775,14 +779,44 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         <ol className="space-y-1">
           {events
             .filter((event) => agentFilter === undefined || event.agent === agentFilter)
-            .map((event) => (
-            <li key={event.id} className="flex gap-3 text-sm">
-              <span className="shrink-0 tabular-nums text-xs leading-6 text-zinc-600">
-                {new Date(event.created_at).toLocaleTimeString()}
-              </span>
-              <span className="text-zinc-300">{describeEvent(event)}</span>
-            </li>
-          ))}
+            .map((event) => {
+              const reasoning = reasoningOf(event);
+              const expanded = expandedReasoning.has(event.id);
+              const long = reasoning !== null && reasoning.length > REASONING_PREVIEW;
+              return (
+                <li key={event.id} className="flex gap-3 text-sm">
+                  <span className="shrink-0 tabular-nums text-xs leading-6 text-zinc-600">
+                    {new Date(event.created_at).toLocaleTimeString()}
+                  </span>
+                  {reasoning !== null ? (
+                    <span className="text-zinc-300">
+                      {agentName(event.agent)} is thinking:{" "}
+                      <span className="text-zinc-400">
+                        {long && !expanded ? `${reasoning.slice(0, REASONING_PREVIEW)}…` : reasoning}
+                      </span>
+                      {long && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedReasoning((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(event.id)) next.delete(event.id);
+                              else next.add(event.id);
+                              return next;
+                            })
+                          }
+                          className="ml-1 text-xs text-zinc-500 hover:text-zinc-300"
+                        >
+                          {expanded ? "show less" : "show more"}
+                        </button>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-300">{describeEvent(event)}</span>
+                  )}
+                </li>
+              );
+            })}
         </ol>
         {!FINISHED_STATUSES.has(run.status) && (
           <p className="animate-pulse text-xs text-zinc-500">Watching for updates…</p>

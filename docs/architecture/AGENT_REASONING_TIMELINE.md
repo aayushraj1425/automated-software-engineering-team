@@ -44,6 +44,12 @@ flowchart LR
   would double it. Only the reasoning that precedes an action becomes an event.
 - **The web renders it as its own line.** `event-text.ts` gets an
   `agent.reasoning` case, shown as the agent thinking, distinct from a tool call.
+- **Expandable on the timeline.** A reasoning trace can run long, so the line
+  shows a 140-character preview with a **show more / show less** toggle; the full
+  text (`reasoningOf(event)`) is already in the page — the toggle only changes
+  what's rendered. This matters most alongside the per-agent timeline filter
+  ([TIMELINE_AGENT_FILTER.md](TIMELINE_AGENT_FILTER.md)): once you've narrowed to
+  one agent to follow its thinking, you can read that thinking in full.
 
 ## Honest boundaries
 
