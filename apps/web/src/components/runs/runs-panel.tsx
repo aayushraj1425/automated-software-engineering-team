@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { relativeTime } from "@/lib/relative-time";
+
 import { StatusChip } from "./status-chip";
 import type { RunSummary } from "./types";
 
@@ -172,7 +174,12 @@ export function RunsPanel() {
             className="flex w-full items-center justify-between gap-3 rounded-md border border-zinc-800 px-4 py-3 text-left hover:bg-zinc-900"
           >
             <span className="truncate text-sm">{run.request}</span>
-            <StatusChip status={run.status} />
+            <span className="flex shrink-0 items-center gap-3">
+              <span className="text-xs text-zinc-600">
+                {relativeTime(run.finished_at ?? run.started_at ?? run.created_at)}
+              </span>
+              <StatusChip status={run.status} />
+            </span>
           </button>
         ))}
       </section>

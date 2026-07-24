@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { relativeTime } from "@/lib/relative-time";
+
 import { agentName, describeEvent, reasoningOf, timelineAgents } from "./event-text";
 import { StatusChip } from "./status-chip";
 import {
@@ -404,6 +406,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
             {run.total_input_tokens.toLocaleString()} tokens in ·{" "}
             {run.total_output_tokens.toLocaleString()} tokens out · $
             {run.total_cost_usd.toFixed(4)}
+          </p>
+        )}
+        {relativeTime(run.started_at ?? run.created_at) && (
+          <p className="text-xs text-zinc-500">
+            started {relativeTime(run.started_at ?? run.created_at)}
+            {run.finished_at && <> · finished {relativeTime(run.finished_at)}</>}
           </p>
         )}
         <div className="flex flex-wrap gap-3">

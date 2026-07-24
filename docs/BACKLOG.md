@@ -280,6 +280,14 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · Temporal context for runs — the runs list and the run header now
+  show a coarse "… ago". A list row shows the most meaningful moment
+  (`finished_at ?? started_at ?? created_at`) beside its status chip; the run
+  header spells the verb — `started 3 hours ago · finished 2 hours ago`. The
+  second caller of the `relativeTime` helper (exactly why it went in `lib`) —
+  purely presentational, no API/type/schema change. Design note:
+  [architecture/RUN_TIMESTAMPS.md](architecture/RUN_TIMESTAMPS.md). Web: lint +
+  typecheck clean, 30 tests pass.
 - 2026-07-24 · Show when a repository was last indexed — the API always returned
   `last_indexed_at` and the web type carried it, but the repositories page never
   showed it, so a repo indexed weeks ago looked identical to one indexed minutes
