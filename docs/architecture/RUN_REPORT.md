@@ -14,8 +14,9 @@ everything needed for a one-page summary; it just never assembles one.
 
 `GET /v1/runs/{id}/report` returns a plain-English **markdown** document built
 from the run record — the request, the plan summary, each task and its outcome,
-the cost, and the result (the pull request, or the failure). The web run page
-gets a **Download report** button that saves it as `run-<id>.md`.
+a **Decisions** digest of the agents' reasoning, the cost, and the result (the
+pull request, or the failure). The web run page gets a **Download report** button
+that saves it as `run-<id>.md`.
 
 ```mermaid
 flowchart LR
@@ -25,9 +26,12 @@ flowchart LR
 ```
 
 - **Pure and offline.** `engine/reporting.py::build_run_report(run, tasks,
-  repo_url)` is a pure function over the run and its tasks — no model call, no
-  network, no database access of its own. So it works with `LLM_FAKE=1`, is
-  trivially unit-tested, and never adds cost or latency.
+  repo_url, reasoning)` is a pure function over the run, its tasks, and its
+  reasoning lines — no model call, no network, no database access of its own. So
+  it works with `LLM_FAKE=1`, is trivially unit-tested, and never adds cost or
+  latency. The endpoint does the one extra read (the run's `agent.reasoning`
+  events) and hands the builder `(agent, text)` pairs; the builder shows the
+  first line of each, capped at 25 with an "… and N more" note.
 - **Built from the record, not the workspace.** The report reads the run row and
   its task rows, which survive even after the workspace is cleaned up or the
   repository is disconnected — a report is available for *any* run, in any state.
@@ -40,10 +44,11 @@ flowchart LR
 
 ## Honest boundaries
 
-- **A summary, not a transcript.** The report captures the plan and each task's
-  result line, not the full reasoning trace or the diff. The diff endpoint and
-  the timeline (including `agent.reasoning`, AGENT_REASONING_TIMELINE.md) remain
-  the place to go deep.
+- **A digest, not a transcript.** The Decisions section is the *first line* of
+  each reasoning event, capped — enough to see how the team thought, not the full
+  trace or the diff. The diff endpoint and the timeline (including the expandable
+  `agent.reasoning` lines, AGENT_REASONING_TIMELINE.md) remain the place to go
+  deep. Offline/fake runs emit no reasoning, so the section simply doesn't appear.
 - **Markdown only.** No PDF/HTML rendering — markdown travels everywhere (chat,
   issues, wikis) and needs no dependency. A richer export is a later option.
 - **Generated on request.** The report is not stored; it is rebuilt from the

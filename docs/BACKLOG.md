@@ -280,6 +280,18 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · The run report now shows the team's decisions — the downloadable
+  markdown report gained a **Decisions** section: the first line of each
+  `agent.reasoning` event, labelled by role, in order, capped at 25 with an
+  "… and N more" note. The pure builder gained an optional `reasoning` argument
+  (a `Sequence` of `(agent, text)` pairs, so any caller's tuple list is
+  accepted); the report endpoint does the one extra read and passes it. The
+  report turns from *what changed* into *what the team decided and why*, without
+  the diff or the full trace. Offline/fake runs emit no reasoning, so the section
+  simply doesn't appear — response shape and the Download button are unchanged.
+  Design note updated:
+  [architecture/RUN_REPORT.md](architecture/RUN_REPORT.md). Engine 434 passed,
+  1 skipped.
 - 2026-07-24 · Search runs by what you asked for — `GET /v1/runs` gained an
   optional `q`, a case-insensitive substring match on the request text that
   `AND`-composes with the existing `status` filter and the owner/org visibility

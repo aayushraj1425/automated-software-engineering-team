@@ -559,8 +559,8 @@ async def get_run_report(
     db: AsyncSession = Depends(get_session),
 ) -> RunReportOut:
     """A shareable plain-English markdown summary of the run — request, plan,
-    per-task outcome, cost, and result (RUN_REPORT.md). Built from the run
-    record, so it works even after the workspace is gone."""
+    per-task outcome, the agents' key decisions, cost, and result (RUN_REPORT.md).
+    Built from the run record, so it works even after the workspace is gone."""
     run = await _visible_run(db, run_id, principal)
     repo = await _run_repository(db, run)
     tasks = (
@@ -572,7 +572,15 @@ async def get_run_report(
         .scalars()
         .all()
     )
-    markdown = build_run_report(run, list(tasks), repo.url if repo else None)
+    reasoning_rows = (
+        await db.execute(
+            select(AgentEvent.agent, AgentEvent.payload)
+            .where(AgentEvent.run_id == run_id, AgentEvent.type == "agent.reasoning")
+            .order_by(AgentEvent.id)
+        )
+    ).all()
+    reasoning = [(agent, str((payload or {}).get("text", ""))) for agent, payload in reasoning_rows]
+    markdown = build_run_report(run, list(tasks), repo.url if repo else None, reasoning)
     return RunReportOut(markdown=markdown, filename=f"run-{run_id.hex[:8]}.md")
 
 
