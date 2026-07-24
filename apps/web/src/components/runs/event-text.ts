@@ -9,6 +9,22 @@ export function agentName(role: string | null): string {
     .join(" ");
 }
 
+/** The distinct agents that appear in a run's events, in first-appearance
+ * order, each with how many lines it produced. Run-level and human actions
+ * (no agent) collapse into one `null` entry — the "System" chip. Powers the
+ * timeline filter. Design note: docs/architecture/TIMELINE_AGENT_FILTER.md. */
+export function timelineAgents(
+  events: RunEvent[],
+): { agent: string | null; count: number }[] {
+  const order: (string | null)[] = [];
+  const counts = new Map<string | null, number>();
+  for (const event of events) {
+    if (!counts.has(event.agent)) order.push(event.agent);
+    counts.set(event.agent, (counts.get(event.agent) ?? 0) + 1);
+  }
+  return order.map((agent) => ({ agent, count: counts.get(agent) ?? 0 }));
+}
+
 /** One plain-English line per timeline event. */
 export function describeEvent(event: RunEvent): string {
   const p = event.payload;

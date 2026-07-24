@@ -67,7 +67,7 @@ subset being built now.
 
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
-- [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback; per-agent output panes come later)
+- [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback). The timeline can be filtered to one agent — chips list every role that acted, with line counts, so you can follow a single agent's thread (reasoning → tool calls → summary) — design note: [architecture/TIMELINE_AGENT_FILTER.md](architecture/TIMELINE_AGENT_FILTER.md)
 - [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page, and a nearly-right plan can be edited in place before approving — retitle, re-describe, or drop tasks (dangling dependencies cleaned; the edit lands on the timeline) — design note: [architecture/PLAN_EDITING.md](architecture/PLAN_EDITING.md)
 - [x] Pull-request link on the run page
 - [x] Diff viewer: the run page shows everything the agents changed, colored by +/-
@@ -280,6 +280,19 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · Follow one agent on the run timeline — the chronological stream
+  can now be filtered to a single role. A pure helper, `timelineAgents(events)`,
+  returns the distinct agents that acted (in first-appearance order, with line
+  counts), and the run page renders them as filter chips above the timeline:
+  `All · Product Manager (3) · Backend (12) · …`, with run-level and human lines
+  collapsed into one **System** chip. The filter is a client-side view over the
+  events already streamed in — no new endpoint, nothing added to the SSE stream —
+  and the live stream keeps flowing while a filter is applied. Closes the
+  "per-agent output panes come later" note on the Mission-Control workstream: a
+  filtered timeline gives the "follow one agent" value while keeping chronological
+  context one click away. Design note:
+  [architecture/TIMELINE_AGENT_FILTER.md](architecture/TIMELINE_AGENT_FILTER.md).
+  Web: lint + typecheck clean, 24 tests pass (event-text 8 → 10).
 - 2026-07-21 · The QA sandbox can run in-cluster — a Docker-in-Docker sidecar,
   and it needed no engine change. The sandbox shells out to the `docker` CLI,
   which follows `DOCKER_HOST`; that is the whole trick. `worker.sandbox.enabled=true`

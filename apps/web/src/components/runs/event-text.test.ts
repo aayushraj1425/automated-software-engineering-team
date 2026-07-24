@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agentName, describeEvent } from "./event-text";
+import { agentName, describeEvent, timelineAgents } from "./event-text";
 import type { RunEvent } from "./types";
 
 function event(type: string, payload: Record<string, unknown>, agent: string | null = null): RunEvent {
@@ -12,6 +12,27 @@ describe("agentName", () => {
     expect(agentName("product_manager")).toBe("Product Manager");
     expect(agentName("backend")).toBe("Backend");
     expect(agentName(null)).toBe("System");
+  });
+});
+
+describe("timelineAgents", () => {
+  it("lists distinct agents in first-appearance order with counts", () => {
+    const events = [
+      event("run.started", {}), // System (null)
+      event("plan.created", { tasks: [] }, "product_manager"),
+      event("task.status_changed", { to: "in_progress" }, "backend"),
+      event("tool.called", { tool: "write_file" }, "backend"),
+      event("plan.approved", {}), // System again
+    ];
+    expect(timelineAgents(events)).toEqual([
+      { agent: null, count: 2 },
+      { agent: "product_manager", count: 1 },
+      { agent: "backend", count: 2 },
+    ]);
+  });
+
+  it("is empty when there are no events", () => {
+    expect(timelineAgents([])).toEqual([]);
   });
 });
 

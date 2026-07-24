@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { agentName, describeEvent } from "./event-text";
+import { agentName, describeEvent, timelineAgents } from "./event-text";
 import { StatusChip } from "./status-chip";
 import {
   FINISHED_STATUSES,
@@ -39,6 +39,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const router = useRouter();
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
+  // undefined = show every agent; null = the "System" lines; a role = that agent.
+  const [agentFilter, setAgentFilter] = useState<string | null | undefined>(undefined);
   const [deciding, setDeciding] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -746,8 +748,34 @@ export function RunDetailPanel({ runId }: { runId: string }) {
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Timeline</h2>
+        {events.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {[
+              { agent: undefined as string | null | undefined, label: "All" },
+              ...timelineAgents(events).map(({ agent, count }) => ({
+                agent: agent as string | null | undefined,
+                label: `${agent === null ? "System" : agentName(agent)} (${count})`,
+              })),
+            ].map(({ agent, label }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setAgentFilter(agent)}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  agentFilter === agent
+                    ? "border-zinc-300 bg-zinc-100 text-zinc-900"
+                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <ol className="space-y-1">
-          {events.map((event) => (
+          {events
+            .filter((event) => agentFilter === undefined || event.agent === agentFilter)
+            .map((event) => (
             <li key={event.id} className="flex gap-3 text-sm">
               <span className="shrink-0 tabular-nums text-xs leading-6 text-zinc-600">
                 {new Date(event.created_at).toLocaleTimeString()}
