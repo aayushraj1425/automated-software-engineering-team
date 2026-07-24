@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { StatusChip } from "@/components/runs/status-chip";
+import { relativeTime } from "@/lib/relative-time";
 import { DependencyGraphView } from "./dependency-graph";
 import type { DependencyGraph, RepositorySummary, SearchHit } from "./types";
 
@@ -164,6 +165,9 @@ export function RepositoriesPanel() {
                 {repo.chunks > 0
                   ? `${repo.chunks.toLocaleString()} indexed pieces`
                   : "not indexed yet"}
+                {repo.chunks > 0 && repo.last_indexed_at && (
+                  <> · indexed {relativeTime(repo.last_indexed_at)}</>
+                )}
               </p>
               {repo.status === "index_failed" && repo.status_detail && (
                 <p className="mt-1 truncate text-xs text-red-400" title={repo.status_detail}>

@@ -280,6 +280,16 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · Show when a repository was last indexed — the API always returned
+  `last_indexed_at` and the web type carried it, but the repositories page never
+  showed it, so a repo indexed weeks ago looked identical to one indexed minutes
+  ago. The repo card now reads `1,240 indexed pieces · indexed 3 hours ago`,
+  built on a small reusable, pure `relativeTime(iso, now?)` helper in
+  `web/src/lib` (`just now` / `N minutes|hours|days ago`, `""` for null, an
+  optional `now` for testability). Purely presentational — no API, type, or
+  schema change; the value was already on the wire. Design note:
+  [architecture/REPOSITORY_INDEX_FRESHNESS.md](architecture/REPOSITORY_INDEX_FRESHNESS.md).
+  Web: lint + typecheck clean, 30 tests pass (new relative-time suite).
 - 2026-07-24 · The run report now shows the team's decisions — the downloadable
   markdown report gained a **Decisions** section: the first line of each
   `agent.reasoning` event, labelled by role, in order, capped at 25 with an
