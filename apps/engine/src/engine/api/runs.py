@@ -401,6 +401,7 @@ async def list_runs(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
     status: str | None = Query(default=None, description="Filter to one run status"),
+    q: str | None = Query(default=None, description="Case-insensitive search of the request text"),
 ) -> list[RunOut]:
     stmt = (
         select(AgentRun, Repository.url)
@@ -410,6 +411,10 @@ async def list_runs(
     if status:
         # An unknown status simply matches nothing — no 422 for a stale filter.
         stmt = stmt.where(AgentRun.status == status)
+    if q and q.strip():
+        # Escape LIKE wildcards so a literal % or _ in the query stays literal.
+        pattern = q.strip().translate({ord("\\"): "\\\\", ord("%"): "\\%", ord("_"): "\\_"})
+        stmt = stmt.where(AgentRun.request.ilike(f"%{pattern}%", escape="\\"))
     stmt = stmt.order_by(AgentRun.created_at.desc()).limit(50)
     rows = (await db.execute(stmt)).all()
     return [_run_out(run, url or DISCONNECTED_REPOSITORY) for run, url in rows]

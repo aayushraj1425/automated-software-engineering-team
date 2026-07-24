@@ -280,6 +280,15 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-24 · Search runs by what you asked for — `GET /v1/runs` gained an
+  optional `q`, a case-insensitive substring match on the request text that
+  `AND`-composes with the existing `status` filter and the owner/org visibility
+  clause (search never widens what a principal can see). The user's `%`, `_`, and
+  `\` are escaped before the `ILIKE`, so `100%` is a literal search, not a
+  wildcard; a blank query is a no-op. The runs page gained a debounced (300ms)
+  search box; the BFF forwards only the two known params. Design note:
+  [architecture/RUN_SEARCH.md](architecture/RUN_SEARCH.md). Engine 432 passed,
+  1 skipped; shared types regenerated; web lint + typecheck clean, 26 tests pass.
 - 2026-07-24 · Read an agent's full reasoning on the timeline — reasoning lines
   were truncated to 140 characters, so "following an agent's thinking" cut off
   mid-thought. A reasoning line now previews to 140 characters with a **show

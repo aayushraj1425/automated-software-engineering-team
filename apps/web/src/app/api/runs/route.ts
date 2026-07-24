@@ -10,9 +10,14 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const token = await signServiceToken(session);
-  // Forward a ?status= filter through to the engine (only the known param).
-  const status = new URL(req.url).searchParams.get("status");
-  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  // Forward the known filters through to the engine — status and text search.
+  const params = new URL(req.url).searchParams;
+  const forward = new URLSearchParams();
+  const status = params.get("status");
+  const q = params.get("q");
+  if (status) forward.set("status", status);
+  if (q) forward.set("q", q);
+  const query = forward.toString() ? `?${forward}` : "";
   const upstream = await fetch(`${env.ENGINE_URL}/v1/runs${query}`, {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",

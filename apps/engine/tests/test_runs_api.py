@@ -159,6 +159,43 @@ async def test_runs_list_filters_by_status(client, prepared_db):
     assert len((await client.get("/v1/runs", headers=headers)).json()) == 3
 
 
+async def test_runs_list_searches_the_request_text(client, prepared_db):
+    from engine.db.enums import RunStatus
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    user = f"search_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        session.add_all(
+            [
+                AgentRun(
+                    user_id=user, request="Add an export endpoint", status=RunStatus.COMPLETED
+                ),
+                AgentRun(user_id=user, request="Fix the EXPORT button", status=RunStatus.FAILED),
+                AgentRun(user_id=user, request="Speed up 100% of queries", status=RunStatus.QUEUED),
+            ]
+        )
+        await session.commit()
+
+    headers = auth_headers(user)
+
+    # Case-insensitive substring match on the request.
+    export = (await client.get("/v1/runs?q=export", headers=headers)).json()
+    assert {r["request"] for r in export} == {"Add an export endpoint", "Fix the EXPORT button"}
+
+    # A literal % is escaped — it matches the text, not as a wildcard.
+    literal = (await client.get("/v1/runs?q=100%25", headers=headers)).json()
+    assert [r["request"] for r in literal] == ["Speed up 100% of queries"]
+
+    # Search composes with the status filter.
+    both = (await client.get("/v1/runs?q=export&status=failed", headers=headers)).json()
+    assert [r["request"] for r in both] == ["Fix the EXPORT button"]
+
+    # A blank query is a no-op, and a non-match returns nothing.
+    assert len((await client.get("/v1/runs?q=+", headers=headers)).json()) == 3
+    assert (await client.get("/v1/runs?q=nonsense", headers=headers)).json() == []
+
+
 async def test_run_stats_are_empty_for_a_new_user(client):
     stats = (await client.get("/v1/runs/stats", headers=_headers())).json()
     assert stats["total"] == 0

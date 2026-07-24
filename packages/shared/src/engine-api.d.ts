@@ -1729,6 +1729,8 @@ export interface operations {
             query?: {
                 /** @description Filter to one run status */
                 status?: string | null;
+                /** @description Case-insensitive search of the request text */
+                q?: string | null;
             };
             header?: never;
             path?: never;

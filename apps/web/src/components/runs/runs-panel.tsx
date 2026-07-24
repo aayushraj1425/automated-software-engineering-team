@@ -30,6 +30,8 @@ export function RunsPanel() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [stats, setStats] = useState<RunStats | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,13 +45,22 @@ export function RunsPanel() {
     })();
   }, []);
 
+  // Typing shouldn't fire a request per keystroke — settle for 300ms first.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   useEffect(() => {
     void (async () => {
-      const query = filter ? `?status=${encodeURIComponent(filter)}` : "";
+      const params = new URLSearchParams();
+      if (filter) params.set("status", filter);
+      if (debouncedSearch) params.set("q", debouncedSearch);
+      const query = params.toString() ? `?${params}` : "";
       const res = await fetch(`/api/runs${query}`);
       if (res.ok) setRuns(await res.json());
     })();
-  }, [filter]);
+  }, [filter, debouncedSearch]);
 
   async function startRun(e: React.FormEvent) {
     e.preventDefault();
@@ -115,6 +126,14 @@ export function RunsPanel() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Previous runs</h2>
         {stats && stats.total > 0 && (
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search runs by what you asked for…"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+          />
+        )}
+        {stats && stats.total > 0 && (
           <div className="flex flex-wrap gap-2">
             {[
               ["All", null] as const,
@@ -139,7 +158,11 @@ export function RunsPanel() {
         )}
         {runs.length === 0 && (
           <p className="text-sm text-zinc-500">
-            {filter ? "No runs with this status." : "No runs yet."}
+            {debouncedSearch
+              ? "No runs match your search."
+              : filter
+                ? "No runs with this status."
+                : "No runs yet."}
           </p>
         )}
         {runs.map((run) => (
