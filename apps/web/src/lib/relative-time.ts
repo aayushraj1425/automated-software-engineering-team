@@ -8,24 +8,25 @@ export function relativeTime(iso: string | null | undefined, now: Date = new Dat
   if (Number.isNaN(then)) return "";
 
   const seconds = Math.round((now.getTime() - then) / 1000);
-  if (seconds < 0) return "just now"; // a clock skew into the future reads as now
+  // Under 45s — including a clock skew into the future (negative) — reads as now.
   if (seconds < 45) return "just now";
 
-  // Under 45s already read as "just now"; from there, round to the coarsest
-  // unit whose count stays below the next unit's threshold.
-  const units: [limit: number, secondsPer: number, name: string][] = [
-    [60, 60, "minute"],
-    [24, 3600, "hour"],
-    [7, 86400, "day"],
-    [4.35, 604800, "week"],
-    [12, 2629800, "month"],
-    [Infinity, 31557600, "year"],
+  // Report the largest *whole* unit that fits: floor, largest first. Flooring
+  // (not rounding against the next threshold) means an age never rolls up early
+  // — e.g. 11½ months stays "11 months ago" instead of jumping to "1 year ago".
+  const units: [secondsPer: number, name: string][] = [
+    [31557600, "year"],
+    [2629800, "month"],
+    [604800, "week"],
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
   ];
-  for (const [limit, secondsPer, name] of units) {
-    const value = Math.round(seconds / secondsPer);
-    if (value < limit) {
+  for (const [secondsPer, name] of units) {
+    const value = Math.floor(seconds / secondsPer);
+    if (value >= 1) {
       return `${value} ${name}${value === 1 ? "" : "s"} ago`;
     }
   }
-  return "just now"; // unreachable; the year bucket has no upper limit
+  return "1 minute ago"; // 45–59s rounds up to the smallest named unit
 }

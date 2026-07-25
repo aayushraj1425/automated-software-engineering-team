@@ -36,9 +36,10 @@ flowchart LR
 
 ## Boundaries
 
-- **Coarse, not exact.** It rounds to the largest sensible unit (minutes, hours,
-  days) — enough to judge freshness at a glance. A precise timestamp lives in the
-  `title`/hover if ever needed; the card stays uncluttered.
+- **Coarse, not exact.** It reports the largest *whole* unit that fits (minutes,
+  hours, days, …) — enough to judge freshness at a glance, and it never rolls an
+  age up to the next unit early. A precise timestamp lives in the `title`/hover if
+  ever needed; the card stays uncluttered.
 - **Freshness, not staleness policy.** It reports *when*, and does not judge
   whether the index is "too old" or auto-trigger a re-index. Scheduled or
   drift-triggered re-indexing remains a separate, larger feature.
