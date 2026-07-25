@@ -27,7 +27,9 @@ export default async function RunDetailPage({
           </Link>
         </h1>
       </div>
-      <RunDetailPanel runId={id} />
+      {/* key by id so navigating between runs mounts a fresh panel — local
+          state (events, diff, files, in-flight flags) never bleeds across runs. */}
+      <RunDetailPanel key={id} runId={id} />
     </main>
   );
 }

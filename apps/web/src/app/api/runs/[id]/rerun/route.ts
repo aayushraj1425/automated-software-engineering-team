@@ -18,5 +18,5 @@ export async function POST(
     `${env.ENGINE_URL}/v1/runs/${encodeURIComponent(id)}/rerun`,
     { method: "POST", headers: { authorization: `Bearer ${token}` }, cache: "no-store" },
   );
-  return Response.json(await upstream.json(), { status: upstream.status });
+  return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
 }

@@ -14,5 +14,5 @@ export async function GET(req: Request): Promise<Response> {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",
   });
-  return Response.json(await upstream.json(), { status: upstream.status });
+  return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
 }

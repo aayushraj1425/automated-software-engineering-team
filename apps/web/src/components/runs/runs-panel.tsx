@@ -54,14 +54,21 @@ export function RunsPanel() {
   }, [search]);
 
   useEffect(() => {
+    // Discard a superseded response: if the filter/search changes again before
+    // this fetch resolves, `ignore` stops a slow earlier reply from overwriting
+    // the newer results.
+    let ignore = false;
     void (async () => {
       const params = new URLSearchParams();
       if (filter) params.set("status", filter);
       if (debouncedSearch) params.set("q", debouncedSearch);
       const query = params.toString() ? `?${params}` : "";
       const res = await fetch(`/api/runs${query}`);
-      if (res.ok) setRuns(await res.json());
+      if (!ignore && res.ok) setRuns(await res.json());
     })();
+    return () => {
+      ignore = true;
+    };
   }, [filter, debouncedSearch]);
 
   async function startRun(e: React.FormEvent) {
