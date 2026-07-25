@@ -77,6 +77,18 @@ export function ChatPanel({ userName }: { userName: string }) {
     if (res.ok) void refreshConversations();
   }
 
+  async function exportConversation(id: string) {
+    const res = await fetch(`/api/conversations/${id}/export`);
+    if (!res.ok) return;
+    const { markdown, filename } = (await res.json()) as { markdown: string; filename: string };
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function deleteConversation(id: string) {
     if (!window.confirm("Delete this conversation and its messages?")) return;
     const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
@@ -188,6 +200,15 @@ export function ChatPanel({ userName }: { userName: string }) {
                   className="px-1 text-xs text-zinc-500 hover:text-zinc-200"
                 >
                   ✎
+                </button>
+                <button
+                  type="button"
+                  title="Export as markdown"
+                  aria-label="Export conversation"
+                  onClick={() => void exportConversation(c.id)}
+                  className="px-1 text-xs text-zinc-500 hover:text-zinc-200"
+                >
+                  ⤓
                 </button>
                 <button
                   type="button"

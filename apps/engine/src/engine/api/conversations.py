@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
+from engine.conversation_export import build_conversation_transcript
 from engine.db.models import Conversation, Message
 from engine.db.session import get_session
 
@@ -106,14 +107,13 @@ async def delete_conversation(
     await db.commit()
 
 
-@router.get("/v1/conversations/{conversation_id}/messages")
-async def list_messages(
-    conversation_id: uuid.UUID,
-    principal: Principal = Depends(require_service_auth),
-    db: AsyncSession = Depends(get_session),
-) -> list[MessageOut]:
-    await _owned_conversation(db, conversation_id, principal)
-    rows = (
+class ConversationExportOut(BaseModel):
+    markdown: str
+    filename: str
+
+
+async def _conversation_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[Message]:
+    return list(
         (
             await db.execute(
                 select(Message)
@@ -124,6 +124,32 @@ async def list_messages(
         .scalars()
         .all()
     )
+
+
+@router.get("/v1/conversations/{conversation_id}/export")
+async def export_conversation(
+    conversation_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> ConversationExportOut:
+    """A shareable markdown transcript of the conversation — its title and each
+    turn, with citations (CONVERSATION_EXPORT.md). Owner-scoped like the rest."""
+    conversation = await _owned_conversation(db, conversation_id, principal)
+    messages = await _conversation_messages(db, conversation_id)
+    markdown = build_conversation_transcript(conversation, messages)
+    return ConversationExportOut(
+        markdown=markdown, filename=f"conversation-{conversation_id.hex[:8]}.md"
+    )
+
+
+@router.get("/v1/conversations/{conversation_id}/messages")
+async def list_messages(
+    conversation_id: uuid.UUID,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> list[MessageOut]:
+    await _owned_conversation(db, conversation_id, principal)
+    rows = await _conversation_messages(db, conversation_id)
     return [
         MessageOut(
             id=m.id,

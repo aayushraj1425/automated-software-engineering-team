@@ -168,6 +168,47 @@
         }
       }
     },
+    "/v1/conversations/{conversation_id}/export": {
+      "get": {
+        "summary": "Export Conversation",
+        "description": "A shareable markdown transcript of the conversation \u2014 its title and each\nturn, with citations (CONVERSATION_EXPORT.md). Owner-scoped like the rest.",
+        "operationId": "export_conversation_v1_conversations__conversation_id__export_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationExportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/conversations/{conversation_id}/messages": {
       "get": {
         "summary": "List Messages",
@@ -2505,6 +2546,24 @@
           "updated_at"
         ],
         "title": "ConnectionOut"
+      },
+      "ConversationExportOut": {
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "title": "Markdown"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown",
+          "filename"
+        ],
+        "title": "ConversationExportOut"
       },
       "ConversationOut": {
         "properties": {

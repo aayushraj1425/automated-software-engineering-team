@@ -76,6 +76,27 @@ export interface paths {
         patch: operations["rename_conversation_v1_conversations__conversation_id__patch"];
         trace?: never;
     };
+    "/v1/conversations/{conversation_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Conversation
+         * @description A shareable markdown transcript of the conversation — its title and each
+         *     turn, with citations (CONVERSATION_EXPORT.md). Owner-scoped like the rest.
+         */
+        get: operations["export_conversation_v1_conversations__conversation_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/conversations/{conversation_id}/messages": {
         parameters: {
             query?: never;
@@ -905,6 +926,13 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ConversationExportOut */
+        ConversationExportOut: {
+            /** Markdown */
+            markdown: string;
+            /** Filename */
+            filename: string;
+        };
         /** ConversationOut */
         ConversationOut: {
             /**
@@ -1703,6 +1731,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_conversation_v1_conversations__conversation_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationExportOut"];
                 };
             };
             /** @description Validation Error */

@@ -280,6 +280,18 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-25 · Export a conversation — download a chat conversation as a
+  markdown transcript, the chat parallel to the run report.
+  `GET /v1/conversations/{id}/export` returns `{markdown, filename}` built by a
+  pure `build_conversation_transcript(conversation, messages)` (parallels
+  `reporting.py`): the title, each turn as **You:** / **Assistant:**, and an
+  assistant turn's citations listed as `path:line`. Owner-scoped via the same
+  `_owned_conversation` check (personal, never org-shared); the message read is
+  shared with `list_messages` through a new `_conversation_messages` helper. The
+  chat sidebar gained a **⤓** export button per conversation. Design note:
+  [architecture/CONVERSATION_EXPORT.md](architecture/CONVERSATION_EXPORT.md).
+  Engine 441 passed, 1 skipped; shared types regenerated; web lint + typecheck
+  clean, 30 tests pass.
 - 2026-07-25 · Run again — start a fresh run from an existing one's request and
   repository, to retry a failed run or re-run against updated code.
   `POST /v1/runs/{id}/rerun` reads the source through the same `_visible_run`

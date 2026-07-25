@@ -7,7 +7,7 @@ stream, so the assertions stay deterministic.
 
 import uuid
 
-from engine.db.models import Conversation
+from engine.db.models import Conversation, Message
 from engine.db.session import session_scope
 from tests.conftest import auth_headers
 
@@ -56,3 +56,38 @@ async def test_conversation_ops_are_owner_scoped(client, prepared_db):
     # The owner's conversation is untouched.
     owned = (await client.get("/v1/conversations", headers=auth_headers(owner))).json()
     assert [c["title"] for c in owned] == ["mine"]
+
+
+async def test_export_conversation_returns_a_markdown_transcript(client, prepared_db):
+    user = f"conv_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        conversation = Conversation(user_id=user, title="Export me")
+        session.add(conversation)
+        await session.flush()
+        session.add_all(
+            [
+                Message(conversation_id=conversation.id, role="user", content="Hi there"),
+                Message(conversation_id=conversation.id, role="assistant", content="Hello!"),
+            ]
+        )
+        await session.commit()
+        conversation_id = conversation.id
+
+    resp = await client.get(
+        f"/v1/conversations/{conversation_id}/export", headers=auth_headers(user)
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["filename"].endswith(".md")
+    assert body["markdown"].startswith("# Export me")
+    assert "**You:**" in body["markdown"] and "Hi there" in body["markdown"]
+    assert "Hello!" in body["markdown"]
+
+
+async def test_export_conversation_is_owner_scoped(client, prepared_db):
+    owner = f"conv_{uuid.uuid4().hex[:8]}"
+    conversation_id = await _seed_conversation(owner, title="mine")
+    intruder = auth_headers(f"conv_{uuid.uuid4().hex[:8]}")
+
+    resp = await client.get(f"/v1/conversations/{conversation_id}/export", headers=intruder)
+    assert resp.status_code == 404
