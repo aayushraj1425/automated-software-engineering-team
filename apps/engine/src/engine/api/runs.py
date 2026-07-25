@@ -236,6 +236,40 @@ async def create_run(
     return _run_out(run, url)
 
 
+@router.post("/v1/runs/{run_id}/rerun", status_code=201)
+async def rerun_run(
+    run_id: uuid.UUID,
+    background: BackgroundTasks,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunOut:
+    """Start a fresh run from an existing one's request and repository — retry a
+    failed run, or re-run against updated code. The new run is fully independent:
+    its own plan, approval gate, budget, and history (RUN_RERUN.md). It belongs to
+    whoever triggers it, and goes through planning like any new run."""
+    source = await _visible_run(db, run_id, principal)
+    repo = await _run_repository(db, source)
+    if repo is None:
+        raise HTTPException(
+            status_code=409,
+            detail="This run's repository is no longer connected — reconnect it to run again",
+        )
+
+    run = AgentRun(
+        user_id=principal.user_id,
+        org_id=principal.org_id,
+        repository_id=repo.id,
+        request=source.request,
+        status=RunStatus.QUEUED,
+        max_cost_usd=source.max_cost_usd,
+    )
+    db.add(run)
+    await db.commit()
+
+    background.add_task(dispatch_plan, run.id)
+    return _run_out(run, repo.url)
+
+
 class PlanTaskEdit(BaseModel):
     """One task's edit at the approval gate: retitle, re-describe, or drop.
     An omitted description leaves the existing one alone; an empty string

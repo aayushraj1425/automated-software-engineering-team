@@ -280,6 +280,17 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-25 · Run again — start a fresh run from an existing one's request and
+  repository, to retry a failed run or re-run against updated code.
+  `POST /v1/runs/{id}/rerun` reads the source through the same `_visible_run`
+  owner/org check, then creates a brand-new `AgentRun` (same request,
+  `repository_id`, and `max_cost_usd`) at `QUEUED` and dispatches planning like
+  any new run — its own plan, approval gate, and history; no plan/workspace is
+  reused. The new run belongs to whoever triggers it. A disconnected repository
+  is a 409 (nothing to run against). The run page gained a **Run again** button
+  that opens the fresh run. Design note:
+  [architecture/RUN_RERUN.md](architecture/RUN_RERUN.md). Engine 437 passed,
+  1 skipped; shared types regenerated; web lint + typecheck clean, 30 tests pass.
 - 2026-07-24 · Temporal context for runs — the runs list and the run header now
   show a coarse "… ago". A list row shows the most meaningful moment
   (`finished_at ?? started_at ?? created_at`) beside its status chip; the run

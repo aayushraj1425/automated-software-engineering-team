@@ -318,6 +318,47 @@
         }
       }
     },
+    "/v1/runs/{run_id}/rerun": {
+      "post": {
+        "summary": "Rerun Run",
+        "description": "Start a fresh run from an existing one's request and repository \u2014 retry a\nfailed run, or re-run against updated code. The new run is fully independent:\nits own plan, approval gate, budget, and history (RUN_RERUN.md). It belongs to\nwhoever triggers it, and goes through planning like any new run.",
+        "operationId": "rerun_run_v1_runs__run_id__rerun_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}/plan": {
       "put": {
         "summary": "Edit Plan",
@@ -514,7 +555,7 @@
     "/v1/runs/{run_id}/report": {
       "get": {
         "summary": "Get Run Report",
-        "description": "A shareable plain-English markdown summary of the run \u2014 request, plan,\nper-task outcome, cost, and result (RUN_REPORT.md). Built from the run\nrecord, so it works even after the workspace is gone.",
+        "description": "A shareable plain-English markdown summary of the run \u2014 request, plan,\nper-task outcome, the agents' key decisions, cost, and result (RUN_REPORT.md).\nBuilt from the run record, so it works even after the workspace is gone.",
         "operationId": "get_run_report_v1_runs__run_id__report_get",
         "parameters": [
           {

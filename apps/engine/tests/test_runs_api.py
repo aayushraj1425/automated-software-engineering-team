@@ -196,6 +196,49 @@ async def test_runs_list_searches_the_request_text(client, prepared_db):
     assert (await client.get("/v1/runs?q=nonsense", headers=headers)).json() == []
 
 
+async def test_rerun_starts_a_fresh_independent_run(client):
+    headers = _headers()
+    source = await _create_run(client, headers, request="Add a /health endpoint")
+
+    resp = await client.post(f"/v1/runs/{source['id']}/rerun", headers=headers)
+    assert resp.status_code == 201, resp.text
+    fresh = resp.json()
+
+    assert fresh["id"] != source["id"]  # a new run, not the same one
+    assert fresh["request"] == "Add a /health endpoint"  # same ask
+    assert fresh["repository_url"] == source["repository_url"]  # same repository
+
+    # It is a real, separately-fetchable run that went through its own planning.
+    detail = (await client.get(f"/v1/runs/{fresh['id']}", headers=headers)).json()
+    assert detail["id"] == fresh["id"]
+    assert len(detail["tasks"]) > 0  # the offline planner seeded its own board
+
+
+async def test_rerun_is_owner_scoped(client):
+    owner = _headers()
+    intruder = _headers()
+    run = await _create_run(client, owner)
+
+    resp = await client.post(f"/v1/runs/{run['id']}/rerun", headers=intruder)
+    assert resp.status_code == 404  # missing and not-yours look the same
+
+
+async def test_rerun_refused_when_repository_disconnected(client, prepared_db):
+    from engine.db.enums import RunStatus
+    from engine.db.models import AgentRun
+    from engine.db.session import session_scope
+
+    user = f"rerun_{uuid.uuid4().hex[:8]}"
+    async with session_scope(user_id=user) as session:
+        run = AgentRun(user_id=user, request="orphan", status=RunStatus.COMPLETED)  # no repository
+        session.add(run)
+        await session.commit()
+        run_id = run.id
+
+    resp = await client.post(f"/v1/runs/{run_id}/rerun", headers=auth_headers(user))
+    assert resp.status_code == 409
+
+
 async def test_run_stats_are_empty_for_a_new_user(client):
     stats = (await client.get("/v1/runs/stats", headers=_headers())).json()
     assert stats["total"] == 0

@@ -111,6 +111,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rerun Run
+         * @description Start a fresh run from an existing one's request and repository — retry a
+         *     failed run, or re-run against updated code. The new run is fully independent:
+         *     its own plan, approval gate, budget, and history (RUN_RERUN.md). It belongs to
+         *     whoever triggers it, and goes through planning like any new run.
+         */
+        post: operations["rerun_run_v1_runs__run_id__rerun_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{run_id}/plan": {
         parameters: {
             query?: never;
@@ -208,8 +231,8 @@ export interface paths {
         /**
          * Get Run Report
          * @description A shareable plain-English markdown summary of the run — request, plan,
-         *     per-task outcome, cost, and result (RUN_REPORT.md). Built from the run
-         *     record, so it works even after the workspace is gone.
+         *     per-task outcome, the agents' key decisions, cost, and result (RUN_REPORT.md).
+         *     Built from the run record, so it works even after the workspace is gone.
          */
         get: operations["get_run_report_v1_runs__run_id__report_get"];
         put?: never;
@@ -1770,6 +1793,37 @@ export interface operations {
                 "application/json": components["schemas"]["RunCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rerun_run_v1_runs__run_id__rerun_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             201: {

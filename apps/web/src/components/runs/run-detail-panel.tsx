@@ -73,6 +73,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [savingPlan, setSavingPlan] = useState(false);
   const [planNote, setPlanNote] = useState<string | null>(null);
   const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
+  const [rerunning, setRerunning] = useState(false);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
   const filesRequestedRef = useRef(false);
@@ -382,6 +383,20 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     URL.revokeObjectURL(url);
   }
 
+  // Start a fresh run from this one's request + repository, then open it.
+  async function rerun() {
+    setRerunning(true);
+    const res = await fetch(`/api/runs/${runId}/rerun`, { method: "POST" });
+    if (res.ok) {
+      const fresh: { id: string } = await res.json();
+      router.push(`/runs/${fresh.id}`);
+      return;
+    }
+    const detail = await res.json().catch(() => null);
+    window.alert(detail?.detail ?? `Could not re-run (${res.status})`);
+    setRerunning(false);
+  }
+
   // A run that is not actively working can be deleted (the engine refuses the rest).
   const deletable = !["queued", "planning", "executing", "reviewing"].includes(run.status);
 
@@ -431,6 +446,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
             className="inline-block rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-zinc-400"
           >
             Download report
+          </button>
+          <button
+            type="button"
+            onClick={() => void rerun()}
+            disabled={rerunning}
+            title="Start a fresh run with the same request and repository"
+            className="inline-block rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
+          >
+            {rerunning ? "Starting…" : "Run again"}
           </button>
           {deletable && (
             <button
