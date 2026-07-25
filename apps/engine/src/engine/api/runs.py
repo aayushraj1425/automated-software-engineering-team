@@ -566,10 +566,13 @@ async def delete_run(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> None:
-    """Delete a run and its history — owner-scoped. Refused while the run is
-    still working; an awaiting-approval, completed, failed, or cancelled run is
-    safe to remove. Its tasks, events, and artifacts cascade in the database,
-    and its workspace is removed from disk."""
+    """Delete a run and its history. Visible to the run's owner or, for an
+    org-shared run, any member of its organization (via `_visible_run`, like the
+    rest of the runs API; runs are an org-shared table per ORGANIZATION_SHARING.md
+    — unlike conversations, which are owner-only). Refused while the run is still
+    working; an awaiting-approval, completed, failed, or cancelled run is safe to
+    remove. Its tasks, events, and artifacts cascade in the database, and its
+    workspace is removed from disk."""
     run = await _visible_run(db, run_id, principal)
     if run.status in _ACTIVE_RUN_STATUSES:
         raise HTTPException(
