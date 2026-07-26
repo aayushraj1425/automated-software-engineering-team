@@ -1,6 +1,6 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-22
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-26
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
@@ -280,6 +280,23 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-26 · One BFF proxy helper — the ~40 web `/api/*` routes each repeated
+  the same block: check the session (401), sign a service JWT, forward to the
+  engine at `/v1/…`, relay status + JSON. Copy-paste is how bugs drift (one
+  route had already forgotten to guard `upstream.json()` against an empty error
+  body). The block now lives once in `apps/web/src/lib/bff.ts` as
+  `proxyToEngine(req, path, options?)`; every route reads as its one
+  distinguishing line — the engine path and method — with `forwardBody` and
+  `orgRole` the only options. No behavior change (same 401, same
+  400-on-bad-body, same 204 passthrough, same status relay); the one deliberate
+  tightening is that every route now guards the JSON read, not just the one that
+  remembered to. Streaming routes (`chat`, the run event stream) and the
+  better-auth handler don't fit the shape and stay hand-written. 39 routes
+  migrated, −407 lines net. First automated coverage for the proxy: `bff.test.ts`
+  asserts the 401/400 guards, the 204 passthrough, the status/body relay, and
+  the body-forwarding. Design note:
+  [architecture/BFF_PROXY.md](architecture/BFF_PROXY.md). Web lint + typecheck
+  clean, 37 tests pass (was 31).
 - 2026-07-25 · Export a conversation — download a chat conversation as a
   markdown transcript, the chat parallel to the run report.
   `GET /v1/conversations/{id}/export` returns `{markdown, filename}` built by a
