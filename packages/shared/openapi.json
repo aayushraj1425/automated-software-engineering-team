@@ -68,17 +68,47 @@
       "get": {
         "summary": "List Conversations",
         "operationId": "list_conversations_v1_conversations_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive search of the title and message text",
+              "title": "Q"
+            },
+            "description": "Case-insensitive search of the title and message text"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ConversationOut"
                   },
-                  "type": "array",
                   "title": "Response List Conversations V1 Conversations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -562,7 +592,7 @@
       },
       "delete": {
         "summary": "Delete Run",
-        "description": "Delete a run and its history \u2014 owner-scoped. Refused while the run is\nstill working; an awaiting-approval, completed, failed, or cancelled run is\nsafe to remove. Its tasks, events, and artifacts cascade in the database,\nand its workspace is removed from disk.",
+        "description": "Delete a run and its history \u2014 tasks, events, and artifacts cascade in the\ndatabase, and the workspace is removed from disk. Refused while the run is\nstill working. Visible to the run's owner or organization, like the rest of\nthe runs API (ORGANIZATION_SHARING.md).",
         "operationId": "delete_run_v1_runs__run_id__delete",
         "parameters": [
           {

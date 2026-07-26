@@ -280,6 +280,20 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-26 · Search your conversations — the chat parallel to searching the
+  runs list. `GET /v1/conversations` gained an optional `q`: a case-insensitive
+  substring match on the conversation's title **or any of its messages'
+  content** (an `EXISTS` subquery, so a conversation appears once however many
+  messages hit). The user's `%`, `_`, and `\` are escaped before the `ILIKE`, so
+  `50%` is literal, not a wildcard; a blank query is a no-op. The owner clause is
+  applied first, so search only narrows what the caller could already see (RLS
+  enforces it independently). The chat sidebar gained a debounced (300ms) search
+  box; the BFF forwards the one `q` param through the shared `proxyToEngine`
+  helper. Design note:
+  [architecture/CONVERSATION_SEARCH.md](architecture/CONVERSATION_SEARCH.md).
+  Engine ruff/pyright clean, `test_conversations.py` 4 → 6 (title match, message
+  match, blank no-op, wildcard-literal + owner-scoped); shared types regenerated;
+  web lint + typecheck clean, 37 tests pass.
 - 2026-07-26 · One BFF proxy helper — the ~40 web `/api/*` routes each repeated
   the same block: check the session (401), sign a service JWT, forward to the
   engine at `/v1/…`, relay status + JSON. Copy-paste is how bugs drift (one

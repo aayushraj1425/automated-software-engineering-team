@@ -20,19 +20,27 @@ export function ChatPanel({ userName }: { userName: string }) {
   const [busy, setBusy] = useState(false);
   const [repositories, setRepositories] = useState<RepositorySummary[]>([]);
   const [repositoryId, setRepositoryId] = useState<string>("");
+  const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
-    const res = await fetch("/api/conversations");
+    const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : "";
+    const res = await fetch(`/api/conversations${query}`);
     if (res.ok) setConversations(await res.json());
-  }, []);
+  }, [search]);
 
+  // Repositories load once; the conversation list re-fetches as the search box
+  // changes, debounced, via refreshConversations' dependency on `search`.
   useEffect(() => {
-    void refreshConversations();
     void (async () => {
       const res = await fetch("/api/repositories");
       if (res.ok) setRepositories(await res.json());
     })();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => void refreshConversations(), 300);
+    return () => clearTimeout(timer);
   }, [refreshConversations]);
 
   useEffect(() => {
@@ -113,14 +121,10 @@ export function ChatPanel({ userName }: { userName: string }) {
       for await (const { event, data } of parseSse(res.body)) {
         if (event === "citations") {
           const citations = (data.citations ?? []) as Citation[];
-          setMessages((prev) =>
-            prev.map((m) => (m.id === draftId ? { ...m, citations } : m)),
-          );
+          setMessages((prev) => prev.map((m) => (m.id === draftId ? { ...m, citations } : m)));
         } else if (event === "memory") {
           const memories = (data.memories ?? []) as RecalledMemoryRef[];
-          setMessages((prev) =>
-            prev.map((m) => (m.id === draftId ? { ...m, memories } : m)),
-          );
+          setMessages((prev) => prev.map((m) => (m.id === draftId ? { ...m, memories } : m)));
         } else if (event === "token") {
           const tokenText = String(data.text ?? "");
           setMessages((prev) =>
@@ -166,7 +170,20 @@ export function ChatPanel({ userName }: { userName: string }) {
         >
           + New chat
         </button>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search conversations"
+          aria-label="Search conversations"
+          className="mx-3 mb-2 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
+        />
         <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+          {conversations.length === 0 && search.trim() && (
+            <p className="px-3 py-2 text-xs text-zinc-600">
+              No conversations match “{search.trim()}”.
+            </p>
+          )}
           {conversations.map((c) => (
             <div
               key={c.id}

@@ -231,10 +231,10 @@ export interface paths {
         post?: never;
         /**
          * Delete Run
-         * @description Delete a run and its history — owner-scoped. Refused while the run is
-         *     still working; an awaiting-approval, completed, failed, or cancelled run is
-         *     safe to remove. Its tasks, events, and artifacts cascade in the database,
-         *     and its workspace is removed from disk.
+         * @description Delete a run and its history — tasks, events, and artifacts cascade in the
+         *     database, and the workspace is removed from disk. Refused while the run is
+         *     still working. Visible to the run's owner or organization, like the rest of
+         *     the runs API (ORGANIZATION_SHARING.md).
          */
         delete: operations["delete_run_v1_runs__run_id__delete"];
         options?: never;
@@ -1662,7 +1662,10 @@ export interface operations {
     };
     list_conversations_v1_conversations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Case-insensitive search of the title and message text */
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1676,6 +1679,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

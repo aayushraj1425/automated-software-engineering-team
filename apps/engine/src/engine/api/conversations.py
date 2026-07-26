@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.auth import Principal, require_service_auth
@@ -57,19 +57,26 @@ async def _owned_conversation(
 async def list_conversations(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
+    q: str | None = Query(
+        default=None, description="Case-insensitive search of the title and message text"
+    ),
 ) -> list[ConversationOut]:
-    rows = (
-        (
-            await db.execute(
-                select(Conversation)
-                .where(Conversation.user_id == principal.user_id)
-                .order_by(Conversation.updated_at.desc())
-                .limit(50)
-            )
+    stmt = select(Conversation).where(Conversation.user_id == principal.user_id)
+    if q and q.strip():
+        # Escape LIKE wildcards so a literal % or _ in the query stays literal.
+        pattern = q.strip().translate({ord("\\"): "\\\\", ord("%"): "\\%", ord("_"): "\\_"})
+        like = f"%{pattern}%"
+        # Match the title or any of the conversation's messages (EXISTS, so a
+        # conversation appears once however many of its messages hit).
+        has_matching_message = (
+            select(Message.id)
+            .where(Message.conversation_id == Conversation.id)
+            .where(Message.content.ilike(like, escape="\\"))
+            .exists()
         )
-        .scalars()
-        .all()
-    )
+        stmt = stmt.where(or_(Conversation.title.ilike(like, escape="\\"), has_matching_message))
+    stmt = stmt.order_by(Conversation.updated_at.desc()).limit(50)
+    rows = (await db.execute(stmt)).scalars().all()
     return [
         ConversationOut(id=c.id, title=c.title, created_at=c.created_at, updated_at=c.updated_at)
         for c in rows
