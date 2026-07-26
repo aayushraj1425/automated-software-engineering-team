@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { signOut } from "@/lib/auth-client";
+import { downloadMarkdownFrom } from "@/lib/download";
 import { parseSse } from "@/lib/sse";
 
 import type { RepositorySummary } from "@/components/repositories/types";
@@ -75,18 +76,6 @@ export function ChatPanel({ userName }: { userName: string }) {
       body: JSON.stringify({ title }),
     });
     if (res.ok) void refreshConversations();
-  }
-
-  async function exportConversation(id: string) {
-    const res = await fetch(`/api/conversations/${id}/export`);
-    if (!res.ok) return;
-    const { markdown, filename } = (await res.json()) as { markdown: string; filename: string };
-    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   async function deleteConversation(id: string) {
@@ -205,7 +194,7 @@ export function ChatPanel({ userName }: { userName: string }) {
                   type="button"
                   title="Export as markdown"
                   aria-label="Export conversation"
-                  onClick={() => void exportConversation(c.id)}
+                  onClick={() => void downloadMarkdownFrom(`/api/conversations/${c.id}/export`)}
                   className="px-1 text-xs text-zinc-500 hover:text-zinc-200"
                 >
                   ⤓

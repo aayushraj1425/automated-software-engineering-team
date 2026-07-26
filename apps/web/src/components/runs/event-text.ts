@@ -1,5 +1,10 @@
 import type { RunEvent } from "./types";
 
+/** How many characters of an agent's reasoning to show before truncating —
+ * shared by the timeline's inline preview and describeEvent's fallback line so
+ * the two never desync. */
+export const REASONING_PREVIEW = 140;
+
 /** Nice display name for an agent role, e.g. "product_manager" → "Product Manager". */
 export function agentName(role: string | null): string {
   if (!role) return "System";
@@ -72,7 +77,8 @@ export function describeEvent(event: RunEvent): string {
     }
     case "agent.reasoning": {
       const text = String(p.text ?? "").trim();
-      const shown = text.length > 140 ? `${text.slice(0, 140)}…` : text;
+      const shown =
+        text.length > REASONING_PREVIEW ? `${text.slice(0, REASONING_PREVIEW)}…` : text;
       return `${agentName(event.agent)} is thinking: ${shown}`;
     }
     case "review.verdict":

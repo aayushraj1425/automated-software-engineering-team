@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 
-import { agentName, describeEvent, reasoningOf, timelineAgents } from "./event-text";
+import { agentName, describeEvent, reasoningOf, REASONING_PREVIEW, timelineAgents } from "./event-text";
 import { StatusChip } from "./status-chip";
 import {
   FINISHED_STATUSES,
@@ -15,8 +16,6 @@ import {
 } from "./types";
 
 const POLL_MS = 1500;
-// A reasoning trace longer than this is previewed with a "show more" toggle.
-const REASONING_PREVIEW = 140;
 
 // The diff exists once the engineers have worked (and the workspace remains).
 const DIFF_STATUSES = new Set(["reviewing", "completed", "failed"]);
@@ -367,22 +366,6 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   // A finished run's workspace is idle — safe for a human to edit and commit.
   const editable = run.status === "completed" || run.status === "failed";
 
-  // Download a shareable markdown summary of the run (built server-side).
-  async function downloadReport() {
-    const res = await fetch(`/api/runs/${runId}/report`);
-    if (!res.ok) return;
-    const { markdown, filename } = (await res.json()) as {
-      markdown: string;
-      filename: string;
-    };
-    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   // Start a fresh run from this one's request + repository, then open it.
   async function rerun() {
     setRerunning(true);
@@ -442,7 +425,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           )}
           <button
             type="button"
-            onClick={() => void downloadReport()}
+            onClick={() => void downloadMarkdownFrom(`/api/runs/${runId}/report`)}
             className="inline-block rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-zinc-400"
           >
             Download report

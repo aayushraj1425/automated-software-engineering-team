@@ -22,7 +22,7 @@ export async function GET(req: Request): Promise<Response> {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",
   });
-  return Response.json(await upstream.json(), { status: upstream.status });
+  return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -47,5 +47,5 @@ export async function POST(req: Request): Promise<Response> {
     },
     body: JSON.stringify(body),
   });
-  return Response.json(await upstream.json(), { status: upstream.status });
+  return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
 }
