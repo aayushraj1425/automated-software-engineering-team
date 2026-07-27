@@ -280,6 +280,15 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-27 · When a conversation was last active — the chat sidebar now shows
+  a coarse "… ago" under each conversation's title (`relativeTime(updated_at)`),
+  so the list reads as a timeline instead of undated rows. `updated_at` is the
+  field the list is already ordered by, so the newest conversations read "just
+  now" at the top. The **third caller** of the shared, pure `relativeTime` helper
+  (after the repository card and the runs list) — purely presentational, no API,
+  type, schema, or engine change; the value was already on the wire. Design note:
+  [architecture/CONVERSATION_TIMESTAMPS.md](architecture/CONVERSATION_TIMESTAMPS.md).
+  Web: prettier + lint + typecheck clean, 37 tests pass.
 - 2026-07-26 · Search your conversations — the chat parallel to searching the
   runs list. `GET /v1/conversations` gained an optional `q`: a case-insensitive
   substring match on the conversation's title **or any of its messages'

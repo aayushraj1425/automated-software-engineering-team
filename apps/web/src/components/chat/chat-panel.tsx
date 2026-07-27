@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { signOut } from "@/lib/auth-client";
 import { downloadMarkdownFrom } from "@/lib/download";
+import { relativeTime } from "@/lib/relative-time";
 import { parseSse } from "@/lib/sse";
 
 import type { RepositorySummary } from "@/components/repositories/types";
@@ -193,9 +194,10 @@ export function ChatPanel({ userName }: { userName: string }) {
             >
               <button
                 onClick={() => void openConversation(c.id)}
-                className="block flex-1 truncate px-3 py-2 text-left text-sm"
+                className="block flex-1 truncate px-3 py-2 text-left"
               >
-                {c.title ?? "Untitled"}
+                <span className="block truncate text-sm">{c.title ?? "Untitled"}</span>
+                <span className="block text-xs text-zinc-500">{relativeTime(c.updated_at)}</span>
               </button>
               <div className="flex shrink-0 items-center gap-1 pr-2 opacity-0 group-hover:opacity-100">
                 <button
