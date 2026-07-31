@@ -1,6 +1,7 @@
 # How ASEP Works
 
-Read this first. Plain language, real file names, no jargon.
+An overview of what the platform does and what happens under the hood when you
+use it, with pointers to the files involved.
 
 ## What the app does today
 
@@ -15,7 +16,7 @@ in a sandbox, scans it for leaked secrets, and opens a pull request.
 flowchart LR
     B[Your browser] -->|1. sends your message| W["Web app<br/>Next.js on :3000"]
     W -->|2. checks you are signed in,<br/>forwards the message| E["Engine<br/>FastAPI on :8000"]
-    E -->|3. asks the AI model| L["Gemini API"]
+    E -->|3. asks the AI model| L["LLM provider<br/>(set by MODEL_* in .env)"]
     L -->|4. words stream back| E
     E -->|5. words stream back| W
     W -->|6. words appear live| B

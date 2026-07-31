@@ -1,8 +1,12 @@
 # Architecture Overview
 
-**Status:** Living document · **Last updated:** 2026-07-02
-Decisions with trade-offs are recorded as [ADRs](adr/); this document shows how the
-pieces fit together.
+**Status:** Living document · **Last updated:** 2026-07-31
+Decisions with trade-offs are recorded as [ADRs](adr); this document shows how the
+pieces fit together. For a prose walkthrough aimed at a newcomer, read
+[`../architecture.md`](../architecture.md) first — this document is the diagram and
+data-ownership reference behind it. The flows below were the original phase targets;
+they all shipped, and the agent-run pipeline (plan → approve → implement → review →
+sandbox + scanners → pull request) is fully in place.
 
 ## System context
 
