@@ -20,6 +20,7 @@ from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from engine.agents.audit import audit_user_var, build_audit_log
 from engine.agents.engineer import execute_revision, execute_task
 from engine.agents.loop import LlmUsage
 from engine.agents.product_manager import create_plan
@@ -127,20 +128,21 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
     """Audit trail: one tool.called event per tool invocation (ADR-0008)."""
 
     async def _record(name: str, args: dict[str, Any], result: str) -> None:
+        summary = _summarize_args(args)
+        preview = result[:200]
+        ok = not result.startswith("ERROR:")
         async with session_scope() as session:
             _emit(
                 session,
                 run_id,
                 "tool.called",
-                {
-                    "tool": name,
-                    "args": _summarize_args(args),
-                    "ok": not result.startswith("ERROR:"),
-                    "result": result[:200],
-                },
+                {"tool": name, "args": summary, "ok": ok, "result": preview},
                 agent=agent,
                 task_id=task_id,
             )
+            # The durable security mirror, written in the same transaction
+            # (docs/architecture/AUDIT_LOG.md).
+            session.add(build_audit_log(run_id, agent, task_id, name, summary, ok, preview))
             await _commit_and_ping(session, run_id)
 
     return _record
@@ -228,6 +230,9 @@ async def _plan_run(run_id: uuid.UUID) -> None:
         # The run owner's provider keys ride this task's context to the
         # ModelRouter (PROVIDER_KEYS.md); no keys means the .env keys apply.
         provider_keys_var.set(await load_provider_keys(session, run.user_id, run.org_id))
+        # …and the owner rides the context to the tool-call audit trail, so a
+        # row stays attributable after the run is gone (AUDIT_LOG.md).
+        audit_user_var.set(run.user_id)
         run.started_at = _now()
         _emit(session, run_id, "run.started", {"request": run.request})
         _set_run_status(session, run, RunStatus.PLANNING)
@@ -316,6 +321,7 @@ async def _execute_tasks(run_id: uuid.UUID) -> None:
         base_sha = run.base_sha or ""
         # The run owner's provider keys, for every model call this task makes.
         provider_keys_var.set(await load_provider_keys(session, run.user_id, run.org_id))
+        audit_user_var.set(run.user_id)  # attributes the tool-call audit trail (AUDIT_LOG.md)
         rows = (
             (
                 await session.execute(

@@ -17,6 +17,7 @@ from engine.db.models import (
     AgentEvent,
     AgentRun,
     AgentTask,
+    AuditLog,
     Conversation,
     GeneratedDocument,
     IntegrationConnection,
@@ -170,6 +171,7 @@ def _rows_for(user_id: str) -> tuple[Repository, list]:
         AgentRun(user_id=user_id, repository_id=repository.id, request="prove RLS"),
         ProviderKey(user_id=user_id, provider="anthropic", encrypted_key="x", last4="1234"),
         IntegrationConnection(user_id=user_id, encrypted_config="x"),
+        AuditLog(actor_id=user_id, action="tool.called", target="run"),
     ]
 
 
@@ -316,7 +318,7 @@ def test_every_child_table_is_in_the_policy_map():
 
 
 async def test_every_protected_table_filters_by_owner(prepared_db):
-    """One sweep across all five policy-carrying tables (the very list the
+    """One sweep across all six owner-scoped tables (the very list the
     policies are generated from): a stranger's rows are invisible to a pinned
     session's bare SELECT."""
     me, stranger = f"all_me_{uuid.uuid4().hex[:6]}", f"all_other_{uuid.uuid4().hex[:6]}"

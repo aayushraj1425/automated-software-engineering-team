@@ -48,12 +48,16 @@ USER_OWNED_TABLES: dict[str, str] = {
     "agent_runs": "user_id",
     "provider_keys": "user_id",
     "integration_connections": "user_id",
+    # The general actor/action log: a row belongs to the actor who did it
+    # (a chat message, or an agent tool call — the run owner). Owner-scoped,
+    # never org-shared — audit is personal (AUDIT_LOG.md).
+    "audit_logs": "actor_id",
 }
 
 # Child table → (parent table, foreign-key column). A child row is visible
 # exactly when its parent row is: the EXISTS subquery consults the *parent's*
 # policy, so the owner/org logic lives in one place and can never drift.
-# (audit_logs stays out: no owning parent, written by the service only.)
+# (audit_logs is not a child: it carries its own owner column, actor_id.)
 CHILD_TABLES: dict[str, tuple[str, str]] = {
     "messages": ("conversations", "conversation_id"),
     "agent_tasks": ("agent_runs", "run_id"),

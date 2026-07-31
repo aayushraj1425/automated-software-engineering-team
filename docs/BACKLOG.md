@@ -54,9 +54,9 @@ subset being built now.
 - [x] Read-side tools: list directory, read file (size-capped), search — ripgrep when it is on PATH (fast, gitignore-aware), the Python scan as the no-dependency fallback, same output contract either way — design note: [architecture/RIPGREP_SEARCH.md](architecture/RIPGREP_SEARCH.md)
 - [x] Write-side tools: write file and apply-patch, both jailed — `apply_patch` applies a unified diff via `git apply` (dry-run first, both prefix styles, whitespace-tolerant), so an edit is the size of the change instead of the whole file — design note: [architecture/APPLY_PATCH_TOOL.md](architecture/APPLY_PATCH_TOOL.md)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
-- [x] Open pull request via the GitHub API with a generated description (checklist note included; full Definition-of-Done template pending)
+- [x] Open pull request via the GitHub API with a generated description carrying the full Definition-of-Done checklist (`engine/agents/pull_request.py`, host-agnostic — GitHub/GitLab/Bitbucket share it) — design note: [architecture/PULL_REQUEST_BODY.md](architecture/PULL_REQUEST_BODY.md)
 - [x] Task-board tools: engineers add newly discovered work with `add_task` (pending, next sequence — the supervisor merges and schedules it in the same run) and skip unnecessary pending tasks with `update_task_status` (skipped-only; refuses when unfinished work depends on the task) — design note: [architecture/TASK_BOARD_TOOLS.md](architecture/TASK_BOARD_TOOLS.md)
-- [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored; `audit_logs` mirror pending)
+- [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored) and mirrored into the general `audit_logs` table (`action="tool.called"`, one row per call, same transaction) — design note: [architecture/AUDIT_LOG.md](architecture/AUDIT_LOG.md)
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
 
 ### Workstream: Specialist Agents (blocking)
@@ -280,6 +280,51 @@ The project's wrap-up phase: make every role reason before it acts.
 
 ## Done
 
+- 2026-07-30 · Tool calls are mirrored into the audit log — the other inline
+  loose end on the Agent Tools workstream. Every agent tool call already landed
+  on the run timeline as a `tool.called` event; it is now *also* written to the
+  general `audit_logs` table (the same table that logs a chat message), so
+  "who did what" across the platform lives in one queryable, indexed place. The
+  mirror row (`actor_id` = the run owner, `action="tool.called"`, `target` = the
+  run, `meta` = tool/agent/ok/task/args/result) is built by a pure
+  `build_audit_log` in `engine/agents/audit.py` and added to the **same
+  transaction** as the timeline event — no extra round trip, and the two can't
+  disagree. The run owner reaches the write through `audit_user_var`, a context
+  variable set at each run entrypoint beside `provider_keys_var`; a tool called
+  with no run context records `actor_id="system"` rather than failing. No new
+  table — the tool call is just another audited action. Design note:
+  [architecture/AUDIT_LOG.md](architecture/AUDIT_LOG.md). Engine
+  ruff/format/pyright clean; full suite 450 passed / 1 skipped (9 new tests).
+- 2026-07-30 · Row-level security reaches `audit_logs` — closing the follow-up
+  the mirror flagged. `audit_logs` was the one FORCE-RLS exception: it predated
+  the deny-by-default work and carried no policy, so any role with a table grant
+  could read every actor's rows. It now gets the standard owner-or-service policy
+  on `actor_id` (migration 0024, up/down/up verified; `"audit_logs": "actor_id"`
+  in `USER_OWNED_TABLES`), so a session reads only its own audit rows and Postgres
+  refuses the rest — owner-only, never org-shared (audit is personal). The
+  tool-call mirror is *written* under the service context, so it is never blocked;
+  a chat row is written by the user session and passes because `actor_id` is that
+  user. RLS now covers **six** ownership-carrying tables, not five — wording
+  updated in [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md).
+  Engine ruff/format/pyright clean; a new test proves a user sees only its own
+  audit rows while the service sees all.
+- 2026-07-30 · The generated pull request carries the full Definition of Done —
+  the last inline loose end on the Agent Tools workstream. Published requests
+  used to end with a one-line placeholder note (`Review checklist: correctness,
+  scope, security, consistency.`); they now carry the ten-item Definition-of-Done
+  checklist verbatim from `.github/PULL_REQUEST_TEMPLATE.md`, unchecked for the
+  human reviewer. A new pure builder, `build_pull_request_body(plan_summary,
+  run_id)` in `engine/agents/pull_request.py`, feeds all three publish paths
+  (GitHub PR, GitLab MR, Bitbucket PR) the same body, so the checklist can't drift
+  between hosts — the same shape as `build_run_report`. Two deliberate choices:
+  the boxes ship **unchecked** (the team can't self-certify a human review, and
+  the body says so), and the items are **embedded in code** rather than read from
+  the template file (the deployed engine ships without the repo's `.github/`), so
+  a test reads the checklist back out of the template and asserts it matches
+  `DEFINITION_OF_DONE` — the two can't silently diverge. Design note:
+  [architecture/PULL_REQUEST_BODY.md](architecture/PULL_REQUEST_BODY.md). Engine
+  ruff/format/pyright clean; `test_pull_request_body.py` (3 tests) passes and no
+  existing test relied on the old note.
 - 2026-07-27 · When a conversation was last active — the chat sidebar now shows
   a coarse "… ago" under each conversation's title (`relativeTime(updated_at)`),
   so the list reads as a timeline instead of undated rows. `updated_at` is the

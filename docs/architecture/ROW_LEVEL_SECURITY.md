@@ -27,11 +27,13 @@ flowchart LR
     H[no context at all —\na forgotten pin] --> X[(zero rows,\ndeny by default)]
 ```
 
-- **Policies live on the five tables that carry ownership directly** —
-  `repositories` (`owner_id`) and `conversations`, `agent_runs`,
-  `provider_keys`, `integration_connections` (`user_id`). Each gets
-  `ENABLE` **and** `FORCE` row level security: `FORCE` matters because the
-  engine connects as the table owner, and owners bypass RLS without it.
+- **Policies live on the six tables that carry ownership directly** —
+  `repositories` (`owner_id`); `conversations`, `agent_runs`,
+  `provider_keys`, `integration_connections` (`user_id`); and `audit_logs`
+  (`actor_id` — the general actor/action log, owner-scoped and never
+  org-shared; migration 0024). Each gets `ENABLE` **and** `FORCE` row level
+  security: `FORCE` matters because the engine connects as the table owner,
+  and owners bypass RLS without it.
 - **A row is visible/writable when** `app.user_id` (a transaction-local GUC)
   equals the ownership column — **or when the GUC is unset**, which is the
   trusted internal context. The single source of truth for the policy SQL is

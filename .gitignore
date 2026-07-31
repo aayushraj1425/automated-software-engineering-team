@@ -39,3 +39,12 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Miscellaneous
+.ua/
+docs/reverse_engineering_guidelines/
+docs/phase1-phase5.html
+docs/phase1-phase5.md
+docs/PRODUCTION_READINESS_REVIEW.md
+PROJECT_STRUCTURE.md
+docs/CODE_TOUR.md

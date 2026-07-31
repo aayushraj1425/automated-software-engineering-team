@@ -451,6 +451,11 @@ class GeneratedDocument(Base, TimestampMixin):
 
 
 class AuditLog(Base):
+    """General actor/action audit trail: ``actor_id`` did ``action`` to
+    ``target`` (``meta`` carries the detail). Records a chat message
+    (``chat.message``) and every agent tool call (``tool.called``, mirrored from
+    the run timeline — docs/architecture/AUDIT_LOG.md)."""
+
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
