@@ -4,31 +4,41 @@
 
 ## Context
 
-We need relational data (users, orgs, repos, conversations, runs, tasks), vector search
-for repository intelligence (Phase 2), full-text search, and LangGraph checkpoint storage.
-Operating many datastores early adds cost with no user value.
+We need several kinds of storage: relational data (users, organizations,
+repositories, conversations, runs, tasks), vector search for repository
+intelligence, full-text search, and somewhere to keep LangGraph's checkpoints.
+Standing up a separate datastore for each of these early in the project would add
+real operational cost without giving users anything in return.
 
 ## Decision
 
-**One PostgreSQL 16 database** with the **pgvector** extension (enabled from migration
-0001) serves as system of record, vector store, and checkpoint store. Access from the
-engine via SQLAlchemy 2 async on psycopg3; schema migrations via Alembic. Vector access
-will hide behind a small retriever interface (Phase 2) so the store can be swapped.
+One PostgreSQL 16 database, with the pgvector extension enabled from migration
+0001, serves as the system of record, the vector store, and the checkpoint store
+all at once. The engine reaches it through SQLAlchemy 2 (async, on psycopg 3),
+and schema changes go through Alembic. Vector access sits behind a small retriever
+interface, so if we ever need to move vectors elsewhere, the change stays
+contained.
 
 ## Alternatives considered
 
-- **Dedicated vector DB (Qdrant/Weaviate/Milvus)** — better ANN performance and
-  filtering at large scale, but another service to run, and it splits code metadata from
-  vectors, forcing cross-store joins for hybrid search. Revisit past ~10M chunks or if
-  pgvector latency hurts.
-- **SQLite (dev) + Postgres (prod)** — divergent behavior (extensions, concurrency)
-  undermines the walking-skeleton goal of prod-like dev.
-- **Elasticsearch for text search** — powerful BM25, heavy operationally; Postgres FTS
-  is adequate for Phase 2's hybrid retrieval and can be fused with vectors in one query.
+- **A dedicated vector database** (Qdrant, Weaviate, or Milvus) would give better
+  approximate-nearest-neighbor performance and filtering at large scale, but it is
+  another service to run, and it splits code metadata from the vectors — which
+  forces cross-store joins for hybrid search. Worth revisiting past roughly ten
+  million chunks, or if pgvector latency starts to hurt.
+- **SQLite in dev with Postgres in production** would diverge in behavior
+  (extensions, concurrency) badly enough to undermine the whole point of a
+  production-like development environment.
+- **Elasticsearch for text search** brings powerful BM25 ranking but is heavy to
+  operate. Postgres full-text search is good enough for the hybrid retrieval we
+  need, and it can be fused with vector search in a single query.
 
 ## Consequences
 
-- One backup/restore story, transactional consistency between metadata and vectors.
-- Postgres becomes the scaling bottleneck to watch; mitigations in order: indexes/HNSW,
-  read replicas, then extract the vector workload behind the retriever interface.
-- pgvector image (`pgvector/pgvector:pg16`) replaces the stock postgres image in dev.
+- One backup-and-restore story, and transactional consistency between metadata
+  and vectors.
+- Postgres becomes the scaling bottleneck to keep an eye on. The mitigations, in
+  order, are better indexes and HNSW, then read replicas, then extracting the
+  vector workload behind the retriever interface.
+- The pgvector image (`pgvector/pgvector:pg16`) replaces the stock Postgres image
+  in development.

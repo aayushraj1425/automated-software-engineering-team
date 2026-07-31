@@ -4,34 +4,45 @@
 
 ## Context
 
-We need a product UI with authentication *and* an AI runtime with the strongest agent
-ecosystem. The AI ecosystem (LangGraph, LiteLLM, tree-sitter bindings, ML tooling) is
-Python-first; the UI ecosystem is TypeScript-first.
+We need two things that pull in opposite directions: a polished product UI with
+authentication, and an AI runtime built on the strongest agent ecosystem
+available. That ecosystem — LangGraph, LiteLLM, tree-sitter bindings, the broader
+ML tooling — is Python-first, while the UI ecosystem is TypeScript-first. Rather
+than compromise on either, we let each live in the language that suits it.
 
 ## Decision
 
 Two applications:
 
-- **apps/web (Next.js 15)** — UI plus a *backend-for-frontend*: owns browser sessions
-  (better-auth), signs a short-lived HS256 **service JWT** (`ENGINE_SERVICE_SECRET`,
-  `sub`=user id, ~60s expiry) and proxies REST/SSE to the engine. The engine is never
-  exposed to browsers.
-- **apps/engine (FastAPI, Python 3.12)** — all AI work: model routing, agent graphs,
-  repo operations, background workers; owns the domain schema via Alembic.
+- **apps/web (Next.js 15)** is the UI and also a backend-for-frontend. It owns
+  browser sessions through better-auth, signs a short-lived HS256 service JWT
+  (`ENGINE_SERVICE_SECRET`, `sub` = user id, roughly 60-second expiry), and
+  proxies REST and SSE calls to the engine. The engine is never exposed to
+  browsers.
+- **apps/engine (FastAPI, Python 3.12)** does all the AI work: model routing,
+  agent graphs, repository operations, and background workers. It also owns the
+  domain schema through Alembic.
 
 ## Alternatives considered
 
-- **Node-only stack** (Next.js + Node agent runtime) — one language, but the Python
-  agent/parsing ecosystem is materially stronger; we'd reimplement LangGraph/tree-sitter
-  maturity.
-- **Separate API gateway service** (NestJS/Fastify between web and engine) — clean, but
-  a third deployable with no current responsibilities the BFF can't cover. Add later if
-  non-browser clients (CLI, IDE plugins) need a public API.
-- **Python-only** (FastAPI + Jinja/HTMX) — weak fit for a rich workspace UI.
+- **A Node-only stack** (Next.js plus a Node agent runtime) keeps everything in
+  one language, but the Python agent and parsing ecosystem is materially
+  stronger. We would end up reimplementing the maturity of LangGraph and
+  tree-sitter ourselves.
+- **A separate API gateway service** (NestJS or Fastify sitting between web and
+  engine) would be clean, but it is a third deployable with no responsibility the
+  BFF cannot already cover. We can add it later, when non-browser clients such as
+  a CLI or IDE plugin need a public API.
+- **A Python-only stack** (FastAPI with Jinja or HTMX) is a poor fit for a rich
+  workspace UI.
 
 ## Consequences
 
-- Clear contract boundary: engine OpenAPI spec → generated TS types (packages/shared).
-- Service JWT keeps user identity flowing to the engine without duplicating auth.
-- Two runtimes to operate; acceptable, both are containerized identically in prod.
-- A future public API/CLI will motivate promoting the engine behind a real gateway.
+- The contract boundary is explicit: the engine's OpenAPI spec generates the
+  TypeScript types in `packages/shared`.
+- The service JWT carries user identity to the engine without duplicating auth
+  logic on both sides.
+- There are two runtimes to operate, which we accept — both are containerized the
+  same way in production.
+- The day a public API or CLI arrives is the day it makes sense to promote the
+  engine behind a real gateway.
