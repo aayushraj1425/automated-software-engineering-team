@@ -6,7 +6,7 @@ Create Date: 2026-07-13
 
 Two nullable columns on work_items recording the external issue a work item was
 pushed to (Linear first): the URL and the human key (e.g. "ENG-42"). Design
-note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+note: docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 from collections.abc import Sequence

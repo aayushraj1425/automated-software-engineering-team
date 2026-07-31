@@ -12,7 +12,7 @@ repository's `.github/` directory; a test pins the two in sync. The boxes are
 left unchecked — the agent team cannot honestly self-certify a human review, so
 completing the checklist is the reviewer's job.
 
-Design note: docs/architecture/PULL_REQUEST_BODY.md.
+Design note: docs/architecture/agents/PULL_REQUEST_BODY.md.
 """
 
 import uuid

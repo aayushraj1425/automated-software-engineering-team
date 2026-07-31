@@ -4,7 +4,7 @@ A pure "create this there" function — it never touches the database or a work
 item. In dry-run mode (INTEGRATIONS_DRY_RUN=1: tests, offline dev) it skips the
 network and returns a deterministic placeholder, so the whole push path runs
 without a real Linear workspace. Design note:
-docs/architecture/EXTERNAL_INTEGRATIONS.md.
+docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import httpx

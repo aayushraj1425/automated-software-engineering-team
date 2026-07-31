@@ -6,7 +6,7 @@ Create Date: 2026-07-08
 
 One row per source file with a SHA-256 of its bytes from the last index, so a
 re-index re-embeds only the files that changed. Design note:
-docs/architecture/INCREMENTAL_INDEXING.md.
+docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md.
 """
 
 from collections.abc import Sequence

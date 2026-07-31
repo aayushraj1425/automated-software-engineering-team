@@ -3,7 +3,7 @@
 INTEGRATIONS_DRY_RUN=1 (set in conftest) makes the Slack adapter skip the
 network and report a dry run, so the whole path — connect → run finishes →
 `integration.notified` event — runs without a real workspace. Design note:
-docs/architecture/EXTERNAL_INTEGRATIONS.md.
+docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import uuid

@@ -7,7 +7,7 @@ any difference fails the suite and names the file.
 
 Deliberate change? Review the diff, then refresh the snapshot and commit
 both together:  uv run python tests/test_prompt_snapshots.py
-Design note: docs/architecture/PROMPT_SNAPSHOTS.md.
+Design note: docs/architecture/agents/PROMPT_SNAPSHOTS.md.
 """
 
 import hashlib

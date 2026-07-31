@@ -2,7 +2,7 @@
 
 The model is not called here — LLM_FAKE (set in conftest) short-circuits
 review_diff to a canned all-clear, and the validation/rendering helpers are
-pure. Design note: docs/architecture/WEBHOOK_REVIEWER.md.
+pure. Design note: docs/architecture/execution-qa/WEBHOOK_REVIEWER.md.
 """
 
 import pytest

@@ -6,7 +6,7 @@ org+provider) — partial unique indexes replace the old constraint. The
 table's RLS policy gains the org clause, so Postgres itself shows a shared
 key to whoever has that organization active and nobody else.
 Frozen from ``engine/db/rls.py`` like every policy migration.
-Design note: docs/architecture/PROVIDER_KEYS.md (organization-shared keys).
+Design note: docs/architecture/identity-integrations/PROVIDER_KEYS.md (organization-shared keys).
 
 Revision ID: 0021
 Revises: 0020

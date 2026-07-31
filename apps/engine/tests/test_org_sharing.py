@@ -3,7 +3,7 @@
 Two layers under test, both stating the same rule (owner OR active org):
 the RLS policies attacked with raw SQL through pinned sessions, and the API
 routes through real requests carrying the ``org`` claim.
-Design note: docs/architecture/ORGANIZATION_SHARING.md.
+Design note: docs/architecture/identity-integrations/ORGANIZATION_SHARING.md.
 """
 
 import uuid

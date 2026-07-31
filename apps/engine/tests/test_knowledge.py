@@ -3,7 +3,7 @@
 LLM_FAKE=1 (set in conftest) keeps everything offline: embeddings are
 deterministic and the run pipeline is the fixed three-task plan, so a whole
 run can complete inside a test and leave real memories behind.
-Design note: docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+Design note: docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 import json

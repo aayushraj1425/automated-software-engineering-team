@@ -457,7 +457,7 @@ async def test_create_run_rejects_bad_input(client):
     assert bad_url.status_code == 422
 
 
-# ── Workspace file browser (docs/architecture/WORKSPACE_PANELS.md) ──────────
+# ── Workspace file browser (docs/architecture/runs-ui/WORKSPACE_PANELS.md) ──────────
 
 
 async def _completed_run(client, headers) -> str:

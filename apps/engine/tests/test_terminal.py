@@ -3,7 +3,7 @@
 The docker CLI is faked (recording calls, scripted answers) so the whole
 path — session creation, hardening flags, TTL refresh, timeout reset, the
 API's guards — runs offline, the same approach as the sandbox tests.
-Design note: docs/architecture/IN_BROWSER_TERMINAL.md.
+Design note: docs/architecture/runs-ui/IN_BROWSER_TERMINAL.md.
 """
 
 import time

@@ -3,7 +3,7 @@
 A repository URL maps to at most one connected host kind (GitLab or
 Bitbucket); GitHub keeps using the environment token and local/unknown URLs
 push plainly, so neither appears here. Design note:
-docs/architecture/SOURCE_HOSTS.md.
+docs/architecture/agents/SOURCE_HOSTS.md.
 """
 
 from typing import Any

@@ -9,7 +9,7 @@ run back into a startable state the same way startup recovery does. That is
 what makes a graceful shutdown safe — stopping the worker mid-run cancels the
 job, Postgres keeps the checkpoint (status, board, workspace commits), arq
 re-delivers the job, and the reset lets it finish what the last worker
-started. Design note: docs/architecture/BACKGROUND_WORKER.md.
+started. Design note: docs/architecture/agents/BACKGROUND_WORKER.md.
 """
 
 import asyncio
@@ -55,7 +55,7 @@ async def execute_tasks_job(ctx: dict[str, Any], run_id: str) -> None:
 
 
 async def backup_database_job(ctx: dict[str, Any]) -> None:
-    """Nightly Postgres dump (docs/architecture/BACKUPS_AND_RECOVERY.md).
+    """Nightly Postgres dump (docs/architecture/operations/BACKUPS_AND_RECOVERY.md).
     pg_dump is a blocking subprocess, so it runs on a thread; a failure is
     logged by arq and the next night simply tries again — pruning only runs
     after a *successful* dump, so failures never eat existing backups."""

@@ -1,7 +1,7 @@
 """Runs API: start an agent run, list runs, watch one run's progress.
 
 The UI streams GET /v1/runs/{id}/events/stream for live timeline entries
-(design note: docs/architecture/RUN_EVENT_STREAMING.md) and polls
+(design note: docs/architecture/agents/RUN_EVENT_STREAMING.md) and polls
 GET /v1/runs/{id} for the task board; the plain events endpoint
 (?after=<last event id>) remains as the polling fallback.
 """

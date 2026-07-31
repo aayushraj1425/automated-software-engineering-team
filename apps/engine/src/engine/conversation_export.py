@@ -4,7 +4,7 @@ a question-and-answer session, the chat parallel to the run report.
 A pure function over the conversation and its messages: no model call, no
 database, no network, so it works offline and is trivially testable.
 
-Design note: docs/architecture/CONVERSATION_EXPORT.md.
+Design note: docs/architecture/chat/CONVERSATION_EXPORT.md.
 """
 
 from engine.db.models import Conversation, Message

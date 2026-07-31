@@ -3,7 +3,7 @@
 Postgres is the record and Redis only wakes the stream, so every test works
 with or without a Redis server: a missing ping is covered by the heartbeat
 (shrunk here so tests stay fast). Design note:
-docs/architecture/RUN_EVENT_STREAMING.md.
+docs/architecture/agents/RUN_EVENT_STREAMING.md.
 """
 
 import asyncio

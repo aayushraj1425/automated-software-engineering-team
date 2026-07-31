@@ -10,7 +10,7 @@ Never the hot path, and never *before* the local dump is safe: create_backup
 uploads only after the local file is written, verified, and pruned. A failed
 upload raises so the nightly job surfaces it — the local backup is already kept.
 
-Design note: docs/architecture/BACKUPS_AND_RECOVERY.md.
+Design note: docs/architecture/operations/BACKUPS_AND_RECOVERY.md.
 """
 
 from pathlib import Path

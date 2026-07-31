@@ -7,7 +7,7 @@ services:
       # The bootstrap user must stay a superuser (Postgres insists), so it is
       # NOT the role the engine uses. The init script below creates `asep` as
       # a plain NOSUPERUSER role — superusers bypass row-level security
-      # (docs/architecture/ROW_LEVEL_SECURITY.md).
+      # (docs/architecture/security/ROW_LEVEL_SECURITY.md).
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:

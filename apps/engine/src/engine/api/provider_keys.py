@@ -5,7 +5,7 @@ configured and their last four characters for the settings page. Setting a
 key replaces any previous one for that provider. A key can be explicitly
 shared with the active organization — one org key per provider, visible to
 and replaceable by any member. Design note:
-docs/architecture/PROVIDER_KEYS.md.
+docs/architecture/identity-integrations/PROVIDER_KEYS.md.
 """
 
 from datetime import datetime

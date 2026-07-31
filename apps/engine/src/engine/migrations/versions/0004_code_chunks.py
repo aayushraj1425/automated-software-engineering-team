@@ -5,7 +5,8 @@ Revises: 0003
 Create Date: 2026-07-06
 
 One row per indexed piece of a repository file, with a pgvector embedding for
-similarity search. Design note: docs/architecture/REPOSITORY_INTELLIGENCE.md.
+similarity search. Design note:
+docs/architecture/repository-intelligence/REPOSITORY_INTELLIGENCE.md.
 """
 
 from collections.abc import Sequence

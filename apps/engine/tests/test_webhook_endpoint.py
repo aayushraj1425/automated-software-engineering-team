@@ -3,7 +3,7 @@
 The client fixture's ASGI transport waits for FastAPI background tasks, so a
 queued review has already run by the time the POST returns — we monkeypatch the
 review orchestrator to record the call instead of hitting GitHub. Design note:
-docs/architecture/WEBHOOK_REVIEWER.md.
+docs/architecture/execution-qa/WEBHOOK_REVIEWER.md.
 """
 
 import hashlib

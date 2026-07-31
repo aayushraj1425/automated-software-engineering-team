@@ -7,7 +7,7 @@ chunk either arm likes rises to the top. The displayed score stays the cosine
 similarity; fusion only decides the order.
 
 Used by the repository search endpoint, grounded chat, and the agents'
-search_code tool. Design note: docs/architecture/HYBRID_RETRIEVAL.md.
+search_code tool. Design note: docs/architecture/repository-intelligence/HYBRID_RETRIEVAL.md.
 """
 
 import re

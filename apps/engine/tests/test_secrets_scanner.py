@@ -1,6 +1,6 @@
 """The secrets scanner: which added lines of a diff count as a leak.
 
-Design note: docs/architecture/SECRETS_SCANNING.md.
+Design note: docs/architecture/execution-qa/SECRETS_SCANNING.md.
 """
 
 from engine.security.secrets_scanner import scan_diff

@@ -4,7 +4,8 @@ Runs right after a run reaches a terminal state (beside capture_run_memory), so
 it can never block or break the run. Loads the owner's enabled Slack connection,
 posts the outcome, and records an `integration.notified` timeline event. A run
 with no connection notifies nothing (no event); any failure is logged and
-recorded, never raised. Design note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+recorded, never raised. Design note:
+docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import uuid

@@ -1,10 +1,10 @@
 """Repositories API: connect a repository, index it, and search the index.
 
 Scoped to the caller's own repositories plus the active organization's
-shared ones (docs/architecture/ORGANIZATION_SHARING.md), like the runs API.
+shared ones (docs/architecture/identity-integrations/ORGANIZATION_SHARING.md), like the runs API.
 Indexing runs as a background task; search embeds the question and returns
 the closest chunks by cosine distance
-(design note: docs/architecture/REPOSITORY_INTELLIGENCE.md).
+(design note: docs/architecture/repository-intelligence/REPOSITORY_INTELLIGENCE.md).
 """
 
 import uuid
@@ -177,7 +177,7 @@ async def disconnect_repository(
 ) -> None:
     """Disconnect: the repository's data (index, work items, knowledge,
     documents) goes with it; run history survives detached — the FK is
-    SET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md).
+    SET NULL by design (docs/architecture/runs-ui/RUN_HISTORY_RETENTION.md).
     Destroying a teammate's shared repository takes an admin
     (ORGANIZATION_ROLES.md); your own stays yours to disconnect."""
     repo = await _visible_repository(db, repository_id, principal)

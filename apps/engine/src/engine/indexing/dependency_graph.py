@@ -11,7 +11,7 @@ Python and JS/TS imports resolve by file path; Java and Kotlin imports name a
 fully-qualified type (`com.demo.util.Helper`), so we first index each file's
 package and the types it declares, then resolve imports against that map.
 
-Design note: docs/architecture/DEPENDENCY_GRAPH.md.
+Design note: docs/architecture/repository-intelligence/DEPENDENCY_GRAPH.md.
 """
 
 import os

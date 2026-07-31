@@ -6,7 +6,7 @@ configures the SDK, so instrumented code carries no `if telemetry:` branches.
 `configure_telemetry()` is that switch: called at startup when OTEL_ENABLED=1
 (exporting via OTLP to OTEL_EXPORTER_OTLP_ENDPOINT), or by tests with in-memory
 exporters so assertions read real spans offline. ADR-0010; design note:
-docs/architecture/PRODUCTION_HARDENING.md.
+docs/architecture/operations/PRODUCTION_HARDENING.md.
 """
 
 import time
@@ -35,7 +35,7 @@ request_counter = _meter.create_counter(
 request_duration = _meter.create_histogram(
     "http.server.duration", unit="ms", description="Request duration, by route and status code"
 )
-# LLM spend, so the token-spend alert (docs/architecture/ALERTING.md) has a real
+# LLM spend, so the token-spend alert (docs/architecture/operations/ALERTING.md) has a real
 # series to watch. No unit on the cost counter, so its Prometheus name stays a
 # clean llm_cost_usd_total rather than gaining a unit suffix.
 llm_cost_counter = _meter.create_counter(

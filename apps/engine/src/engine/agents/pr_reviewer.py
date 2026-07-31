@@ -5,7 +5,7 @@ workspace with tools, this one is given only the diff text — it is what the
 webhook reviewer has for someone else's pull request. One planner-tier model
 call returns a strict JSON verdict; the result is rendered as a markdown review
 comment. With LLM_FAKE=1 a canned review is returned so the path is testable
-offline. Design note: docs/architecture/WEBHOOK_REVIEWER.md.
+offline. Design note: docs/architecture/execution-qa/WEBHOOK_REVIEWER.md.
 """
 
 from typing import Any

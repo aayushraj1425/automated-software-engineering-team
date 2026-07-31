@@ -3,7 +3,7 @@
 The module configures the SDK once with in-memory exporters through the same
 `configure_telemetry()` seam production uses, so these assertions read real
 spans offline — the Phase 7 observability exit criterion. Design note:
-docs/architecture/PRODUCTION_HARDENING.md (ADR-0010).
+docs/architecture/operations/PRODUCTION_HARDENING.md (ADR-0010).
 """
 
 import uuid

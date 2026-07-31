@@ -4,7 +4,7 @@ Three layers: the pure logic runs anywhere (CI included); the upload/list/prune
 round trip runs against the dev compose MinIO and skips when it is down; the
 create_backup wiring proves the upload fires exactly when configured (it needs
 pg_dump, so it skips where the client tools are absent, like the sibling suite).
-Design note: docs/architecture/BACKUPS_AND_RECOVERY.md.
+Design note: docs/architecture/operations/BACKUPS_AND_RECOVERY.md.
 """
 
 import uuid

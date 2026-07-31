@@ -37,7 +37,7 @@ function diffLineClass(line: string): string {
 
 /** Watches one run live: events stream in over SSE (each one nudges a
  * throttled task-board refresh); if the stream fails, falls back to the old
- * polling loop. Design note: docs/architecture/RUN_EVENT_STREAMING.md. */
+ * polling loop. Design note: docs/architecture/agents/RUN_EVENT_STREAMING.md. */
 export function RunDetailPanel({ runId }: { runId: string }) {
   const router = useRouter();
   const [run, setRun] = useState<RunDetail | null>(null);

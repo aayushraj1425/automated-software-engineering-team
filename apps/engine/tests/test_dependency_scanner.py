@@ -2,7 +2,7 @@
 
 Pure-function tests (no DB, no network) mirroring the secrets-scanner tests.
 Only ADDED manifest lines are scanned, and only known-vulnerable versions match.
-Design note: docs/architecture/DEPENDENCY_SCANNING.md.
+Design note: docs/architecture/execution-qa/DEPENDENCY_SCANNING.md.
 """
 
 from engine.security.dependency_scanner import scan_diff

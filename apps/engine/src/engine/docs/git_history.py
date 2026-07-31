@@ -5,7 +5,7 @@ no blobs beyond what the log needs — and is removed afterwards. The URL goes
 through the same `ensure_cloneable_url` hygiene as every other clone. A
 fetch that fails (private remote, network down) returns an empty string so
 the changelog can fall back to its snapshot summary honestly instead of
-inventing history. Design note: docs/architecture/DOCUMENTATION_SUITE.md.
+inventing history. Design note: docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
 """
 
 import tempfile

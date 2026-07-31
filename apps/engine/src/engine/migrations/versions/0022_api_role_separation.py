@@ -13,7 +13,7 @@ with no special attributes:
 Grants are skipped quietly when the role does not exist (single-role mode
 keeps working). This is a frozen copy of the statements in
 ``engine/db/rls.py`` (the living source of truth the test suite applies).
-Design note: docs/architecture/ROW_LEVEL_SECURITY.md.
+Design note: docs/architecture/security/ROW_LEVEL_SECURITY.md.
 
 Revision ID: 0022
 Revises: 0021

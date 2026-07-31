@@ -18,13 +18,13 @@ Org-shared tables (repositories, agent_runs) additionally open a row to
 sessions whose ``app.org_id`` — the JWT's membership-checked active
 organization — matches the row's ``org_id``, for reads and writes alike:
 organization members are equal collaborators
-(docs/architecture/ORGANIZATION_SHARING.md). Conversations, provider keys,
+(docs/architecture/identity-integrations/ORGANIZATION_SHARING.md). Conversations, provider keys,
 and integrations stay strictly owner-only.
 
 This module is the single source of truth for the policy SQL. The Alembic
 migrations freeze copies in time; the test suite applies this living version
 after creating the schema, so the entire suite runs under FORCE RLS.
-Design note: docs/architecture/ROW_LEVEL_SECURITY.md.
+Design note: docs/architecture/security/ROW_LEVEL_SECURITY.md.
 """
 
 from sqlalchemy.ext.asyncio import AsyncConnection

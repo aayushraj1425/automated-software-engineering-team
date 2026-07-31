@@ -6,7 +6,7 @@ Create Date: 2026-07-08
 
 One row per first-party import (source file imports target file within the same
 repository). Rebuilt on every re-index, like code_chunks. Design note:
-docs/architecture/DEPENDENCY_GRAPH.md.
+docs/architecture/repository-intelligence/DEPENDENCY_GRAPH.md.
 """
 
 from collections.abc import Sequence

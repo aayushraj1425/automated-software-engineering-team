@@ -9,7 +9,7 @@ export type ProxyOptions = {
    * is a 400 before the engine is called. Omit for a bodyless call. */
   forwardBody?: boolean;
   /** The caller's organization role, signed into the token only by the
-   * destructive routes that gate on it (docs/architecture/ORGANIZATION_ROLES.md);
+   * destructive routes that gate on it (docs/architecture/identity-integrations/ORGANIZATION_ROLES.md);
    * omitted everywhere else so the token stays lean. */
   orgRole?: string | null;
 };
@@ -23,7 +23,7 @@ export type ProxyOptions = {
  * unreadable JSON body when `forwardBody` is set, and a bodyless 204 straight
  * through. Streaming routes (chat, the run event stream) and the better-auth
  * handler don't fit this shape and stay hand-written.
- * Design note: docs/architecture/BFF_PROXY.md. */
+ * Design note: docs/architecture/identity-integrations/BFF_PROXY.md. */
 export async function proxyToEngine(
   req: Request,
   path: string,

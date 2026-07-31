@@ -3,7 +3,7 @@
 Docker itself is faked — a recorded stand-in for the `docker` CLI — so these
 tests run offline and assert the exact sequence of calls: create, copy in,
 install (network ON), disconnect the network, test (network OFF), remove.
-Design note: docs/architecture/SANDBOX_EXECUTION.md.
+Design note: docs/architecture/execution-qa/SANDBOX_EXECUTION.md.
 """
 
 import uuid

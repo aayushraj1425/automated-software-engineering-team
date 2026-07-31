@@ -5,7 +5,7 @@
 # become underscores, counters gain _total, the histogram's ms unit becomes
 # _milliseconds); if your collector is configured to drop unit or _total
 # suffixes, adjust the names to match. The thresholds are deliberate starting
-# points — tune them once real traffic shows the shape (docs/architecture/ALERTING.md).
+# points — tune them once real traffic shows the shape (docs/architecture/operations/ALERTING.md).
 groups:
   - name: asep-availability
     rules:

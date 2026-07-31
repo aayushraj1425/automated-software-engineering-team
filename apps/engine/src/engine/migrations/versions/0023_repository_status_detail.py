@@ -4,7 +4,7 @@ When indexing failed the status became 'index_failed', but the reason lived only
 in the engine logs — the user saw a failure with no explanation. A nullable
 status_detail column carries a short human reason, set on failure and cleared on
 a successful index.
-Design note: docs/architecture/INDEXING_ERROR_SURFACING.md.
+Design note: docs/architecture/repository-intelligence/INDEXING_ERROR_SURFACING.md.
 
 Revision ID: 0023
 Revises: 0022

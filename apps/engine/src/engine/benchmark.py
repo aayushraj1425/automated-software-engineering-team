@@ -9,7 +9,7 @@ workspace git) rather than a provider's latency:
     uv run python -m engine.benchmark retrieval --repeats 10
     uv run python -m engine.benchmark run-pipeline
 
-Baselines are recorded in docs/architecture/BENCHMARKS.md — rerun after any
+Baselines are recorded in docs/architecture/operations/BENCHMARKS.md — rerun after any
 change that touches these paths and update the table in the same PR.
 """
 
@@ -270,7 +270,7 @@ async def _run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m engine.benchmark",
-        description="Offline performance baselines (docs/architecture/BENCHMARKS.md)",
+        description="Offline performance baselines (docs/architecture/operations/BENCHMARKS.md)",
     )
     parser.add_argument(
         "command",

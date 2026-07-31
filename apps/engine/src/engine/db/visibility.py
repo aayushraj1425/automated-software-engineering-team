@@ -6,7 +6,7 @@ A repository or agent run is visible when the caller owns it, or when its
 friendly 404s and correct lists; the row-level-security policies (db/rls.py)
 state the same rule inside Postgres. Conversations, provider keys, and
 integrations stay owner-only and never come through here.
-Design note: docs/architecture/ORGANIZATION_SHARING.md.
+Design note: docs/architecture/identity-integrations/ORGANIZATION_SHARING.md.
 """
 
 from sqlalchemy import ColumnElement, and_, or_

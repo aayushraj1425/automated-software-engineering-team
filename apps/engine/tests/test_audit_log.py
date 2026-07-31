@@ -1,5 +1,5 @@
 """Mirroring agent tool calls into the audit log. Design note:
-docs/architecture/AUDIT_LOG.md."""
+docs/architecture/security/AUDIT_LOG.md."""
 
 import uuid
 from decimal import Decimal

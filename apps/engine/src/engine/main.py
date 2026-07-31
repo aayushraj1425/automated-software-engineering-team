@@ -35,10 +35,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
     warn_if_derived_key()  # secrets-at-rest key fallback (security audit)
     # Spans/metrics are no-ops until this installs the SDK (ADR-0010,
-    # docs/architecture/PRODUCTION_HARDENING.md).
+    # docs/architecture/operations/PRODUCTION_HARDENING.md).
     if get_settings().otel_enabled:
         configure_telemetry()
-    # Resume runs the last process left behind (docs/architecture/RUN_RECOVERY.md).
+    # Resume runs the last process left behind (docs/architecture/agents/RUN_RECOVERY.md).
     # Runs in the background so startup never blocks on an interrupted run; a
     # shutdown mid-recovery just leaves the runs for the next startup. Inline
     # mode only: in queue mode the worker owns runs, and the API must not
@@ -66,7 +66,7 @@ app = FastAPI(
 
 # Added first, so it sits innermost — inside the tracing span, making 429s
 # visible in the request metrics. Off until RATE_LIMIT_PER_MINUTE is set
-# (docs/architecture/RATE_LIMITING.md).
+# (docs/architecture/operations/RATE_LIMITING.md).
 app.add_middleware(RateLimitMiddleware)
 
 # Added before CORS, so CORS wraps it: real API work gets a span, CORS

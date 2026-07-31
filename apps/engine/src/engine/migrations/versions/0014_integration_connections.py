@@ -7,7 +7,7 @@ Create Date: 2026-07-12
 One row per (user, kind). The secret config is AES-GCM ciphertext of a small
 JSON blob (for Slack, the incoming-webhook URL); only that ciphertext and a
 non-secret label are stored. Mirrors provider_keys. Design note:
-docs/architecture/EXTERNAL_INTEGRATIONS.md.
+docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 from collections.abc import Sequence

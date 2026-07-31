@@ -12,7 +12,7 @@ CLI (also the nightly cron in ``engine/worker.py`` when BACKUP_ENABLED=1):
     uv run python -m engine.backup verify  <dump-file>
     uv run python -m engine.backup restore <dump-file> --database-url <url>
 
-Design note: docs/architecture/BACKUPS_AND_RECOVERY.md; the recovery
+Design note: docs/architecture/operations/BACKUPS_AND_RECOVERY.md; the recovery
 procedure lives in docs/runbooks/DISASTER_RECOVERY.md.
 """
 

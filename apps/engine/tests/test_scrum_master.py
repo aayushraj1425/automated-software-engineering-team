@@ -4,7 +4,7 @@ Validation is a pure function; persistence writes to the durable backlog and
 turns position-based dependencies ("item 2 needs item 1") into real work-item
 ids. Offline (LLM_FAKE=1, set in conftest) generate_roadmap returns a fixed
 roadmap so the path runs without a model. Design note:
-docs/architecture/PLANNING_SUITE.md.
+docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 import uuid

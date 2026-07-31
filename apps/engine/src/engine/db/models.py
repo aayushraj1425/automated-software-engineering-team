@@ -105,7 +105,7 @@ class Message(Base):
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
 
-# ── Agent runtime (docs/architecture/AGENT_RUNTIME.md) ──────────────────────
+# ── Agent runtime (docs/architecture/agents/AGENT_RUNTIME.md) ──────────────────────
 
 
 class AgentRun(Base, TimestampMixin):
@@ -116,7 +116,7 @@ class AgentRun(Base, TimestampMixin):
     org_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     # SET NULL, not CASCADE: run history is the audit record of what the
     # agents did — it outlives a disconnected repository
-    # (docs/architecture/RUN_HISTORY_RETENTION.md).
+    # (docs/architecture/runs-ui/RUN_HISTORY_RETENTION.md).
     repository_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("repositories.id", ondelete="SET NULL"), index=True, nullable=True
     )
@@ -217,10 +217,12 @@ class CodeChunk(Base):
     __tablename__ = "code_chunks"
     __table_args__ = (
         # GIN index over the generated tsvector powers the full-text arm of
-        # hybrid retrieval (design note: docs/architecture/HYBRID_RETRIEVAL.md).
+        # hybrid retrieval (design note:
+        # docs/architecture/repository-intelligence/HYBRID_RETRIEVAL.md).
         Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),
         # HNSW approximate-nearest-neighbor index keeps cosine-distance vector
-        # search fast as repositories grow (docs/architecture/INCREMENTAL_INDEXING.md).
+        # search fast as repositories grow
+        # (docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md).
         Index(
             "ix_code_chunks_embedding_hnsw",
             "embedding",
@@ -251,7 +253,8 @@ class CodeChunk(Base):
 class CodeEdge(Base):
     """One first-party import: `source_path` imports `target_path` within the
     same repository (Repository Intelligence). Re-indexing replaces a
-    repository's edges. Design note: docs/architecture/DEPENDENCY_GRAPH.md."""
+    repository's edges. Design note:
+    docs/architecture/repository-intelligence/DEPENDENCY_GRAPH.md."""
 
     __tablename__ = "code_edges"
 
@@ -270,7 +273,8 @@ class CodeEdge(Base):
 class IndexedFile(Base):
     """One source file's content fingerprint from the last index, letting a
     re-index re-embed only the files whose bytes changed (Repository
-    Intelligence). Design note: docs/architecture/INCREMENTAL_INDEXING.md."""
+    Intelligence). Design note:
+    docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md."""
 
     __tablename__ = "indexed_files"
     __table_args__ = (UniqueConstraint("repository_id", "path", name="uq_indexed_files_repo_path"),)
@@ -286,7 +290,7 @@ class IndexedFile(Base):
     )
 
 
-# ── Planning Suite (docs/architecture/PLANNING_SUITE.md) ────────────────────
+# ── Planning Suite (docs/architecture/planning-knowledge/PLANNING_SUITE.md) ────────────────────
 
 
 class WorkItem(Base, TimestampMixin):
@@ -326,7 +330,7 @@ class WorkItem(Base, TimestampMixin):
     external_issue_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
-# ── Identity & Keys (docs/architecture/PROVIDER_KEYS.md) ────────────────────
+# ── Identity & Keys (docs/architecture/identity-integrations/PROVIDER_KEYS.md) ────────────────────
 
 
 class ProviderKey(Base, TimestampMixin):
@@ -365,7 +369,7 @@ class ProviderKey(Base, TimestampMixin):
     last4: Mapped[str] = mapped_column(String(8))
 
 
-# ── External Integrations (docs/architecture/EXTERNAL_INTEGRATIONS.md) ──────
+# ── External Integrations (docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md) ──────
 
 
 class IntegrationConnection(Base, TimestampMixin):
@@ -386,7 +390,7 @@ class IntegrationConnection(Base, TimestampMixin):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
-# ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────
+# ── Knowledge & Memory (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md) ──────────
 
 
 class KnowledgeItem(Base):
@@ -426,7 +430,7 @@ class KnowledgeItem(Base):
     )
 
 
-# ── Documentation Suite (docs/architecture/DOCUMENTATION_SUITE.md) ──────────
+# ── Documentation Suite (docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md) ──────────
 
 
 class GeneratedDocument(Base, TimestampMixin):
@@ -454,7 +458,7 @@ class AuditLog(Base):
     """General actor/action audit trail: ``actor_id`` did ``action`` to
     ``target`` (``meta`` carries the detail). Records a chat message
     (``chat.message``) and every agent tool call (``tool.called``, mirrored from
-    the run timeline — docs/architecture/AUDIT_LOG.md)."""
+    the run timeline — docs/architecture/security/AUDIT_LOG.md)."""
 
     __tablename__ = "audit_logs"
 

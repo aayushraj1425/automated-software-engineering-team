@@ -4,7 +4,7 @@ Deliberately mirrors `engine/indexing/retrieval.py` — a vector arm (embed the
 query, order by cosine distance, finds meaning) and a full-text arm (Postgres
 `to_tsquery`, finds exact words), fused with reciprocal-rank fusion. Same
 shape, same constants; whoever understood code retrieval understands memory
-recall. Design note: docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+recall. Design note: docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 import re

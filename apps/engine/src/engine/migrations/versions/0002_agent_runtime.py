@@ -5,7 +5,7 @@ Revises: 0001
 Create Date: 2026-07-03
 
 Domain model for Phase 1 — Multi-Agent Engineering Team; design rationale in
-docs/architecture/AGENT_RUNTIME.md. Statuses are plain strings (StrEnums in
+docs/architecture/agents/AGENT_RUNTIME.md. Statuses are plain strings (StrEnums in
 engine/db/enums.py), user/org ids reference better-auth as text with no FKs.
 """
 

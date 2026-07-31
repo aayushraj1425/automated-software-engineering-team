@@ -3,7 +3,7 @@
 Three seams: the tools writing agent_tasks (with their guardrails), the
 supervisor merging an ExecutionOutcome's board changes, and the runner's
 executor reporting what changed. Design note:
-docs/architecture/TASK_BOARD_TOOLS.md.
+docs/architecture/agents/TASK_BOARD_TOOLS.md.
 """
 
 import subprocess

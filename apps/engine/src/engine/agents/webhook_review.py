@@ -4,7 +4,7 @@ Fetch the pull request's diff, run the diff-based Reviewer, and post the
 findings as one review comment. Runs off the request path (queued by
 engine/api/webhooks.py) so the webhook itself returns immediately. Errors are
 logged, never raised into the background runner. Design note:
-docs/architecture/WEBHOOK_REVIEWER.md.
+docs/architecture/execution-qa/WEBHOOK_REVIEWER.md.
 """
 
 import structlog

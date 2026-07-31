@@ -36,46 +36,46 @@ The workstreams below remain the full Phase 1 map; the 3-day plan is the
 subset being built now.
 
 ### Workstream: Agent Runtime (blocking)
-- [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/AGENT_RUNTIME.md](architecture/AGENT_RUNTIME.md)
+- [x] Define the run/task/event domain model and its Alembic migration (`agent_runs`, `agent_tasks`, `agent_events`, `artifacts`) — design note: [architecture/agents/AGENT_RUNTIME.md](architecture/agents/AGENT_RUNTIME.md)
 - [x] Supervisor graph: route work by task dependencies, retries (max 2), failure states
 - [x] Agent registry: role → system prompt + tool policy + model tier (configuration-driven)
-- [x] Postgres checkpointing per run, with a resume-after-restart test — the `agent_tasks` board is the checkpoint; startup recovery resumes interrupted runs from it (design note: [architecture/RUN_RECOVERY.md](architecture/RUN_RECOVERY.md))
-- [x] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events/stream` (Postgres stays the record, Redis is the wake-up; design note: [architecture/RUN_EVENT_STREAMING.md](architecture/RUN_EVENT_STREAMING.md))
+- [x] Postgres checkpointing per run, with a resume-after-restart test — the `agent_tasks` board is the checkpoint; startup recovery resumes interrupted runs from it (design note: [architecture/agents/RUN_RECOVERY.md](architecture/agents/RUN_RECOVERY.md))
+- [x] Run event bus: step events → Redis pub/sub → streaming endpoint `/v1/runs/{id}/events/stream` (Postgres stays the record, Redis is the wake-up; design note: [architecture/agents/RUN_EVENT_STREAMING.md](architecture/agents/RUN_EVENT_STREAMING.md))
 - [x] Per-run budget guard (cost cap per ADR-0006 accounting); the run fails with a surfaced reason before the next task starts
-- [x] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work (`RUN_QUEUE=arq` + `uv run arq engine.worker.WorkerSettings`; design note: [architecture/BACKGROUND_WORKER.md](architecture/BACKGROUND_WORKER.md))
+- [x] Background worker entrypoint (arq) executing runs; graceful shutdown mid-run proving checkpoints work (`RUN_QUEUE=arq` + `uv run arq engine.worker.WorkerSettings`; design note: [architecture/agents/BACKGROUND_WORKER.md](architecture/agents/BACKGROUND_WORKER.md))
 
 ### Workstream: Repository Connection & Workspaces (blocking)
-- [x] Repository connection with credentials encrypted at rest: GitLab, Bitbucket, and Jira store a per-user token (AES-GCM, `integration_connections`); GitHub authenticates through the environment token (`GITHUB_TOKEN`) and public/local URLs need none — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md). (A *per-user* GitHub personal-access token and the OAuth *app* flow for repo access stayed a later refinement — the env token covers the single-tenant case, and GitHub OAuth *sign-in* already ships.)
+- [x] Repository connection with credentials encrypted at rest: GitLab, Bitbucket, and Jira store a per-user token (AES-GCM, `integration_connections`); GitHub authenticates through the environment token (`GITHUB_TOKEN`) and public/local URLs need none — design note: [architecture/agents/SOURCE_HOSTS.md](architecture/agents/SOURCE_HOSTS.md). (A *per-user* GitHub personal-access token and the OAuth *app* flow for repo access stayed a later refinement — the env token covers the single-tenant case, and GitHub OAuth *sign-in* already ships.)
 - [x] Repositories API (connect, list with index status and chunk counts) and the connect screen — `POST`/`GET /v1/repositories` plus the indexing, search, and dependency-graph endpoints, and the repositories page's connect form with live index status
 - [x] Workspace manager: clone into `.workspaces/<run>`, one branch per run, cleanup policy
 - [x] Path-jail module with symlink/UNC/traversal tests (security-critical, ADR-0008); paths validated under both Windows and POSIX semantics
 
 ### Workstream: Agent Tools (blocking)
-- [x] Read-side tools: list directory, read file (size-capped), search — ripgrep when it is on PATH (fast, gitignore-aware), the Python scan as the no-dependency fallback, same output contract either way — design note: [architecture/RIPGREP_SEARCH.md](architecture/RIPGREP_SEARCH.md)
-- [x] Write-side tools: write file and apply-patch, both jailed — `apply_patch` applies a unified diff via `git apply` (dry-run first, both prefix styles, whitespace-tolerant), so an edit is the size of the change instead of the whole file — design note: [architecture/APPLY_PATCH_TOOL.md](architecture/APPLY_PATCH_TOOL.md)
+- [x] Read-side tools: list directory, read file (size-capped), search — ripgrep when it is on PATH (fast, gitignore-aware), the Python scan as the no-dependency fallback, same output contract either way — design note: [architecture/agents/RIPGREP_SEARCH.md](architecture/agents/RIPGREP_SEARCH.md)
+- [x] Write-side tools: write file and apply-patch, both jailed — `apply_patch` applies a unified diff via `git apply` (dry-run first, both prefix styles, whitespace-tolerant), so an edit is the size of the change instead of the whole file — design note: [architecture/agents/APPLY_PATCH_TOOL.md](architecture/agents/APPLY_PATCH_TOOL.md)
 - [x] Git tools: commit, diff against the run's base commit (branching is owned by the workspace manager)
-- [x] Open pull request via the GitHub API with a generated description carrying the full Definition-of-Done checklist (`engine/agents/pull_request.py`, host-agnostic — GitHub/GitLab/Bitbucket share it) — design note: [architecture/PULL_REQUEST_BODY.md](architecture/PULL_REQUEST_BODY.md)
-- [x] Task-board tools: engineers add newly discovered work with `add_task` (pending, next sequence — the supervisor merges and schedules it in the same run) and skip unnecessary pending tasks with `update_task_status` (skipped-only; refuses when unfinished work depends on the task) — design note: [architecture/TASK_BOARD_TOOLS.md](architecture/TASK_BOARD_TOOLS.md)
-- [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored) and mirrored into the general `audit_logs` table (`action="tool.called"`, one row per call, same transaction) — design note: [architecture/AUDIT_LOG.md](architecture/AUDIT_LOG.md)
+- [x] Open pull request via the GitHub API with a generated description carrying the full Definition-of-Done checklist (`engine/agents/pull_request.py`, host-agnostic — GitHub/GitLab/Bitbucket share it) — design note: [architecture/agents/PULL_REQUEST_BODY.md](architecture/agents/PULL_REQUEST_BODY.md)
+- [x] Task-board tools: engineers add newly discovered work with `add_task` (pending, next sequence — the supervisor merges and schedules it in the same run) and skip unnecessary pending tasks with `update_task_status` (skipped-only; refuses when unfinished work depends on the task) — design note: [architecture/agents/TASK_BOARD_TOOLS.md](architecture/agents/TASK_BOARD_TOOLS.md)
+- [x] Tool-call audit: every invocation recorded to `agent_events` (file contents summarized, never stored) and mirrored into the general `audit_logs` table (`action="tool.called"`, one row per call, same transaction) — design note: [architecture/security/AUDIT_LOG.md](architecture/security/AUDIT_LOG.md)
 - No arbitrary shell until the Phase 3 sandbox (ADR-0008).
 
 ### Workstream: Specialist Agents (blocking)
 - [x] Product Manager agent: feature request → mini-specification + task breakdown (structured JSON contract, strict validation with one corrective round)
 - [x] Backend, Frontend, and DevOps engineer agents: task → edits + task summary (shared tool loop; commit required before the summary)
 - [x] Reviewer agent: diff → verdict (approve / request changes with role-tagged findings); one revision loop, second verdict is final
-- [x] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested: a checked-in SHA-256 snapshot fails the suite on any prompt drift and names the file; deliberate edits refresh the snapshot and commit both together — design note: [architecture/PROMPT_SNAPSHOTS.md](architecture/PROMPT_SNAPSHOTS.md)
+- [x] Prompt files as versioned assets (`engine/agents/prompts/`), snapshot-tested: a checked-in SHA-256 snapshot fails the suite on any prompt drift and names the file; deliberate edits refresh the snapshot and commit both together — design note: [architecture/agents/PROMPT_SNAPSHOTS.md](architecture/agents/PROMPT_SNAPSHOTS.md)
 
 ### Workstream: Mission-Control Interface (planned)
 - [x] Runs list and a "new run" form (repository URL, request text area)
-- [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback). The timeline can be filtered to one agent — chips list every role that acted, with line counts, so you can follow a single agent's thread (reasoning → tool calls → summary) — design note: [architecture/TIMELINE_AGENT_FILTER.md](architecture/TIMELINE_AGENT_FILTER.md)
-- [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page, and a nearly-right plan can be edited in place before approving — retitle, re-describe, or drop tasks (dangling dependencies cleaned; the edit lands on the timeline) — design note: [architecture/PLAN_EDITING.md](architecture/PLAN_EDITING.md)
+- [x] Run detail: agent timeline and task board (live SSE stream with a polling fallback). The timeline can be filtered to one agent — chips list every role that acted, with line counts, so you can follow a single agent's thread (reasoning → tool calls → summary) — design note: [architecture/runs-ui/TIMELINE_AGENT_FILTER.md](architecture/runs-ui/TIMELINE_AGENT_FILTER.md)
+- [x] Plan approval gate: run pauses at `awaiting_approval`; approve/reject on the run page, and a nearly-right plan can be edited in place before approving — retitle, re-describe, or drop tasks (dangling dependencies cleaned; the edit lands on the timeline) — design note: [architecture/agents/PLAN_EDITING.md](architecture/agents/PLAN_EDITING.md)
 - [x] Pull-request link on the run page
 - [x] Diff viewer: the run page shows everything the agents changed, colored by +/-
 - [x] Run cost widget (token and cost totals in the run header)
 
 ### Workstream: Identity & Keys (planned)
-- [x] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment) — design note: [architecture/PROVIDER_KEYS.md](architecture/PROVIDER_KEYS.md)
-- [x] GitHub OAuth sign-in surfaced in the UI: the server lists which providers have credentials (GitHub/Google/Microsoft), the sign-in and sign-up pages render one button per configured provider, and none configured means the email form alone — the OAuth app itself is operator setup, documented in the design note ([architecture/SIGN_IN_AND_ORGANIZATIONS.md](architecture/SIGN_IN_AND_ORGANIZATIONS.md))
+- [x] Bring-your-own provider keys: encrypted storage (AES-GCM), settings screen, engine resolution order (user key, then environment) — design note: [architecture/identity-integrations/PROVIDER_KEYS.md](architecture/identity-integrations/PROVIDER_KEYS.md)
+- [x] GitHub OAuth sign-in surfaced in the UI: the server lists which providers have credentials (GitHub/Google/Microsoft), the sign-in and sign-up pages render one button per configured provider, and none configured means the email form alone — the OAuth app itself is operator setup, documented in the design note ([architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md](architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md))
 - [x] Organization switcher on top of the better-auth organization plugin: settings-page panel lists/creates organizations and picks the active one (or personal); the BFF service JWT now carries the active organization as its `org` claim on every engine call (same design note)
 
 ### Workstream: Evaluation Seed (planned)
@@ -86,7 +86,7 @@ subset being built now.
 
 ## Phase 2 — Repository Intelligence
 
-Design note: [architecture/REPOSITORY_INTELLIGENCE.md](architecture/REPOSITORY_INTELLIGENCE.md).
+Design note: [architecture/repository-intelligence/REPOSITORY_INTELLIGENCE.md](architecture/repository-intelligence/REPOSITORY_INTELLIGENCE.md).
 Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07-08
 (exit criteria met). Java/Kotlin AST chunking and import resolution landed
 2026-07-08 — see the checked items below.
@@ -95,45 +95,45 @@ Started 2026-07-06; blocking indexing and retrieval workstreams complete 2026-07
 - [x] Embeddings route: `ModelRouter.embed()` with `MODEL_EMBEDDING`; deterministic offline vectors under `LLM_FAKE`
 - [x] `code_chunks` schema (pgvector `vector(768)`, migration 0004) and the line-window chunker
 - [x] Indexer background task: clone → chunk → embed → replace the repository's chunks
-- [x] AST-aware chunking with tree-sitter (Python, TypeScript/JavaScript/TSX, Java, Kotlin) — design note: [architecture/AST_CHUNKING.md](architecture/AST_CHUNKING.md)
-- [x] Incremental re-indexing (changed files only) — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
-- [x] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search — design note: [architecture/INCREMENTAL_INDEXING.md](architecture/INCREMENTAL_INDEXING.md)
+- [x] AST-aware chunking with tree-sitter (Python, TypeScript/JavaScript/TSX, Java, Kotlin) — design note: [architecture/repository-intelligence/AST_CHUNKING.md](architecture/repository-intelligence/AST_CHUNKING.md)
+- [x] Incremental re-indexing (changed files only) — design note: [architecture/repository-intelligence/INCREMENTAL_INDEXING.md](architecture/repository-intelligence/INCREMENTAL_INDEXING.md)
+- [x] Approximate-nearest-neighbor index (hnsw) once repositories outgrow exact search — design note: [architecture/repository-intelligence/INCREMENTAL_INDEXING.md](architecture/repository-intelligence/INCREMENTAL_INDEXING.md)
 
 ### Workstream: Retrieval & Grounding (blocking)
 - [x] Vector search endpoint `GET /v1/repositories/{id}/search` (cosine distance, top 8)
-- [x] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion (design note: [architecture/HYBRID_RETRIEVAL.md](architecture/HYBRID_RETRIEVAL.md))
-- [x] Grounded chat: answers cite real files and line ranges (design note: [architecture/GROUNDED_CHAT.md](architecture/GROUNDED_CHAT.md))
-- [x] Agents consume the index: a `search_code` tool in the shared read-tool set (design note: [architecture/AGENT_CODE_SEARCH.md](architecture/AGENT_CODE_SEARCH.md))
+- [x] Hybrid retrieval: vector + Postgres full-text, fused with reciprocal-rank fusion (design note: [architecture/repository-intelligence/HYBRID_RETRIEVAL.md](architecture/repository-intelligence/HYBRID_RETRIEVAL.md))
+- [x] Grounded chat: answers cite real files and line ranges (design note: [architecture/repository-intelligence/GROUNDED_CHAT.md](architecture/repository-intelligence/GROUNDED_CHAT.md))
+- [x] Agents consume the index: a `search_code` tool in the shared read-tool set (design note: [architecture/agents/AGENT_CODE_SEARCH.md](architecture/agents/AGENT_CODE_SEARCH.md))
 - [x] Retrieval evaluation: golden question set scored against a grep baseline (phase exit criterion)
 
 ### Workstream: Repository Screens (planned)
 - [x] Repositories API: connect, list with index status and chunk counts
 - [x] Repositories page: connect form, index/re-index button with live status, search box with file-and-line-cited results
-- [x] Dependency / architecture graph views (Python, JS/TS/TSX, Java, Kotlin import resolution) (design note: [architecture/DEPENDENCY_GRAPH.md](architecture/DEPENDENCY_GRAPH.md))
+- [x] Dependency / architecture graph views (Python, JS/TS/TSX, Java, Kotlin import resolution) (design note: [architecture/repository-intelligence/DEPENDENCY_GRAPH.md](architecture/repository-intelligence/DEPENDENCY_GRAPH.md))
 
 ## Phase 3 — Execution & QA
 
-Complete 2026-07-10. Design note: [architecture/EXECUTION_AND_QA.md](architecture/EXECUTION_AND_QA.md).
+Complete 2026-07-10. Design note: [architecture/execution-qa/EXECUTION_AND_QA.md](architecture/execution-qa/EXECUTION_AND_QA.md).
 
 ### Workstream: Security Scanning (blocking)
-- [x] Secrets scanner blocks a leaked secret before the pull request opens (phase exit criterion; design note: [architecture/SECRETS_SCANNING.md](architecture/SECRETS_SCANNING.md))
-- [x] Dependency vulnerability scan of manifest changes (lockfiles / requirements) (design note: [architecture/DEPENDENCY_SCANNING.md](architecture/DEPENDENCY_SCANNING.md))
+- [x] Secrets scanner blocks a leaked secret before the pull request opens (phase exit criterion; design note: [architecture/execution-qa/SECRETS_SCANNING.md](architecture/execution-qa/SECRETS_SCANNING.md))
+- [x] Dependency vulnerability scan of manifest changes (lockfiles / requirements) (design note: [architecture/execution-qa/DEPENDENCY_SCANNING.md](architecture/execution-qa/DEPENDENCY_SCANNING.md))
 
 ### Workstream: Sandbox Execution (blocking)
-- [x] Docker sandbox runner: build and test the run's branch with no network egress (design note: [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md))
+- [x] Docker sandbox runner: build and test the run's branch with no network egress (design note: [architecture/execution-qa/SANDBOX_EXECUTION.md](architecture/execution-qa/SANDBOX_EXECUTION.md))
 - [x] Sandbox results land in the run timeline (pass/fail, captured output — the `sandbox.run` event)
 
 ### Workstream: QA Agent (blocking)
-- [x] QA agent runs the project's tests in the sandbox and reads the failures (design note: [architecture/QA_AGENT.md](architecture/QA_AGENT.md))
+- [x] QA agent runs the project's tests in the sandbox and reads the failures (design note: [architecture/execution-qa/QA_AGENT.md](architecture/execution-qa/QA_AGENT.md))
 - [x] Self-correction loop: failing tests route back to the QA agent with the failure text (bounded by `QA_MAX_ATTEMPTS`)
 
 ### Workstream: Webhook Reviewer (planned)
-- [x] GitHub webhook receives pull-request events and queues a review (HMAC-signature auth; design note: [architecture/WEBHOOK_REVIEWER.md](architecture/WEBHOOK_REVIEWER.md))
+- [x] GitHub webhook receives pull-request events and queues a review (HMAC-signature auth; design note: [architecture/execution-qa/WEBHOOK_REVIEWER.md](architecture/execution-qa/WEBHOOK_REVIEWER.md))
 - [x] Review agent comments on the pull request within five minutes (phase exit criterion)
 
 ## Phase 4 — Planning Suite
 
-Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/PLANNING_SUITE.md).
+Complete 2026-07-10. Design note: [architecture/planning-knowledge/PLANNING_SUITE.md](architecture/planning-knowledge/PLANNING_SUITE.md).
 
 ### Workstream: Planning Domain & Backlog Store (blocking)
 - [x] Define the durable, repository-scoped `work_items` model and its Alembic migration (title, description, kind, status, estimate, priority, dependencies, optional implementing-run link)
@@ -153,7 +153,7 @@ Complete 2026-07-10. Design note: [architecture/PLANNING_SUITE.md](architecture/
 ## Phase 5 — Knowledge & Memory
 
 Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Design note:
-[architecture/KNOWLEDGE_AND_MEMORY.md](architecture/KNOWLEDGE_AND_MEMORY.md).
+[architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md](architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
 
 ### Workstream: Knowledge Store (blocking)
 - [x] `knowledge_items` model and its Alembic migration (repository-scoped; kind = decision / outcome / preference / note; embedding + generated full-text column; optional source-run link)
@@ -177,7 +177,7 @@ Complete 2026-07-11 (exit criteria met; stretch item shipped the same day). Desi
 
 ## Phase 6 — Workspace & Integrations
 
-Design note (documentation slice): [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md).
+Design note (documentation slice): [architecture/planning-knowledge/DOCUMENTATION_SUITE.md](architecture/planning-knowledge/DOCUMENTATION_SUITE.md).
 Started 2026-07-12 with the documentation generation suite (self-contained: no
 external credentials, runs fully offline in fake-model mode). The workspace
 panels and external integrations remain and are not yet scheduled.
@@ -188,27 +188,27 @@ panels and external integrations remain and are not yet scheduled.
 - [x] Generator grounded in the index: file map + kind-seeded retrieved code + recalled memory → Markdown document; deterministic offline document under `LLM_FAKE`
 - [x] Documents API: generate / list / delete under `/v1/repositories/{id}/documents`
 - [x] Docs page (`/docs`): pick a document kind, generate it, browse / read / delete the results
-- [x] Git-history changelog: the changelog kind now reads the repository's real commit history (bounded bare shallow clone, `date hash subject (author)` per line) and falls back to the snapshot summary honestly when the fetch fails — design note: [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md)
-- [x] In-place editing of a generated document: `PUT …/documents/{docId}` replaces the content (and optionally the title), the docs page gained an edit toggle with Save/Cancel, and regenerating still creates a new document so an edit is never silently overwritten — design note: [architecture/DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md)
+- [x] Git-history changelog: the changelog kind now reads the repository's real commit history (bounded bare shallow clone, `date hash subject (author)` per line) and falls back to the snapshot summary honestly when the fetch fails — design note: [architecture/planning-knowledge/DOCUMENTATION_SUITE.md](architecture/planning-knowledge/DOCUMENTATION_SUITE.md)
+- [x] In-place editing of a generated document: `PUT …/documents/{docId}` replaces the content (and optionally the title), the docs page gained an edit toggle with Save/Cancel, and regenerating still creates a new document so an edit is never silently overwritten — design note: [architecture/planning-knowledge/DOCUMENTATION_SUITE.md](architecture/planning-knowledge/DOCUMENTATION_SUITE.md)
 
 ### Workstream: Workspace Panels (planned)
-- [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
+- [x] Read-only file browser on the run page: list the run workspace's files and open any one read-only, jailed by `resolve_inside` — design note: [architecture/runs-ui/WORKSPACE_PANELS.md](architecture/runs-ui/WORKSPACE_PANELS.md)
 - [x] In-browser editor + git status/commit panel: on a *finished* run (completed/failed) a file can be edited (jailed write) and the working tree committed; editing an in-flight run is a `409` so a human write never races the agent loop
-- [x] Push a manual workspace commit back to the host: `POST /v1/runs/{id}/push` sends the run branch with the pipeline's own credential logic (GitLab connection, GitHub env token, plain otherwise), the git panel gained a Push branch button, and every push lands on the timeline as `branch.pushed` — design note: [architecture/WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md)
-- [x] In-browser terminal wired to the Phase 3 sandbox: a command console (not a PTY) on finished runs — every command executes in a hardened session container with `--network none` from birth and the workspace *copied* in, so ADR-0008's line does not move — design note: [architecture/IN_BROWSER_TERMINAL.md](architecture/IN_BROWSER_TERMINAL.md)
+- [x] Push a manual workspace commit back to the host: `POST /v1/runs/{id}/push` sends the run branch with the pipeline's own credential logic (GitLab connection, GitHub env token, plain otherwise), the git panel gained a Push branch button, and every push lands on the timeline as `branch.pushed` — design note: [architecture/runs-ui/WORKSPACE_PANELS.md](architecture/runs-ui/WORKSPACE_PANELS.md)
+- [x] In-browser terminal wired to the Phase 3 sandbox: a command console (not a PTY) on finished runs — every command executes in a hardened session container with `--network none` from birth and the workspace *copied* in, so ADR-0008's line does not move — design note: [architecture/runs-ui/IN_BROWSER_TERMINAL.md](architecture/runs-ui/IN_BROWSER_TERMINAL.md)
 
 ### Workstream: External Integrations (planned)
-- [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md)
+- [x] Integrations foundation: encrypted per-user connection store (`integration_connections`, migration 0014, AES-GCM at rest), an adapter layer, dry-run mode, and an owner-scoped API (`/v1/integrations`) — design note: [architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md](architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md)
 - [x] Chat: post run outcomes to Slack — a terminal run notifies the owner's Slack webhook and records an `integration.notified` timeline event; the settings page connects, tests, and removes the webhook
 - [x] Issue trackers: push a work item to Linear (`issueCreate`) from the planning board, storing the issue link on the item, behind a tracker-agnostic dispatch (`engine/integrations/issues.py`) so Jira reuses it
 - [x] Issue trackers: add Jira as a second tracker behind the same dispatch (REST `/rest/api/3/issue`, HTTP-Basic auth, ADF description); the planning board pushes to each connected tracker
-- [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
-- [x] Source hosts: Bitbucket behind the same host-aware publish seam — `bitbucket.org` detection, an encrypted username + app-password connection, the https push authenticates with it, and a finished run opens a Bitbucket pull request; credential resolution now lives once in `engine/integrations/hosts.py`, shared by the pipeline and the manual Push branch button — design note: [architecture/SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md)
+- [x] Source hosts: a run on a `gitlab.com` repository pushes its branch and opens a merge request with the owner's encrypted GitLab token; the publish step is host-aware and the GitHub path is unchanged — design note: [architecture/agents/SOURCE_HOSTS.md](architecture/agents/SOURCE_HOSTS.md)
+- [x] Source hosts: Bitbucket behind the same host-aware publish seam — `bitbucket.org` detection, an encrypted username + app-password connection, the https push authenticates with it, and a finished run opens a Bitbucket pull request; credential resolution now lives once in `engine/integrations/hosts.py`, shared by the pipeline and the manual Push branch button — design note: [architecture/agents/SOURCE_HOSTS.md](architecture/agents/SOURCE_HOSTS.md)
 - [x] Source hosts: self-hosted GitLab — the connection's `base_url` names the instance for detection too, so a run on `https://git.acme.dev/…` pushes with the connection's token and opens its merge request on that instance; self-hosted Bitbucket documented out (Server/Data Center is a different API, not a different host)
 
 ## Phase 7 — Production Hardening
 
-Phase plan: [architecture/PRODUCTION_HARDENING.md](architecture/PRODUCTION_HARDENING.md).
+Phase plan: [architecture/operations/PRODUCTION_HARDENING.md](architecture/operations/PRODUCTION_HARDENING.md).
 Started 2026-07-13 with observability — the workstream everything else in the
 phase (alerting, benchmarks, K8s probes) leans on.
 
@@ -216,34 +216,34 @@ phase (alerting, benchmarks, K8s probes) leans on.
 - [x] OpenTelemetry SDK wired per ADR-0010: instrumentation through the OTel API unconditionally (no-op by default), `OTEL_ENABLED=1` + `OTEL_EXPORTER_OTLP_ENDPOINT` install the SDK and export via OTLP/HTTP
 - [x] Request spans (route template + status, `/healthz` excluded) and request count/duration metrics from a pure-ASGI middleware
 - [x] LLM spans on every ModelRouter call (tier, model, tokens, cost) and `run.plan` / `run.execute` spans tying an agent run together
-- [x] Alerting rules (error rate, p95 latency, token spend): three Prometheus rules in `infra/monitoring/alerting-rules.yml`; the `ModelRouter` now emits `llm.cost.usd`/`llm.tokens` counters so spend is a real series. Thresholds are documented starting points to tune on real traffic — design note: [architecture/ALERTING.md](architecture/ALERTING.md)
+- [x] Alerting rules (error rate, p95 latency, token spend): three Prometheus rules in `infra/monitoring/alerting-rules.yml`; the `ModelRouter` now emits `llm.cost.usd`/`llm.tokens` counters so spend is a real series. Thresholds are documented starting points to tune on real traffic — design note: [architecture/operations/ALERTING.md](architecture/operations/ALERTING.md)
 
 ### Workstream: Hardening the Seams (planned)
-- [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
-- [x] Redis-backed shared rate window (`RATE_LIMIT_SHARED=1`): one token bucket across replicas, taken by an atomic Lua script, degrading to the per-replica bucket if Redis is down — design note: [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md)
-- [x] BFF→engine trust, network-policy half: `engine.networkPolicy.enabled=true` renders a NetworkPolicy allowing ingress to the engine only from the web pods (off by default; enforcement is CNI-dependent, kubelet probes must be allowed) — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
+- [x] Rate limiting on the engine API: per-caller token bucket (verified JWT subject, IP fallback), 429 + `Retry-After`, off by default (`RATE_LIMIT_PER_MINUTE=0`) — design note: [architecture/operations/RATE_LIMITING.md](architecture/operations/RATE_LIMITING.md)
+- [x] Redis-backed shared rate window (`RATE_LIMIT_SHARED=1`): one token bucket across replicas, taken by an atomic Lua script, degrading to the per-replica bucket if Redis is down — design note: [architecture/operations/RATE_LIMITING.md](architecture/operations/RATE_LIMITING.md)
+- [x] BFF→engine trust, network-policy half: `engine.networkPolicy.enabled=true` renders a NetworkPolicy allowing ingress to the engine only from the web pods (off by default; enforcement is CNI-dependent, kubelet probes must be allowed) — design note: [architecture/operations/KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md)
 - [ ] BFF→engine trust, mutual TLS: the stronger half of ADR-0002 — needs cert-manager (or a service mesh) in a real cluster rollout
 
 ### Workstream: Backups & Disaster Recovery
-- [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
-- [x] Ship dumps off-host to S3-compatible storage (`BACKUP_S3_BUCKET`): each verified dump is uploaded and the remote copies pruned to `BACKUP_RETENTION`, off by default, degrading to local-only; works against AWS S3, MinIO, or R2 (design note: [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md)). The volume-mounted alternative for the K8s CronJob is the separate PVC item below.
+- [x] Scheduled Postgres dumps and a **tested** restore path, with a written recovery runbook — design note: [architecture/operations/BACKUPS_AND_RECOVERY.md](architecture/operations/BACKUPS_AND_RECOVERY.md), runbook: [runbooks/DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)
+- [x] Ship dumps off-host to S3-compatible storage (`BACKUP_S3_BUCKET`): each verified dump is uploaded and the remote copies pruned to `BACKUP_RETENTION`, off by default, degrading to local-only; works against AWS S3, MinIO, or R2 (design note: [architecture/operations/BACKUPS_AND_RECOVERY.md](architecture/operations/BACKUPS_AND_RECOVERY.md)). The volume-mounted alternative for the K8s CronJob is the separate PVC item below.
 
 ### Workstream: RBAC & Row-Level Security
-- [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)
-- [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)
+- [x] Row-level security on the ownership-carrying tables (`repositories`, `conversations`, `agent_runs`, `provider_keys`, `integration_connections`): API sessions are pinned to the verified JWT subject, and Postgres itself refuses other users' rows — design note: [architecture/security/ROW_LEVEL_SECURITY.md](architecture/security/ROW_LEVEL_SECURITY.md)
+- [x] Organization-aware sharing: repositories and agent runs created under an active organization are visible — and writable — to whoever has that organization active; the rule lives once in `engine/db/visibility.py` for the route filters and in the RLS policies (`app.org_id` alongside `app.user_id`) for Postgres itself; conversations, provider keys, and integrations stay personal — design note: [architecture/identity-integrations/ORGANIZATION_SHARING.md](architecture/identity-integrations/ORGANIZATION_SHARING.md)
 - [x] Deny-by-default policies with an explicit service context: a session that asserts neither a user pin nor `app.service='1'` reads and writes zero rows; `session_scope()` is the documented internal entry point and the alembic connection asserts the context for data migrations — a forgotten pin is now loud, not a leak
 - [x] Separate non-owner database role for the API: the policies' service clause requires *being* the `asep` role, and user-pinned sessions connect as the DML-only `asep_api` (`DATABASE_URL_API`) — an attacker with raw SQL on an API session cannot claim the service context or touch a policy; the whole test suite runs in two-role mode
 - [x] Subquery policies for the child tables — all ten (`messages`, `agent_tasks`, `agent_events`, `artifacts`, `code_chunks`, `code_edges`, `indexed_files`, `work_items`, `knowledge_items`, `generated_documents`) are now visible exactly when their parent row is, via an `EXISTS` that runs under the parent's own policy; org sharing flows through automatically and retrieval latency is unchanged
-- [x] Organization members, invitations, and roles — the settings panel manages members (invite by email with a copyable accept link, change member/admin roles, remove) via the better-auth organization plugin, and the engine enforces one destructive rule: disconnecting a teammate's shared repository or removing the team's provider key takes an organization admin, carried as a BFF-verified `org_role` claim signed only on those routes — design note: [architecture/ORGANIZATION_ROLES.md](architecture/ORGANIZATION_ROLES.md)
+- [x] Organization members, invitations, and roles — the settings panel manages members (invite by email with a copyable accept link, change member/admin roles, remove) via the better-auth organization plugin, and the engine enforces one destructive rule: disconnecting a teammate's shared repository or removing the team's provider key takes an organization admin, carried as a BFF-verified `org_role` claim signed only on those routes — design note: [architecture/identity-integrations/ORGANIZATION_ROLES.md](architecture/identity-integrations/ORGANIZATION_ROLES.md)
 
 ### Workstream: Deploy
-- [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
+- [x] Production images (engine: API/worker/migrations from one image; web: Next.js standalone) and a Helm chart — `/healthz` probes, pre-upgrade migration Job, one Secret mirroring `.env`, engine ClusterIP-only; CI lints and renders the chart — design note: [architecture/operations/KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md)
 - [ ] Revisit the chart's placeholder resource limits once the benchmarks measure the hot paths
-- [x] In-cluster QA sandbox via a Docker-in-Docker sidecar (`worker.sandbox.enabled=true`): the engine image carries the `docker` client, the chart adds a privileged `docker:dind` sidecar, and the worker's `DOCKER_HOST` points at it — the sandbox code is unchanged (it already follows `DOCKER_HOST`). Off by default (the sidecar is privileged). Design note: [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md)
-- [x] Persistent volume template for `BACKUP_DIR` on the worker: `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce` PVC, mounts it, and points `BACKUP_DIR` at it (off by default; the volume-based alternative to `BACKUP_S3_BUCKET` off-host shipping) — design note: [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)
+- [x] In-cluster QA sandbox via a Docker-in-Docker sidecar (`worker.sandbox.enabled=true`): the engine image carries the `docker` client, the chart adds a privileged `docker:dind` sidecar, and the worker's `DOCKER_HOST` points at it — the sandbox code is unchanged (it already follows `DOCKER_HOST`). Off by default (the sidecar is privileged). Design note: [architecture/execution-qa/SANDBOX_EXECUTION.md](architecture/execution-qa/SANDBOX_EXECUTION.md)
+- [x] Persistent volume template for `BACKUP_DIR` on the worker: `worker.backup.persistence.enabled=true` creates a `ReadWriteOnce` PVC, mounts it, and points `BACKUP_DIR` at it (off by default; the volume-based alternative to `BACKUP_S3_BUCKET` off-host shipping) — design note: [architecture/operations/KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md)
 
 ### Workstream: Benchmarks & Security Audit
-- [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/BENCHMARKS.md](architecture/BENCHMARKS.md)
+- [x] Performance baselines for indexing, retrieval, and the run pipeline — offline CLI (`python -m engine.benchmark`), first baseline table recorded in the design note: [architecture/operations/BENCHMARKS.md](architecture/operations/BENCHMARKS.md)
 - [x] Checklist audit of the security boundaries — every boundary verified with code evidence, one finding fixed inline (the route-table auth sweep test), the rest logged: [security/SECURITY_AUDIT.md](security/SECURITY_AUDIT.md)
 - [x] Loud startup warning when `ENGINE_ENCRYPTION_KEY` is unset and secrets fall back to the key derived from `ENGINE_SERVICE_SECRET` — API lifespan and worker both warn at boot (audit finding 2)
 - [x] Webhook replay/dedupe guard — queued `X-GitHub-Delivery` ids are remembered (bounded, in-process) and a redelivery is ignored instead of re-reviewed (audit finding 3)
@@ -253,18 +253,18 @@ phase (alerting, benchmarks, K8s probes) leans on.
 The project's wrap-up phase: make every role reason before it acts.
 
 ### Workstream: Reasoning Prompts (blocking)
-- [x] Chain-of-thought and simulation in every role prompt — a short, uniform "think → simulate → act" directive added to all nine role prompts (Product Manager, Backend, Frontend, DevOps, Reviewer, QA, Scrum Master, Technical Writer, Supervisor): reason through the task, then predict the outcome of the intended change (and what could break) before touching the workspace. Prompt-level by design — no extra LLM calls, no pipeline change — captured by the prompt-snapshot contract. Design note: [architecture/DELIBERATE_REASONING.md](architecture/DELIBERATE_REASONING.md)
-- [x] Agent reasoning on the run timeline — the text a model turn writes alongside its tool calls (its "why" before acting) is surfaced as an `agent.reasoning` timeline event, so a human watches each agent's rationale, not just its actions. A parallel `on_reasoning` observer next to `on_tool`, purely additive (real-model only; unit-tested directly); the web renders it as a distinct "is thinking" line. Design note: [architecture/AGENT_REASONING_TIMELINE.md](architecture/AGENT_REASONING_TIMELINE.md)
-- [x] Run report — `GET /v1/runs/{id}/report` returns a shareable plain-English markdown summary of a run (request, plan, per-task outcome, cost, result), built by a pure `build_run_report` over the run record (no model, no workspace, works offline and after cleanup); the run page gains a **Download report** button. Design note: [architecture/RUN_REPORT.md](architecture/RUN_REPORT.md)
-- [x] Run statistics — `GET /v1/runs/stats` aggregates the caller's visible runs (owner/org-scoped) into the product KPI: counts by status, completed/failed, success rate (terminal-only), total spend and tokens; the runs page shows a Runs · Success-rate · Total-spend strip. Closes the "no metric for run outcomes" gap the performance analysis flagged. Design note: [architecture/RUN_STATISTICS.md](architecture/RUN_STATISTICS.md)
+- [x] Chain-of-thought and simulation in every role prompt — a short, uniform "think → simulate → act" directive added to all nine role prompts (Product Manager, Backend, Frontend, DevOps, Reviewer, QA, Scrum Master, Technical Writer, Supervisor): reason through the task, then predict the outcome of the intended change (and what could break) before touching the workspace. Prompt-level by design — no extra LLM calls, no pipeline change — captured by the prompt-snapshot contract. Design note: [architecture/agents/DELIBERATE_REASONING.md](architecture/agents/DELIBERATE_REASONING.md)
+- [x] Agent reasoning on the run timeline — the text a model turn writes alongside its tool calls (its "why" before acting) is surfaced as an `agent.reasoning` timeline event, so a human watches each agent's rationale, not just its actions. A parallel `on_reasoning` observer next to `on_tool`, purely additive (real-model only; unit-tested directly); the web renders it as a distinct "is thinking" line. Design note: [architecture/agents/AGENT_REASONING_TIMELINE.md](architecture/agents/AGENT_REASONING_TIMELINE.md)
+- [x] Run report — `GET /v1/runs/{id}/report` returns a shareable plain-English markdown summary of a run (request, plan, per-task outcome, cost, result), built by a pure `build_run_report` over the run record (no model, no workspace, works offline and after cleanup); the run page gains a **Download report** button. Design note: [architecture/runs-ui/RUN_REPORT.md](architecture/runs-ui/RUN_REPORT.md)
+- [x] Run statistics — `GET /v1/runs/stats` aggregates the caller's visible runs (owner/org-scoped) into the product KPI: counts by status, completed/failed, success rate (terminal-only), total spend and tokens; the runs page shows a Runs · Success-rate · Total-spend strip. Closes the "no metric for run outcomes" gap the performance analysis flagged. Design note: [architecture/runs-ui/RUN_STATISTICS.md](architecture/runs-ui/RUN_STATISTICS.md)
 - [x] Filter the runs list by status — `GET /v1/runs?status=<status>` (unknown status is a no-op, not a 422); the runs page shows clickable status chips (from the stats counts) that filter the list, with the BFF forwarding the one known param
-- [x] Delete a run — `DELETE /v1/runs/{id}` removes a run and its history (tasks, events, artifacts cascade; workspace removed), owner-scoped; refused `409` while the run is actively working (queued/planning/executing/reviewing). A **Delete run** button on the run page for deletable runs. Design note: [architecture/RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md) (§Deleting a run explicitly)
-- [x] Conversation management — `PATCH /v1/conversations/{id}` (rename; blank title → 422) and `DELETE /v1/conversations/{id}` (delete + cascade messages), owner-scoped through one `_owned_conversation` helper; the chat sidebar gains hover rename/delete affordances. Design note: [architecture/CONVERSATION_MANAGEMENT.md](architecture/CONVERSATION_MANAGEMENT.md)
-- [x] Surface the indexing-failure reason — a nullable `repositories.status_detail` (migration 0023) carries a short human reason set when indexing fails and cleared on a good index (or a re-index); `RepositoryOut` exposes it and the repo card shows "Indexing failed: …" instead of a bare badge. Design note: [architecture/INDEXING_ERROR_SURFACING.md](architecture/INDEXING_ERROR_SURFACING.md)
+- [x] Delete a run — `DELETE /v1/runs/{id}` removes a run and its history (tasks, events, artifacts cascade; workspace removed), owner-scoped; refused `409` while the run is actively working (queued/planning/executing/reviewing). A **Delete run** button on the run page for deletable runs. Design note: [architecture/runs-ui/RUN_HISTORY_RETENTION.md](architecture/runs-ui/RUN_HISTORY_RETENTION.md) (§Deleting a run explicitly)
+- [x] Conversation management — `PATCH /v1/conversations/{id}` (rename; blank title → 422) and `DELETE /v1/conversations/{id}` (delete + cascade messages), owner-scoped through one `_owned_conversation` helper; the chat sidebar gains hover rename/delete affordances. Design note: [architecture/chat/CONVERSATION_MANAGEMENT.md](architecture/chat/CONVERSATION_MANAGEMENT.md)
+- [x] Surface the indexing-failure reason — a nullable `repositories.status_detail` (migration 0023) carries a short human reason set when indexing fails and cleared on a good index (or a re-index); `RepositoryOut` exposes it and the repo card shows "Indexing failed: …" instead of a bare badge. Design note: [architecture/repository-intelligence/INDEXING_ERROR_SURFACING.md](architecture/repository-intelligence/INDEXING_ERROR_SURFACING.md)
 
 ## Beyond Phase 3 (headlines only)
 
-- ~~Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack)~~ — landed 2026-07-19 ([CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md)).
+- ~~Continuous integration end-to-end job using the fake-model mode (Playwright against the compose stack)~~ — landed 2026-07-19 ([CI_END_TO_END_SMOKE.md](architecture/operations/CI_END_TO_END_SMOKE.md)).
 - LiteLLM proxy-server evaluation if callers beyond the engine appear (ADR-0006).
 - Langfuse in compose plus a ModelRouter trace exporter (ADR-0010).
 
@@ -274,9 +274,9 @@ The project's wrap-up phase: make every role reason before it acts.
 |---|---|---|
 | pnpm hoisted linker (phantom dependencies possible) | OneDrive junction safety (ADR-0001) | if the checkout leaves OneDrive |
 | Engine trusts the BFF's JWT without mutual TLS | development-only topology (ADR-0002) | Phase 7 |
-| Rate limiting's shared window closed 2026-07-21 (`RATE_LIMIT_SHARED` puts one bucket in Redis across replicas, degrading to per-replica if Redis is down — [RATE_LIMITING.md](architecture/RATE_LIMITING.md)); the BFF itself stays unlimited | engine ceiling covers BFF-proxied traffic | per-route tiers if real traffic shows the shape |
-| ~~Playwright smoke not in CI (needs the compose stack)~~ — closed 2026-07-19: a CI job runs the smoke against the compose stack in fake-model mode ([CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md)) | — | a production-build smoke (the Docker images, not dev servers) can come with hosted multi-tenancy |
-| ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
+| Rate limiting's shared window closed 2026-07-21 (`RATE_LIMIT_SHARED` puts one bucket in Redis across replicas, degrading to per-replica if Redis is down — [RATE_LIMITING.md](architecture/operations/RATE_LIMITING.md)); the BFF itself stays unlimited | engine ceiling covers BFF-proxied traffic | per-route tiers if real traffic shows the shape |
+| ~~Playwright smoke not in CI (needs the compose stack)~~ — closed 2026-07-19: a CI job runs the smoke against the compose stack in fake-model mode ([CI_END_TO_END_SMOKE.md](architecture/operations/CI_END_TO_END_SMOKE.md)) | — | a production-build smoke (the Docker images, not dev servers) can come with hosted multi-tenancy |
+| ~~Deleting a repository cascades away its run history~~ — closed 2026-07-18: the FK is `SET NULL`, runs survive a disconnect ([RUN_HISTORY_RETENTION.md](architecture/runs-ui/RUN_HISTORY_RETENTION.md)) | — | an automatic pruning *schedule* can come with hosted multi-tenancy |
 
 ## Done
 
@@ -293,7 +293,7 @@ The project's wrap-up phase: make every role reason before it acts.
   variable set at each run entrypoint beside `provider_keys_var`; a tool called
   with no run context records `actor_id="system"` rather than failing. No new
   table — the tool call is just another audited action. Design note:
-  [architecture/AUDIT_LOG.md](architecture/AUDIT_LOG.md). Engine
+  [architecture/security/AUDIT_LOG.md](architecture/security/AUDIT_LOG.md). Engine
   ruff/format/pyright clean; full suite 450 passed / 1 skipped (9 new tests).
 - 2026-07-30 · Row-level security reaches `audit_logs` — closing the follow-up
   the mirror flagged. `audit_logs` was the one FORCE-RLS exception: it predated
@@ -305,7 +305,7 @@ The project's wrap-up phase: make every role reason before it acts.
   tool-call mirror is *written* under the service context, so it is never blocked;
   a chat row is written by the user session and passes because `actor_id` is that
   user. RLS now covers **six** ownership-carrying tables, not five — wording
-  updated in [architecture/ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md).
+  updated in [architecture/security/ROW_LEVEL_SECURITY.md](architecture/security/ROW_LEVEL_SECURITY.md).
   Engine ruff/format/pyright clean; a new test proves a user sees only its own
   audit rows while the service sees all.
 - 2026-07-30 · The generated pull request carries the full Definition of Done —
@@ -322,7 +322,7 @@ The project's wrap-up phase: make every role reason before it acts.
   the template file (the deployed engine ships without the repo's `.github/`), so
   a test reads the checklist back out of the template and asserts it matches
   `DEFINITION_OF_DONE` — the two can't silently diverge. Design note:
-  [architecture/PULL_REQUEST_BODY.md](architecture/PULL_REQUEST_BODY.md). Engine
+  [architecture/agents/PULL_REQUEST_BODY.md](architecture/agents/PULL_REQUEST_BODY.md). Engine
   ruff/format/pyright clean; `test_pull_request_body.py` (3 tests) passes and no
   existing test relied on the old note.
 - 2026-07-27 · When a conversation was last active — the chat sidebar now shows
@@ -332,7 +332,7 @@ The project's wrap-up phase: make every role reason before it acts.
   now" at the top. The **third caller** of the shared, pure `relativeTime` helper
   (after the repository card and the runs list) — purely presentational, no API,
   type, schema, or engine change; the value was already on the wire. Design note:
-  [architecture/CONVERSATION_TIMESTAMPS.md](architecture/CONVERSATION_TIMESTAMPS.md).
+  [architecture/chat/CONVERSATION_TIMESTAMPS.md](architecture/chat/CONVERSATION_TIMESTAMPS.md).
   Web: prettier + lint + typecheck clean, 37 tests pass.
 - 2026-07-26 · Search your conversations — the chat parallel to searching the
   runs list. `GET /v1/conversations` gained an optional `q`: a case-insensitive
@@ -344,7 +344,7 @@ The project's wrap-up phase: make every role reason before it acts.
   enforces it independently). The chat sidebar gained a debounced (300ms) search
   box; the BFF forwards the one `q` param through the shared `proxyToEngine`
   helper. Design note:
-  [architecture/CONVERSATION_SEARCH.md](architecture/CONVERSATION_SEARCH.md).
+  [architecture/chat/CONVERSATION_SEARCH.md](architecture/chat/CONVERSATION_SEARCH.md).
   Engine ruff/pyright clean, `test_conversations.py` 4 → 6 (title match, message
   match, blank no-op, wildcard-literal + owner-scoped); shared types regenerated;
   web lint + typecheck clean, 37 tests pass.
@@ -363,7 +363,7 @@ The project's wrap-up phase: make every role reason before it acts.
   migrated, −407 lines net. First automated coverage for the proxy: `bff.test.ts`
   asserts the 401/400 guards, the 204 passthrough, the status/body relay, and
   the body-forwarding. Design note:
-  [architecture/BFF_PROXY.md](architecture/BFF_PROXY.md). Web lint + typecheck
+  [architecture/identity-integrations/BFF_PROXY.md](architecture/identity-integrations/BFF_PROXY.md). Web lint + typecheck
   clean, 37 tests pass (was 31).
 - 2026-07-25 · Export a conversation — download a chat conversation as a
   markdown transcript, the chat parallel to the run report.
@@ -374,7 +374,7 @@ The project's wrap-up phase: make every role reason before it acts.
   `_owned_conversation` check (personal, never org-shared); the message read is
   shared with `list_messages` through a new `_conversation_messages` helper. The
   chat sidebar gained a **⤓** export button per conversation. Design note:
-  [architecture/CONVERSATION_EXPORT.md](architecture/CONVERSATION_EXPORT.md).
+  [architecture/chat/CONVERSATION_EXPORT.md](architecture/chat/CONVERSATION_EXPORT.md).
   Engine 441 passed, 1 skipped; shared types regenerated; web lint + typecheck
   clean, 30 tests pass.
 - 2026-07-25 · Run again — start a fresh run from an existing one's request and
@@ -386,7 +386,7 @@ The project's wrap-up phase: make every role reason before it acts.
   reused. The new run belongs to whoever triggers it. A disconnected repository
   is a 409 (nothing to run against). The run page gained a **Run again** button
   that opens the fresh run. Design note:
-  [architecture/RUN_RERUN.md](architecture/RUN_RERUN.md). Engine 437 passed,
+  [architecture/runs-ui/RUN_RERUN.md](architecture/runs-ui/RUN_RERUN.md). Engine 437 passed,
   1 skipped; shared types regenerated; web lint + typecheck clean, 30 tests pass.
 - 2026-07-24 · Temporal context for runs — the runs list and the run header now
   show a coarse "… ago". A list row shows the most meaningful moment
@@ -394,7 +394,7 @@ The project's wrap-up phase: make every role reason before it acts.
   header spells the verb — `started 3 hours ago · finished 2 hours ago`. The
   second caller of the `relativeTime` helper (exactly why it went in `lib`) —
   purely presentational, no API/type/schema change. Design note:
-  [architecture/RUN_TIMESTAMPS.md](architecture/RUN_TIMESTAMPS.md). Web: lint +
+  [architecture/runs-ui/RUN_TIMESTAMPS.md](architecture/runs-ui/RUN_TIMESTAMPS.md). Web: lint +
   typecheck clean, 30 tests pass.
 - 2026-07-24 · Show when a repository was last indexed — the API always returned
   `last_indexed_at` and the web type carried it, but the repositories page never
@@ -404,7 +404,7 @@ The project's wrap-up phase: make every role reason before it acts.
   `web/src/lib` (`just now` / `N minutes|hours|days ago`, `""` for null, an
   optional `now` for testability). Purely presentational — no API, type, or
   schema change; the value was already on the wire. Design note:
-  [architecture/REPOSITORY_INDEX_FRESHNESS.md](architecture/REPOSITORY_INDEX_FRESHNESS.md).
+  [architecture/repository-intelligence/REPOSITORY_INDEX_FRESHNESS.md](architecture/repository-intelligence/REPOSITORY_INDEX_FRESHNESS.md).
   Web: lint + typecheck clean, 30 tests pass (new relative-time suite).
 - 2026-07-24 · The run report now shows the team's decisions — the downloadable
   markdown report gained a **Decisions** section: the first line of each
@@ -416,7 +416,7 @@ The project's wrap-up phase: make every role reason before it acts.
   the diff or the full trace. Offline/fake runs emit no reasoning, so the section
   simply doesn't appear — response shape and the Download button are unchanged.
   Design note updated:
-  [architecture/RUN_REPORT.md](architecture/RUN_REPORT.md). Engine 434 passed,
+  [architecture/runs-ui/RUN_REPORT.md](architecture/runs-ui/RUN_REPORT.md). Engine 434 passed,
   1 skipped.
 - 2026-07-24 · Search runs by what you asked for — `GET /v1/runs` gained an
   optional `q`, a case-insensitive substring match on the request text that
@@ -425,7 +425,7 @@ The project's wrap-up phase: make every role reason before it acts.
   `\` are escaped before the `ILIKE`, so `100%` is a literal search, not a
   wildcard; a blank query is a no-op. The runs page gained a debounced (300ms)
   search box; the BFF forwards only the two known params. Design note:
-  [architecture/RUN_SEARCH.md](architecture/RUN_SEARCH.md). Engine 432 passed,
+  [architecture/runs-ui/RUN_SEARCH.md](architecture/runs-ui/RUN_SEARCH.md). Engine 432 passed,
   1 skipped; shared types regenerated; web lint + typecheck clean, 26 tests pass.
 - 2026-07-24 · Read an agent's full reasoning on the timeline — reasoning lines
   were truncated to 140 characters, so "following an agent's thinking" cut off
@@ -434,7 +434,7 @@ The project's wrap-up phase: make every role reason before it acts.
   the page, so the toggle only changes what's rendered — no fetch, no schema.
   Pairs with the per-agent filter below: narrow to one agent, then read its
   thinking in full. Design note updated:
-  [architecture/AGENT_REASONING_TIMELINE.md](architecture/AGENT_REASONING_TIMELINE.md).
+  [architecture/agents/AGENT_REASONING_TIMELINE.md](architecture/agents/AGENT_REASONING_TIMELINE.md).
   Web: lint + typecheck clean, 26 tests pass (event-text 10 → 12).
 - 2026-07-24 · Follow one agent on the run timeline — the chronological stream
   can now be filtered to a single role. A pure helper, `timelineAgents(events)`,
@@ -447,7 +447,7 @@ The project's wrap-up phase: make every role reason before it acts.
   "per-agent output panes come later" note on the Mission-Control workstream: a
   filtered timeline gives the "follow one agent" value while keeping chronological
   context one click away. Design note:
-  [architecture/TIMELINE_AGENT_FILTER.md](architecture/TIMELINE_AGENT_FILTER.md).
+  [architecture/runs-ui/TIMELINE_AGENT_FILTER.md](architecture/runs-ui/TIMELINE_AGENT_FILTER.md).
   Web: lint + typecheck clean, 24 tests pass (event-text 8 → 10).
 - 2026-07-21 · The QA sandbox can run in-cluster — a Docker-in-Docker sidecar,
   and it needed no engine change. The sandbox shells out to the `docker` CLI,
@@ -460,7 +460,7 @@ The project's wrap-up phase: make every role reason before it acts.
   with Kata/gVisor/sysbox as the hardening path. The sandbox's own guarantees
   (workspace copied not mounted, network unplugged for the test phase,
   capabilities dropped) are untouched. Design note updated:
-  [architecture/SANDBOX_EXECUTION.md](architecture/SANDBOX_EXECUTION.md).
+  [architecture/execution-qa/SANDBOX_EXECUTION.md](architecture/execution-qa/SANDBOX_EXECUTION.md).
   Verified beyond rendering: the sandbox runs a workspace to `passed` against a
   real `docker:dind` daemon over `DOCKER_HOST` (the exact sidecar wiring, proven
   locally); the engine image builds with the `docker` client present and no
@@ -489,7 +489,7 @@ The project's wrap-up phase: make every role reason before it acts.
   engine pods — most CNIs do this by default, but it is the operator's to
   confirm, so it ships opt-in like the backup PVC. New template
   `engine-networkpolicy.yaml`. Design note boundary updated:
-  [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md).
+  [architecture/operations/KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md).
   Verified with `helm lint` (clean) and `helm template`: no NetworkPolicy by
   default; with it on, the policy selects the engine pods and allows ingress
   only from the web pods on 8000, and the full chart renders exit-0 with ingress
@@ -505,7 +505,7 @@ The project's wrap-up phase: make every role reason before it acts.
   projected LLM spend over $20/hour. The rules target the standard
   OTel → Prometheus metric names and carry deliberately-tunable starting
   thresholds, both called out in the design note so nobody mistakes them for
-  calibrated values. Design note: [architecture/ALERTING.md](architecture/ALERTING.md).
+  calibrated values. Design note: [architecture/operations/ALERTING.md](architecture/operations/ALERTING.md).
   Verified: engine ruff/pyright clean, full suite 416 passed / 1 skipped (a new
   test reads the cost/token counters back from an in-memory metric reader), and
   `promtool check rules` passes (3 rules found). Routing a fired alert to a
@@ -539,7 +539,7 @@ The project's wrap-up phase: make every role reason before it acts.
   survives a lost node. `storageClass` is omitted when empty (the cluster's
   default StorageClass), `size`/`accessMode`/`mountPath` are values. New
   template `worker-backup-pvc.yaml`. Design note boundary updated:
-  [architecture/KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md).
+  [architecture/operations/KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md).
   Verified with `helm lint` (clean) and `helm template`: no PVC and no mount by
   default; with persistence on, the PVC (10Gi, ReadWriteOnce), the claim mount,
   and `BACKUP_DIR=/var/backups/asep` all render, and a set `storageClass`
@@ -560,7 +560,7 @@ The project's wrap-up phase: make every role reason before it acts.
   raises so the nightly job surfaces it without ever costing a backup. Off by
   default, so a single-machine deployment is unchanged until it opts in. New
   module `engine/backup_remote.py`; `boto3` added. Design note updated:
-  [architecture/BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md);
+  [architecture/operations/BACKUPS_AND_RECOVERY.md](architecture/operations/BACKUPS_AND_RECOVERY.md);
   `.env.example` gained the `BACKUP_S3_*` keys; the debt/backlog off-host row is
   struck (the volume-mounted PVC alternative stays as its own item). Verified:
   engine ruff/pyright clean, full suite 415 passed / 1 skipped — six new tests:
@@ -595,7 +595,7 @@ The project's wrap-up phase: make every role reason before it acts.
   Redis only in the tests that opt in. `ratelimit.py` split into a
   `LocalLimiter` and a `SharedLimiter` behind the same async `take`; the
   middleware picks one per request. Design note:
-  [architecture/RATE_LIMITING.md](architecture/RATE_LIMITING.md); debt-register
+  [architecture/operations/RATE_LIMITING.md](architecture/operations/RATE_LIMITING.md); debt-register
   row struck; `.env.example` gained `RATE_LIMIT_SHARED`. Verified: engine
   ruff/pyright clean, full suite 409 passed / 1 skipped — three new tests (the
   shared window enforced through a live Redis, separate callers, and the
@@ -629,7 +629,7 @@ The project's wrap-up phase: make every role reason before it acts.
   PR watch. The registry test now asserts the stronger property: every tool
   a role declares is implemented, so a policy typo is a loud failure instead
   of a tool that silently never appears. Design note:
-  [architecture/CI_END_TO_END_SMOKE.md](architecture/CI_END_TO_END_SMOKE.md).
+  [architecture/operations/CI_END_TO_END_SMOKE.md](architecture/operations/CI_END_TO_END_SMOKE.md).
   Verified: engine ruff/pyright clean, full engine suite 406 passed /
   1 skipped (including the new declared-tools-are-implemented test); the
   smoke passes locally against the compose stack the same way the CI job
@@ -654,7 +654,7 @@ The project's wrap-up phase: make every role reason before it acts.
   provider key (its contributor or an admin). `Principal` grew
   `org_role`/`is_org_admin`; `signServiceToken` takes an options bag and
   refuses to sign a role without an org. Design note:
-  [architecture/ORGANIZATION_ROLES.md](architecture/ORGANIZATION_ROLES.md);
+  [architecture/identity-integrations/ORGANIZATION_ROLES.md](architecture/identity-integrations/ORGANIZATION_ROLES.md);
   the org-sharing note's "equal collaborators" boundary updated in place.
   Verified: engine 405 passed / 1 skipped (two new gate tests in
   `test_org_sharing.py`); web lint, typecheck, and 21 tests green
@@ -677,7 +677,7 @@ The project's wrap-up phase: make every role reason before it acts.
   every pinned session through it — 400+ existing tests re-verify the
   separation for free), migration `0022` applies grants (skipped quietly
   without the role — single-role mode keeps working), and `.env.example`
-  documents the second URL. Design note: architecture/ROW_LEVEL_SECURITY.md
+  documents the second URL. Design note: architecture/security/ROW_LEVEL_SECURITY.md
   (privilege separation); audit updated in place. Engine 403 passed,
   1 skipped; web untouched.
 - 2026-07-19 · The in-browser terminal — the last Phase 6 item, and the
@@ -696,7 +696,7 @@ The project's wrap-up phase: make every role reason before it acts.
   containers carry `asep.terminal=1` so orphans are one docker command
   away. `SANDBOX_ENABLED=0` or no Docker refuses with a plain-language
   reason, never host execution. Design note:
-  architecture/IN_BROWSER_TERMINAL.md. Engine 402 passed, 1 skipped (8
+  architecture/runs-ui/IN_BROWSER_TERMINAL.md. Engine 402 passed, 1 skipped (8
   new tests over a scripted fake docker: hardening flags asserted on the
   actual run call, session reuse, TTL refresh, timeout reset, the
   disabled-sandbox refusal, and the API's 409/404 guards — the auth sweep
@@ -716,7 +716,7 @@ The project's wrap-up phase: make every role reason before it acts.
   API entry points and the run's own `org_id` in the runner. Members are
   equal collaborators: any member sees the team key (last four + a
   "team key" tag, never the value), replaces it, or removes it. Design
-  note: architecture/PROVIDER_KEYS.md (organization-shared keys);
+  note: architecture/identity-integrations/PROVIDER_KEYS.md (organization-shared keys);
   ORGANIZATION_SHARING.md's table updated. Engine 394 passed, 1 skipped
   (3 new tests: member visibility/replace/remove, the no-org 400, and
   personal-beats-team resolution incl. the org-inactive fallback); web
@@ -737,7 +737,7 @@ The project's wrap-up phase: make every role reason before it acts.
   rejection), no role changes, no reordering. The run page's gate gained
   Edit plan → per-task title input, description textarea, drop/keep
   toggle → Save; approving then executes exactly the edited board.
-  Design note: architecture/PLAN_EDITING.md. Engine 391 passed, 1 skipped
+  Design note: architecture/agents/PLAN_EDITING.md. Engine 391 passed, 1 skipped
   (3 new tests: edit+drop then the edited board runs to completion,
   dangling-dependency cleanup proven by a no-deadlock run, and the
   guardrails — all-dropped 400, foreign task id 400, post-approval 409);
@@ -757,7 +757,7 @@ The project's wrap-up phase: make every role reason before it acts.
   page. Repository-scoped data (index, work items, knowledge, documents)
   cascades as before; memory capture skips detached runs; the benchmark
   harness deletes its synthetic runs explicitly now that the cascade no
-  longer does. Design note: architecture/RUN_HISTORY_RETENTION.md. Engine
+  longer does. Design note: architecture/runs-ui/RUN_HISTORY_RETENTION.md. Engine
   388 passed, 1 skipped (3 new tests: history survives with full record,
   409 while active then 204 after finishing, intruder 404); web 19 passed.
 - 2026-07-18 · Self-hosted GitLab, closing the Source Hosts workstream:
@@ -771,7 +771,7 @@ The project's wrap-up phase: make every role reason before it acts.
   and opens its merge request on that instance. Self-hosted Bitbucket
   documented out on purpose: Server/Data Center speaks a different API
   (1.0-style REST, different auth) — a different protocol, not a
-  different host. Design note: architecture/SOURCE_HOSTS.md (updated in
+  different host. Design note: architecture/agents/SOURCE_HOSTS.md (updated in
   place). Engine 385 passed, 1 skipped (3 new tests); web untouched.
 - 2026-07-17 · Ripgrep-backed search: the agents' plain-text `search` tool
   uses ripgrep when it is on PATH — fixed-string, case-insensitive, `.git`
@@ -785,7 +785,7 @@ The project's wrap-up phase: make every role reason before it acts.
   bundled rg; on CI, the preinstalled one; skips cleanly where neither
   exists). No regex exposure — the tool stays plain-text; `search_code`
   remains the meaning-based arm. Design note:
-  architecture/RIPGREP_SEARCH.md. Engine 382 passed, 1 skipped; web
+  architecture/agents/RIPGREP_SEARCH.md. Engine 382 passed, 1 skipped; web
   untouched.
 - 2026-07-17 · The apply_patch tool: engineers no longer rewrite a whole
   file for a two-line fix. The long-declared name is now bound — a unified
@@ -799,7 +799,7 @@ The project's wrap-up phase: make every role reason before it acts.
   application by design — that is how silent corruption ships. write_file
   stays for new and small files; the offline pipeline is untouched. The
   schema teaches the model when to prefer which. Design note:
-  architecture/APPLY_PATCH_TOOL.md. Engine 381 passed, 1 skipped (6 new
+  architecture/agents/APPLY_PATCH_TOOL.md. Engine 381 passed, 1 skipped (6 new
   tests: both prefix styles, file creation, jail escape refused, mismatch
   guidance, non-diff rejected); web untouched.
 - 2026-07-17 · Child-table row-level security: the last tables guarded only
@@ -848,7 +848,7 @@ The project's wrap-up phase: make every role reason before it acts.
   is a git host, not an issue tracker (asserted in tests like GitLab).
   Every `IntegrationKind` now has an adapter, so the deny-by-default gate
   test proves itself with a kind that does not exist. Design note:
-  architecture/SOURCE_HOSTS.md (updated in place). Engine 370 passed,
+  architecture/agents/SOURCE_HOSTS.md (updated in place). Engine 370 passed,
   1 skipped (7 new tests); web 19 passed.
 - 2026-07-17 · In-place document editing: a generated document is a
   starting point, not gospel — the person who knows the project can now
@@ -859,7 +859,7 @@ The project's wrap-up phase: make every role reason before it acts.
   document gained an edit toggle — textarea, Save/Cancel, nothing more.
   Regenerating a kind still creates a *new* document, so a human edit is
   never silently overwritten by the model; last save wins (no versioning —
-  logged as a boundary). Design note: architecture/DOCUMENTATION_SUITE.md
+  logged as a boundary). Design note: architecture/planning-knowledge/DOCUMENTATION_SUITE.md
   (updated in place). Engine 364 passed, 1 skipped (3 new tests: edit
   roundtrip with title kept on content-only saves, unknown document 404,
   intruder 404); web 19 passed.
@@ -879,7 +879,7 @@ The project's wrap-up phase: make every role reason before it acts.
   history flows end to end in the tests: 4 new (log lines newest-first from
   a real local repo, empty on an unfetchable URL, the API-stored changelog
   contains the real subjects, the fallback document). Design note:
-  architecture/DOCUMENTATION_SUITE.md (updated in place). Engine 361
+  architecture/planning-knowledge/DOCUMENTATION_SUITE.md (updated in place). Engine 361
   passed, 1 skipped; web untouched.
 - 2026-07-17 · Manual workspace push: the last stranded step in the
   edit-by-hand loop. A finished run's workspace could be browsed, edited,
@@ -894,7 +894,7 @@ The project's wrap-up phase: make every role reason before it acts.
   `branch.pushed` with who pressed the button. The git panel gained a
   Push branch button beside Commit. Proven against a real local bare
   origin in the tests: commit by hand, push by hand, the origin has the
-  branch. Design note: architecture/WORKSPACE_PANELS.md (updated in
+  branch. Design note: architecture/runs-ui/WORKSPACE_PANELS.md (updated in
   place). Engine 357 passed, 1 skipped (3 new tests); web 19 passed.
 - 2026-07-16 · Prompt snapshots: editing an agent prompt is now a visible
   decision instead of a silent behavior change. `tests/prompt_snapshots.json`
@@ -906,7 +906,7 @@ The project's wrap-up phase: make every role reason before it acts.
   registry's prompt files. Verified the failure path for real: a one-newline
   edit failed the suite naming backend.md. Drift detection only — prompt
   *quality* stays the evaluation harness's job. Design note:
-  architecture/PROMPT_SNAPSHOTS.md. Engine 354 passed, 1 skipped; web
+  architecture/agents/PROMPT_SNAPSHOTS.md. Engine 354 passed, 1 skipped; web
   untouched.
 - 2026-07-16 · Task-board agent tools (the Agent Tools workstream's last
   open item): engineers can now change the board they work from. `add_task`
@@ -923,7 +923,7 @@ The project's wrap-up phase: make every role reason before it acts.
   existing semantics are untouched. Both tools audit to the timeline
   (`task.created`, `task.status_changed` with the reason), the engineer
   prompts teach the discipline, and the run page renders the new events in
-  plain English. Design note: architecture/TASK_BOARD_TOOLS.md. Engine 352
+  plain English. Design note: architecture/agents/TASK_BOARD_TOOLS.md. Engine 352
   passed, 1 skipped (10 new tests across tools, supervisor merge, and the
   runner glue); web 18 passed.
 - 2026-07-16 · Organization-aware sharing: the org claim now means something —
@@ -941,7 +941,7 @@ The project's wrap-up phase: make every role reason before it acts.
   like `sub`. Conversations, provider keys, and integrations stay personal.
   Connecting an already-org-shared repository URL reuses the shared row
   instead of duplicating it. Design note:
-  architecture/ORGANIZATION_SHARING.md. Engine 342 passed, 1 skipped (8 new
+  architecture/identity-integrations/ORGANIZATION_SHARING.md. Engine 342 passed, 1 skipped (8 new
   tests attack both seams: raw SQL through pinned sessions and real requests
   carrying the claim); web 17 passed (panel copy).
 - 2026-07-16 · Sign-in providers and the organization switcher (the last two
@@ -955,7 +955,7 @@ The project's wrap-up phase: make every role reason before it acts.
   every BFF-signed service JWT carries the active organization as its `org`
   claim (the engine's Principal already parses it). That claim is the seam
   org-aware RLS sharing builds on — that follow-up is now unblocked. Design
-  note: architecture/SIGN_IN_AND_ORGANIZATIONS.md. Web 17 passed (2 new test
+  note: architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md. Web 17 passed (2 new test
   files: the decoded token's claims, the provider-driven buttons); engine
   untouched.
 - 2026-07-15 · Audit follow-ups (findings 2 and 3 closed the day they were
@@ -996,7 +996,7 @@ The project's wrap-up phase: make every role reason before it acts.
   of the database afterwards. Deliberately a CLI, not pytest timing
   assertions (those flake on slow runners) — the suite keeps a smoke test
   that the harness runs at tiny sizes. Design note:
-  architecture/BENCHMARKS.md. Engine 328 passed, 1 skipped; web untouched.
+  architecture/operations/BENCHMARKS.md. Engine 328 passed, 1 skipped; web untouched.
 - 2026-07-15 · Kubernetes deploy: the platform is now something `helm install`
   can put on a cluster. Two production images — the engine
   (`infra/docker/engine.Dockerfile`: python-slim + uv, git and
@@ -1018,7 +1018,7 @@ The project's wrap-up phase: make every role reason before it acts.
   sign-in — a probe pass); `helm lint` + `helm template` green locally and
   now a CI job. Boundaries logged: sandbox off in-cluster, placeholder
   resource limits until benchmarks, no NetworkPolicy/mTLS/autoscaling yet.
-  Design note: architecture/KUBERNETES_DEPLOY.md. Web 13 passed; engine
+  Design note: architecture/operations/KUBERNETES_DEPLOY.md. Web 13 passed; engine
   code untouched.
 - 2026-07-14 · Row-level security (defense in depth behind the API's
   owner-scoping): Postgres now refuses to hand a pinned session another
@@ -1040,7 +1040,7 @@ The project's wrap-up phase: make every role reason before it acts.
   documented tolerances. Boundaries logged as follow-ups: unset context is
   trusted (deny-by-default needs a non-owner API role), child tables are
   guarded through parents, org-aware sharing waits on the org switcher.
-  Design note: architecture/ROW_LEVEL_SECURITY.md. Engine 325 passed,
+  Design note: architecture/security/ROW_LEVEL_SECURITY.md. Engine 325 passed,
   1 skipped; web untouched.
 - 2026-07-14 · Backups & disaster recovery: `engine/backup.py` drives the
   standard `pg_dump`/`pg_restore` as subprocesses — custom-format dumps written
@@ -1055,7 +1055,7 @@ The project's wrap-up phase: make every role reason before it acts.
   *from* that dump, on every push — plus a narrow, documented tolerance for a
   newer client's session settings against an older server (PG18 → PG16), with
   anything else still failing the restore. Runbook a stressed human can follow:
-  runbooks/DISASTER_RECOVERY.md; design note: architecture/BACKUPS_AND_RECOVERY.md.
+  runbooks/DISASTER_RECOVERY.md; design note: architecture/operations/BACKUPS_AND_RECOVERY.md.
   Boundary: the backup directory is a local disk — shipping dumps off-host is
   the logged Deploy-workstream follow-up. Engine 319 passed, 1 skipped; web
   untouched.
@@ -1072,7 +1072,7 @@ The project's wrap-up phase: make every role reason before it acts.
   tracing span, so 429s land in the request metrics for free. Boundary: the
   bucket is per replica — a Redis-backed shared window is the Deploy-workstream
   follow-up, and the debt register now says exactly that. Design note:
-  architecture/RATE_LIMITING.md. Engine 312 passed, 1 skipped; web untouched.
+  architecture/operations/RATE_LIMITING.md. Engine 312 passed, 1 skipped; web untouched.
 - 2026-07-13 · Phase 7 opens — OpenTelemetry traces + metrics (ADR-0010's
   planned revisit): `engine/observability.py` holds the SDK switch —
   instrumentation goes through the OTel *API* unconditionally, so spans and
@@ -1087,7 +1087,7 @@ The project's wrap-up phase: make every role reason before it acts.
   post-mortems. Tests inject in-memory exporters through the same seam and
   read real spans offline. No collector in compose — the engine exports;
   running the telemetry stack is the operator's side (Deploy workstream).
-  Phase plan + design note: architecture/PRODUCTION_HARDENING.md; ADR-0010
+  Phase plan + design note: architecture/operations/PRODUCTION_HARDENING.md; ADR-0010
   updated. Engine 306 passed, 1 skipped; web unchanged.
 - 2026-07-13 · Workspace editor + git-commit panel: the run-page file browser
   became a light editor. Three new owner-scoped, jailed endpoints —
@@ -1099,7 +1099,7 @@ The project's wrap-up phase: make every role reason before it acts.
   write then would race it. The run page's viewer becomes a textarea with a Save
   button on a finished run, and a Working-tree panel lists changes and commits
   them. The commit stays local to the workspace — re-publishing it to the host is
-  a later item. Design note: architecture/WORKSPACE_PANELS.md. Engine 300 passed,
+  a later item. Design note: architecture/runs-ui/WORKSPACE_PANELS.md. Engine 300 passed,
   1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Workspace Panels open — a read-only file browser on the run page:
   a completed run's workspace persists on disk (only a rejected/recovered run
@@ -1113,7 +1113,7 @@ The project's wrap-up phase: make every role reason before it acts.
   file list beside a read-only viewer — next to the existing diff and timeline.
   The shared `_load_run_workspace` helper also de-duplicated the diff endpoint.
   Editing, git staging, and a terminal (the ADR-0008 arbitrary-shell boundary)
-  are deliberately deferred. Design note: architecture/WORKSPACE_PANELS.md.
+  are deliberately deferred. Design note: architecture/runs-ui/WORKSPACE_PANELS.md.
   Engine 294 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Source hosts — GitLab merge requests: the run publish step is now
   host-aware. `engine/integrations/gitlab.py` recognizes `gitlab.com` URLs
@@ -1128,7 +1128,7 @@ The project's wrap-up phase: make every role reason before it acts.
   A repo on neither host publishes the branch only, exactly as before, so the
   GitHub golden path is unchanged (all run-pipeline tests green). The settings
   page connects GitLab (token + optional base URL). Design note:
-  architecture/SOURCE_HOSTS.md. Engine 288 passed, 1 skipped; web 13 passed,
+  architecture/agents/SOURCE_HOSTS.md. Engine 288 passed, 1 skipped; web 13 passed,
   build clean.
 - 2026-07-13 · Jira as a second issue tracker: the shared "an issue was created"
   contract (`IssueResult`) moved into the dispatcher (`engine/integrations/issues.py`),
@@ -1140,7 +1140,7 @@ The project's wrap-up phase: make every role reason before it acts.
   the settings page connects Jira (site URL, email, token, project key —
   encrypted at rest), and the planning board offers a push action per connected
   tracker. A differently-shaped API behind the unchanged dispatch is the proof
-  the abstraction holds. Design note: architecture/EXTERNAL_INTEGRATIONS.md.
+  the abstraction holds. Design note: architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
   Engine 283 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-13 · Issue-tracker push (Linear) on the integrations foundation: a
   work item can now be pushed to Linear as an issue from the planning board.
@@ -1157,7 +1157,7 @@ The project's wrap-up phase: make every role reason before it acts.
   and a push / re-push action; the settings page connects Linear (API key + team
   id, encrypted at rest). The Slack `test` endpoint stays Slack-only — a
   tracker's "test" would create a junk issue. Design note:
-  architecture/EXTERNAL_INTEGRATIONS.md. Engine 279 passed, 1 skipped; web 13
+  architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md. Engine 279 passed, 1 skipped; web 13
   passed, build clean.
 - 2026-07-12 · External integrations foundation + outbound Slack: a new
   `integration_connections` table (migration 0014, up/down/up verified) holds
@@ -1174,7 +1174,7 @@ The project's wrap-up phase: make every role reason before it acts.
   Integrations section on `/settings` connect, test, and remove a Slack webhook;
   `IntegrationKind` names Jira/Linear/GitLab/Bitbucket too, but the API only
   accepts the active kinds (this slice: slack). Design note:
-  architecture/EXTERNAL_INTEGRATIONS.md. Engine 272 passed, 1 skipped; web 13
+  architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md. Engine 272 passed, 1 skipped; web 13
   passed, build clean.
 - 2026-07-12 · Phase 6 opens — documentation generation suite: a new
   Technical Writer agent role (read-only, planner tier;
@@ -1190,7 +1190,7 @@ The project's wrap-up phase: make every role reason before it acts.
   delete under `/v1/repositories/{id}/documents`) and the `/docs` page (pick a
   kind, generate, read, delete) make it usable. Under `LLM_FAKE=1` the generator
   returns a deterministic document listing the repository's real files, so the
-  whole path runs offline. Design note: architecture/DOCUMENTATION_SUITE.md.
+  whole path runs offline. Design note: architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
   Engine 261 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-12 · Identity & Keys — bring-your-own provider keys: each user can
   store an Anthropic / OpenAI / Gemini key, AES-GCM-encrypted at rest
@@ -1203,7 +1203,7 @@ The project's wrap-up phase: make every role reason before it acts.
   (chat, a run's planning and execution, roadmap generation), so the
   ModelRouter stays the single litellm gateway with no signature plumbing.
   The `/settings` page sets, replaces, and removes keys (masked to last
-  four), linked from every screen. Design note: architecture/PROVIDER_KEYS.md.
+  four), linked from every screen. Design note: architecture/identity-integrations/PROVIDER_KEYS.md.
   Engine 254 passed, 1 skipped; web 13 passed, build clean.
 - 2026-07-12 · Agent Runtime — background worker (the last blocking runtime
   item): a new dispatch seam (`engine/jobs.py`) sends "plan this run" /
@@ -1218,7 +1218,7 @@ The project's wrap-up phase: make every role reason before it acts.
   startup recovery is gated to inline mode so it can't fight a healthy
   worker. Live arq round trip (enqueue → burst worker → plan → approve →
   execute → completed) runs against the dev Redis. Design note:
-  architecture/BACKGROUND_WORKER.md. Engine 245 passed, 1 skipped.
+  architecture/agents/BACKGROUND_WORKER.md. Engine 245 passed, 1 skipped.
 - 2026-07-11 · Agent Runtime — run event bus (live timeline streaming): the
   runner pings a per-run Redis channel after every event commit
   (`engine/events/bus.py`), and `GET /v1/runs/{id}/events/stream` pushes each
@@ -1229,7 +1229,7 @@ The project's wrap-up phase: make every role reason before it acts.
   status, and stay open across the approval pause. The run page swapped its
   1.5-second event polling for one `EventSource` (each pushed event nudges a
   throttled task-board refresh) and falls back to polling if the stream is
-  unreachable. Design note: architecture/RUN_EVENT_STREAMING.md. Engine 240
+  unreachable. Design note: architecture/agents/RUN_EVENT_STREAMING.md. Engine 240
   passed, 1 skipped; web 13 passed.
 - 2026-07-11 · Agent Runtime — run recovery (resume after restart): the
   `agent_tasks` board in Postgres already checkpoints every status change, so
@@ -1241,7 +1241,7 @@ The project's wrap-up phase: make every role reason before it acts.
   run carries a `run.recovered` timeline event; runs awaiting approval and
   terminal runs are untouched. Gated by `RUN_RECOVERY_ENABLED` (on by default,
   off in tests, which call recovery directly). Design note:
-  architecture/RUN_RECOVERY.md. Engine 234 passed, 1 skipped.
+  architecture/agents/RUN_RECOVERY.md. Engine 234 passed, 1 skipped.
 - 2026-07-11 · Grounded chat reads the team memory (Phase 5 complete, stretch
   item shipped): chat about a connected repository recalls the memories most
   relevant to the question into its system context next to the code excerpts,
@@ -1262,7 +1262,7 @@ The project's wrap-up phase: make every role reason before it acts.
   context. The knowledge API (list / search / add / delete under
   `/v1/repositories/{id}/knowledge`) and the `/knowledge` page (kind badges,
   source-run links, search, add-a-note form) make memory visible. Design
-  note: architecture/KNOWLEDGE_AND_MEMORY.md. Engine 227 passed, 1 skipped;
+  note: architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md. Engine 227 passed, 1 skipped;
   web 12 passed, build clean.
 - 2026-07-10 · Scrum Master roadmap generation, estimation, and plan insights:
   `POST /v1/repositories/{id}/roadmap` hands a one-line goal (plus the indexed
@@ -1273,7 +1273,7 @@ The project's wrap-up phase: make every role reason before it acts.
   (`engine/agents/scrum_master.py`). Blocker detection and the next-item
   recommendation are deterministic (`engine/planning/insights.py`), served by
   `GET …/work-items/insights`, and shown as the Plan health section on the
-  planning board. Design note: architecture/PLANNING_SUITE.md.
+  planning board. Design note: architecture/planning-knowledge/PLANNING_SUITE.md.
 - 2026-07-10 · Durable work-items backlog and the planning board: the
   repository-scoped `work_items` table (migration 0010) holds planned work that
   outlives any single run — deleting the implementing run only nulls the link.
@@ -1281,7 +1281,7 @@ The project's wrap-up phase: make every role reason before it acts.
   validates that dependencies stay inside the repository. The `/planning` page
   lists the backlog in board order with drag-to-reorder, kind / priority /
   estimate / milestone badges, and inline status and estimate edits. Design
-  note: architecture/PLANNING_SUITE.md.
+  note: architecture/planning-knowledge/PLANNING_SUITE.md.
 - 2026-07-10 · Dependency vulnerability scan gates the pull request: a sibling of
   the secrets scanner (`engine/security/dependency_scanner.py`) reads only the
   *added* lines of the run's diff, extracts (package, version) pairs from
@@ -1290,7 +1290,7 @@ The project's wrap-up phase: make every role reason before it acts.
   version, matched by PEP 440 specifiers). The runner's `_dependency_gate` fails
   the run and records a `dependency.scan` timeline event when a known-vulnerable
   pin is introduced. Deterministic and network-free, so it runs in tests like the
-  secrets gate. Design note: architecture/DEPENDENCY_SCANNING.md.
+  secrets gate. Design note: architecture/execution-qa/DEPENDENCY_SCANNING.md.
 - 2026-07-09 · Webhook reviewer comments on real pull requests (Phase 3 exit
   criterion 2): `POST /v1/webhooks/github` authenticates GitHub deliveries by
   HMAC-SHA256 signature (constant-time, fail-closed on an unconfigured secret),
@@ -1298,14 +1298,14 @@ The project's wrap-up phase: make every role reason before it acts.
   returns 202 immediately. The task fetches the PR's unified diff, the
   diff-based Reviewer (`engine/agents/pr_reviewer.py`) returns strict-JSON
   findings, and one review comment is posted (`event: COMMENT`) — well inside
-  five minutes. Design note: architecture/WEBHOOK_REVIEWER.md.
+  five minutes. Design note: architecture/execution-qa/WEBHOOK_REVIEWER.md.
 - 2026-07-09 · QA agent closes the self-correction loop: when the sandbox tests
   fail, `engine/agents/qa.py` hands the captured output to a new QA role (full
   engineer tool set, forbidden from gaming the tests), which fixes the code and
   commits; the runner re-runs the sandbox and repeats up to `QA_MAX_ATTEMPTS`
   (default 2) before failing the run. Each cycle is on the timeline — a
   `qa.attempt` event per fix and a `sandbox.run` event per re-run, both stamped
-  with the attempt number. Design note: architecture/QA_AGENT.md.
+  with the attempt number. Design note: architecture/execution-qa/QA_AGENT.md.
 - 2026-07-08 · Docker sandbox runs the tests before the pull request (Phase 3
   exit criterion 1): `engine/sandbox/runner.py` copies the workspace into a
   disposable container (2 GB / 2 CPUs / 256 processes, no host env vars),
@@ -1315,7 +1315,7 @@ The project's wrap-up phase: make every role reason before it acts.
   `sandbox.run` timeline event carrying the output tail; Docker-missing or
   no-test-setup skips are recorded, never silent. Live smoke test proved
   egress really is blocked during the test phase. Design note:
-  architecture/SANDBOX_EXECUTION.md. Engine 132 passed, 1 skipped.
+  architecture/execution-qa/SANDBOX_EXECUTION.md. Engine 132 passed, 1 skipped.
 - 2026-07-08 · Phase 3 opens with the secrets gate (phase exit criterion met):
   `engine/security/secrets_scanner.py` scans only the lines a run *adds*
   (unified diff, high-confidence patterns for cloud keys, tokens, private
@@ -1323,8 +1323,8 @@ The project's wrap-up phase: make every role reason before it acts.
   stored redacted). The runner checks the diff after review approval and
   before the branch push — a hit fails the run with a `security.scan`
   timeline event and no pull request opens; a clean scan records the same
-  event and proceeds. Design notes: architecture/EXECUTION_AND_QA.md (phase
-  plan), architecture/SECRETS_SCANNING.md. Engine 116 passed, 1 skipped.
+  event and proceeds. Design notes: architecture/execution-qa/EXECUTION_AND_QA.md (phase
+  plan), architecture/execution-qa/SECRETS_SCANNING.md. Engine 116 passed, 1 skipped.
 - 2026-07-02 · Phase 0 document pack: PRD, architecture overview, ADR-0001…0010, roadmap, backlog, security baseline.
 - 2026-07-02 · Phase 0 walking skeleton verified end-to-end: compose services healthy
   (postgres on host port 5433), alembic up/down/up cycle + better-auth migration,
@@ -1334,7 +1334,7 @@ The project's wrap-up phase: make every role reason before it acts.
 - 2026-07-03 · Phase 0 shipped to GitHub: seven task-scoped commits pushed, CI green on
   main and pull request #1 (foundation PR with the Definition-of-Done checklist).
 - 2026-07-03 · Agent Runtime — run/task/event domain model: design note
-  (architecture/AGENT_RUNTIME.md with lifecycle + ER diagrams), `engine/db/enums.py`
+  (architecture/agents/AGENT_RUNTIME.md with lifecycle + ER diagrams), `engine/db/enums.py`
   StrEnums, four new models, Alembic revision `0002_agent_runtime` (up/down/up verified
   on the dev database), five round-trip/cascade/constraint tests (engine suite 19/19).
 - 2026-07-03 · Agent Runtime — agent registry: `engine/agents/registry.py` maps each
@@ -1405,13 +1405,13 @@ The project's wrap-up phase: make every role reason before it acts.
   streams a `citations` SSE event, and stores sources on the assistant message
   (`messages.citations`, migration 0005, up/down/up verified). The chat page
   gained a repository picker and a Sources list under grounded answers. Design
-  note: architecture/GROUNDED_CHAT.md. Engine 89 passed, web 10/10.
+  note: architecture/repository-intelligence/GROUNDED_CHAT.md. Engine 89 passed, web 10/10.
 - 2026-07-06 · Agents consume the index: `search_code` joins the jailed toolbox
   and the shared read-tool set (Product Manager, engineers, Reviewer). The tool
   resolves the run's repository through the workspace's run id — an agent can
   only search its own run's index — and answers with guidance instead of an
   error when no index exists. Role prompts explain when to prefer it over
-  plain search. Design note: architecture/AGENT_CODE_SEARCH.md. Engine 91
+  plain search. Design note: architecture/agents/AGENT_CODE_SEARCH.md. Engine 91
   passed.
 - 2026-07-08 · Hybrid retrieval: `retrieve_chunks` now runs a vector arm and a
   Postgres full-text arm (generated `content_tsv` column + GIN index, migration
@@ -1419,7 +1419,7 @@ The project's wrap-up phase: make every role reason before it acts.
   fusion — exact identifiers and error strings surface even offline, while the
   displayed score stays cosine similarity. The signature is unchanged, so the
   search endpoint, grounded chat, and `search_code` gain hybrid ranking for
-  free. Design note: architecture/HYBRID_RETRIEVAL.md.
+  free. Design note: architecture/repository-intelligence/HYBRID_RETRIEVAL.md.
 - 2026-07-08 · Retrieval evaluation (Phase 2 exit criterion): a golden question
   set over the fixture service scored with recall and mean reciprocal rank
   against a grep baseline (`engine/retrieval_eval.py`, `scripts/eval_retrieval.py`).
@@ -1432,13 +1432,13 @@ The project's wrap-up phase: make every role reason before it acts.
   parser errors fall back to the version-1 line windows. The chunk record is
   unchanged, so the schema, embedder, and hybrid retrieval need no changes; a
   re-index picks up the better boundaries. Design note:
-  architecture/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
+  architecture/repository-intelligence/AST_CHUNKING.md. Engine 96 passed, 1 skipped.
 - 2026-07-08 · Dependency graph resolves Java and Kotlin imports: a first pass
   indexes each JVM file's `package` and declared types into a fully-qualified
   name → file map, then import statements resolve against it — wildcards link the
   whole package and static/member imports fall back to their declaring type,
   while third-party imports still drop out. Python and JS/TS keep their
-  path-based resolution. Design note: architecture/DEPENDENCY_GRAPH.md. Engine
+  path-based resolution. Design note: architecture/repository-intelligence/DEPENDENCY_GRAPH.md. Engine
   107 passed, 1 skipped.
 - 2026-07-08 · AST chunking extended to Java and Kotlin: the tree-sitter
   chunker now splits `.java`, `.kt`, and `.kts` files at their top-level types
@@ -1446,7 +1446,7 @@ The project's wrap-up phase: make every role reason before it acts.
   keeping a definition whole instead of a blind line window; large types still
   window past the 200-line cap and unknown grammars keep the fallback. The
   dependency graph does not yet resolve Java/Kotlin imports. Design note:
-  architecture/AST_CHUNKING.md. Engine 105 passed, 1 skipped.
+  architecture/repository-intelligence/AST_CHUNKING.md. Engine 105 passed, 1 skipped.
 - 2026-07-08 · Incremental re-indexing and HNSW index (Phase 2 indexing
   workstream complete): each source file's SHA-256 is recorded in `indexed_files`
   (migration 0008, up/down/up verified), so a re-index re-embeds only the files
@@ -1455,7 +1455,7 @@ The project's wrap-up phase: make every role reason before it acts.
   full rebuild each run (cheap, no embedding call). An HNSW index over the
   embedding column (`vector_cosine_ops`, migration 0009) keeps cosine-distance
   vector search fast as repositories grow; retrieval uses it automatically with
-  no code change. Design note: architecture/INCREMENTAL_INDEXING.md. Engine 103
+  no code change. Design note: architecture/repository-intelligence/INCREMENTAL_INDEXING.md. Engine 103
   passed, 1 skipped.
 - 2026-07-08 · Dependency / architecture graph: the indexer now also extracts
   first-party import edges with tree-sitter (`engine/indexing/dependency_graph.py`,
@@ -1464,4 +1464,4 @@ The project's wrap-up phase: make every role reason before it acts.
   re-index. `GET /v1/repositories/{id}/graph` returns nodes with in/out degree
   plus edges; the repositories page draws it as a dependency-light circular
   SVG (nodes sized by how many files import them). Design note:
-  architecture/DEPENDENCY_GRAPH.md. Engine 101 passed 1 skipped, web 12 passed.
+  architecture/repository-intelligence/DEPENDENCY_GRAPH.md. Engine 101 passed 1 skipped, web 12 passed.

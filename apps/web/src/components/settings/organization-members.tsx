@@ -20,7 +20,7 @@ type Invitation = {
 /** The active organization's members and invitations: invite by email with a
  * role, hand over the accept link (no email provider is wired), change roles,
  * remove members. better-auth enforces its own permission rules server-side —
- * this panel adds UI, not policy (docs/architecture/ORGANIZATION_ROLES.md). */
+ * this panel adds UI, not policy (docs/architecture/identity-integrations/ORGANIZATION_ROLES.md). */
 export function OrganizationMembers({
   members,
   invitations,

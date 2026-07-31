@@ -5,7 +5,7 @@ introduces — because a secret already in the repository is not this run's leak
 to block. Each added line is matched against a small set of high-confidence
 patterns; a match yields a finding with the raw secret redacted, never stored.
 
-Design note: docs/architecture/SECRETS_SCANNING.md.
+Design note: docs/architecture/execution-qa/SECRETS_SCANNING.md.
 """
 
 import re

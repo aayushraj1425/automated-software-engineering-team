@@ -4,7 +4,7 @@ checkpoint (the agent_tasks board) at engine startup.
 Each test forges the exact state a crashed process leaves behind — a run
 frozen in a non-terminal status — then calls recover_interrupted_runs()
 directly (startup recovery is disabled in conftest so tests stay isolated).
-Design note: docs/architecture/RUN_RECOVERY.md.
+Design note: docs/architecture/agents/RUN_RECOVERY.md.
 """
 
 import uuid

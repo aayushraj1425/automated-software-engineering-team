@@ -3,7 +3,7 @@
 Everything that remembers — the runner's automatic capture, the rejection
 gate, the knowledge API — goes through `remember()`, so every memory gets an
 embedding and the same length caps. Design note:
-docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 import uuid

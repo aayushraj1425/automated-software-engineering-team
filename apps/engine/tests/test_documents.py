@@ -3,7 +3,7 @@
 LLM_FAKE=1 (set in conftest) keeps everything offline — the Technical Writer
 returns a deterministic document listing the repository's real file paths, so
 the whole path (generate → persist → list → delete) runs without a model.
-Design note: docs/architecture/DOCUMENTATION_SUITE.md.
+Design note: docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
 """
 
 import subprocess

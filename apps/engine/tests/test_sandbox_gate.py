@@ -3,7 +3,7 @@
 The sandbox itself is faked (its own lifecycle is covered in test_sandbox.py);
 these tests check what the gate does with each outcome — fail the run, record
 the timeline event, or let the run proceed. Design note:
-docs/architecture/SANDBOX_EXECUTION.md.
+docs/architecture/execution-qa/SANDBOX_EXECUTION.md.
 """
 
 import uuid

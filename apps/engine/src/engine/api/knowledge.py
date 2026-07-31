@@ -3,7 +3,7 @@
 Owner-scoped like the work-items API. Lists a repository's memories newest
 first, searches them with the same hybrid recall the agents use, accepts
 hand-written notes and preferences, and deletes memories that turned out to be
-wrong. Design note: docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+wrong. Design note: docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 import uuid

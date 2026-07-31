@@ -4,7 +4,7 @@ Deleting a repository used to erase every run made on it — timelines, task
 boards, audit events, costs. Runs are the platform's audit record; the
 repository FK becomes nullable with ON DELETE SET NULL, so disconnecting a
 repository detaches its runs instead of destroying them.
-Design note: docs/architecture/RUN_HISTORY_RETENTION.md.
+Design note: docs/architecture/runs-ui/RUN_HISTORY_RETENTION.md.
 
 Revision ID: 0020
 Revises: 0019

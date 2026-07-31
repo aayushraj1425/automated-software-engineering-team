@@ -14,9 +14,9 @@ export type SessionForToken = {
 /** Short-lived HS256 JWT asserting the acting user to the engine (ADR-0002).
  * The active organization (the settings-page switcher) rides along as the
  * `org` claim — the engine's Principal already parses it, and org-aware
- * sharing builds on it (docs/architecture/SIGN_IN_AND_ORGANIZATIONS.md).
+ * sharing builds on it (docs/architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md).
  * `orgRole` is signed in only by the destructive routes that gate on it
- * (docs/architecture/ORGANIZATION_ROLES.md). */
+ * (docs/architecture/identity-integrations/ORGANIZATION_ROLES.md). */
 export async function signServiceToken(
   session: SessionForToken,
   options?: { orgRole?: string | null },

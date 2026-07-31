@@ -6,7 +6,7 @@ reference, a changelog, or an architecture overview. Context gathering mirrors
 the Scrum Master's grounding (distinct file paths from `code_chunks`, plus
 hybrid-retrieved chunks for a kind-specific seed query). With LLM_FAKE=1 a
 deterministic document listing the real file paths is returned so the whole
-path runs offline. Design note: docs/architecture/DOCUMENTATION_SUITE.md.
+path runs offline. Design note: docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
 """
 
 import uuid
@@ -140,7 +140,7 @@ async def generate_document(
     map_block = f"\n\nRepository files:\n{file_map}" if file_map else ""
     code_block = f"\n\nRelevant code:\n{code_excerpts}" if code_excerpts else ""
     # Recalled team memory rides along as context, never as command
-    # (docs/architecture/KNOWLEDGE_AND_MEMORY.md).
+    # (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
     memory_block = f"\n\n{memory}" if memory else ""
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},

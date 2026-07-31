@@ -6,7 +6,7 @@ same backlog. An item is blocked while any dependency is not done (a cancelled
 dependency blocks too: the item needs replanning, and flagging it surfaces
 that). The recommendation is the next unblocked, highest-priority item that has
 not been started, ties broken by board position. Design note:
-docs/architecture/PLANNING_SUITE.md.
+docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 from collections.abc import Sequence

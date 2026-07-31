@@ -3,7 +3,7 @@
 The same guards as the other workspace write panels (finished runs only,
 run-page visibility scoping), and ADR-0008's boundary intact — commands
 execute in the sandbox container, never on the host.
-Design note: docs/architecture/IN_BROWSER_TERMINAL.md.
+Design note: docs/architecture/runs-ui/IN_BROWSER_TERMINAL.md.
 """
 
 import uuid

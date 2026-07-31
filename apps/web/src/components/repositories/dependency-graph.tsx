@@ -3,7 +3,7 @@
 import type { DependencyGraph } from "./types";
 
 // Deterministic circular layout — no graph library, no physics, same picture
-// every time. Design note: docs/architecture/DEPENDENCY_GRAPH.md.
+// every time. Design note: docs/architecture/repository-intelligence/DEPENDENCY_GRAPH.md.
 const WIDTH = 620;
 const HEIGHT = 480;
 const CENTER_X = WIDTH / 2;

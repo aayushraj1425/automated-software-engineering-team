@@ -9,7 +9,7 @@ RATE_LIMIT_PER_MINUTE=0 (the default) disables everything.
 
 The bucket lives in-process per replica by default; RATE_LIMIT_SHARED=1 moves
 it into Redis so every replica draws from one window, degrading back to the
-in-process bucket if Redis is unreachable — see docs/architecture/RATE_LIMITING.md.
+in-process bucket if Redis is unreachable — see docs/architecture/operations/RATE_LIMITING.md.
 """
 
 import json

@@ -8,7 +8,7 @@ pending while done tasks keep their commits), then start it again.
 
 Two callers share these resets: API startup recovery (inline mode) and the
 arq worker's re-entrant job functions (queue mode). Design notes:
-docs/architecture/RUN_RECOVERY.md, docs/architecture/BACKGROUND_WORKER.md.
+docs/architecture/agents/RUN_RECOVERY.md, docs/architecture/agents/BACKGROUND_WORKER.md.
 """
 
 import asyncio

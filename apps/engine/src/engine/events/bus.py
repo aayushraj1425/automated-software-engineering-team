@@ -4,7 +4,7 @@ Redis carries no payloads — a ping on the run's channel just means "new rows
 in agent_events, go read them". So a lost ping (or Redis being down entirely)
 costs at most one heartbeat of latency, never an event, and there is nothing
 to replay when Redis restarts. Design note:
-docs/architecture/RUN_EVENT_STREAMING.md (ADR-0004 chose Redis for this).
+docs/architecture/agents/RUN_EVENT_STREAMING.md (ADR-0004 chose Redis for this).
 """
 
 import asyncio

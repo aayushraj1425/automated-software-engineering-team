@@ -4,7 +4,7 @@
 tracker returns the same thing. One dispatch entry per tracker kind, so the push
 endpoint never names a specific tracker and a new tracker (Jira) slots in as one
 more branch. Adapter-specific errors are translated into a common IssueError.
-Design note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+Design note: docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 from dataclasses import dataclass

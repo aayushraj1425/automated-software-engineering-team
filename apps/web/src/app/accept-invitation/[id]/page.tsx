@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 /** The landing page for a copied invitation link: accept joins the
  * organization and switches into it; decline just declines. Signed-out
  * visitors are sent to sign in first — better-auth matches the invitation
- * to the signed-in email (docs/architecture/ORGANIZATION_ROLES.md). */
+ * to the signed-in email (docs/architecture/identity-integrations/ORGANIZATION_ROLES.md). */
 export default function AcceptInvitationPage({
   params,
 }: {

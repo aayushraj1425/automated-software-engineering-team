@@ -1,7 +1,7 @@
 """The run report: a shareable markdown summary built from the run record.
 
 Pure function, no DB — the objects are constructed in memory. Design note:
-docs/architecture/RUN_REPORT.md.
+docs/architecture/runs-ui/RUN_REPORT.md.
 """
 
 import uuid

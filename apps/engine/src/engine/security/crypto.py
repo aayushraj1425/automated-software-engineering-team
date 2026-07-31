@@ -4,7 +4,7 @@ The database only ever holds ciphertext. The encryption key comes from
 ENGINE_ENCRYPTION_KEY (base64, 32 bytes); when unset — development — it is
 derived from ENGINE_SERVICE_SECRET so the dev loop needs no extra setup, and
 production must set a dedicated value. Design note:
-docs/architecture/PROVIDER_KEYS.md.
+docs/architecture/identity-integrations/PROVIDER_KEYS.md.
 """
 
 import base64

@@ -1,5 +1,5 @@
 """The pull request body: the plan summary plus the full Definition-of-Done
-checklist. Pure builder, no DB. Design note: docs/architecture/PULL_REQUEST_BODY.md.
+checklist. Pure builder, no DB. Design note: docs/architecture/agents/PULL_REQUEST_BODY.md.
 """
 
 import re

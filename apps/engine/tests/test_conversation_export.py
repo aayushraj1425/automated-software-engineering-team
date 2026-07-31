@@ -1,7 +1,7 @@
 """The conversation transcript: a shareable markdown export built from the rows.
 
 Pure function, no DB — the objects are constructed in memory. Design note:
-docs/architecture/CONVERSATION_EXPORT.md.
+docs/architecture/chat/CONVERSATION_EXPORT.md.
 """
 
 import uuid

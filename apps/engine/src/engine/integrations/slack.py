@@ -3,7 +3,7 @@
 A pure "send this there" function — it never touches the database or a run. In
 dry-run mode (INTEGRATIONS_DRY_RUN=1: tests, offline dev) it skips the network
 and reports success, so the whole notify path runs without a real workspace.
-Design note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+Design note: docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import httpx

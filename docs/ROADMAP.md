@@ -38,19 +38,19 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   agent generates a milestone roadmap of estimated, dependency-linked work items saved to
   the backlog and shown on the task board; blocker detection flags an item waiting on an
   unfinished dependency and recommends the next unblocked, highest-value item to start.
-  ✅ *Both met 2026-07-10.* Design note: [PLANNING_SUITE.md](architecture/PLANNING_SUITE.md).
+  ✅ *Both met 2026-07-10.* Design note: [PLANNING_SUITE.md](architecture/planning-knowledge/PLANNING_SUITE.md).
 - **Phase 5 — Knowledge & Memory:** a finished run leaves durable memory behind (the
   approved plan as a `decision`, the result as an `outcome`), searchable on the knowledge
   page after the run is gone; planning a new run recalls the most relevant memories into
   the planner's context — a stored preference demonstrably reaches the next run's
   planning prompt (the `memory.recalled` timeline event proves it). ✅ *Both met
-  2026-07-11.* Design note: [KNOWLEDGE_AND_MEMORY.md](architecture/KNOWLEDGE_AND_MEMORY.md).
+  2026-07-11.* Design note: [KNOWLEDGE_AND_MEMORY.md](architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
 - **Phase 6 — Workspace & Integrations** *(in progress)*: the documentation
   generation suite is the first slice — from a connected, indexed repository the
   Technical Writer agent produces a README, API reference, changelog, or
   architecture overview grounded in the repository's real files, saved per
   repository and readable on the docs page. ✅ *Documentation slice met
-  2026-07-12.* Design note: [DOCUMENTATION_SUITE.md](architecture/DOCUMENTATION_SUITE.md).
+  2026-07-12.* Design note: [DOCUMENTATION_SUITE.md](architecture/planning-knowledge/DOCUMENTATION_SUITE.md).
   The external-integrations foundation opened with outbound Slack notifications:
   a run reaching a terminal state posts its outcome to the owner's Slack webhook
   (encrypted at rest) and records an `integration.notified` timeline event; the
@@ -60,18 +60,18 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   behind a tracker-agnostic dispatch. Jira followed as a differently-shaped
   second tracker (REST + HTTP-Basic auth) behind the same dispatch, proving the
   abstraction holds. ✅ *Linear + Jira slices met 2026-07-13.* Design note:
-  [EXTERNAL_INTEGRATIONS.md](architecture/EXTERNAL_INTEGRATIONS.md).
+  [EXTERNAL_INTEGRATIONS.md](architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md).
   The source-host slice made the publish step host-aware: a run on a `gitlab.com`
   repository pushes its branch and opens a **merge request** with the owner's
   encrypted GitLab token, while the GitHub path is unchanged. ✅ *GitLab slice
-  met 2026-07-13.* Design note: [SOURCE_HOSTS.md](architecture/SOURCE_HOSTS.md).
+  met 2026-07-13.* Design note: [SOURCE_HOSTS.md](architecture/agents/SOURCE_HOSTS.md).
   The Workspace Panels workstream opened with a read-only file browser on the run
   page: a run's persisted workspace is listed and any file opened read-only,
   jailed by the same path guard the agents use, then became a light editor: on a
   *finished* run a file can be edited and the change committed from a git panel
   (editing an in-flight run is refused, so a human write never races the agent
   loop). ✅ *File-browser + editor/commit slices met 2026-07-13.* Design note:
-  [WORKSPACE_PANELS.md](architecture/WORKSPACE_PANELS.md). The remaining slices
+  [WORKSPACE_PANELS.md](architecture/runs-ui/WORKSPACE_PANELS.md). The remaining slices
   then landed: a manual branch push from the workspace panel, Bitbucket as a
   second non-GitHub host behind the same dispatch, and the sandboxed in-browser
   terminal (a lazy `--network none` container, workspace copied not mounted,
@@ -84,33 +84,33 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   ✅ *Observability slice met 2026-07-13.* Rate limiting followed — a
   per-caller token bucket in front of the API (429 + `Retry-After`, off by
   default), retiring the oldest debt-register entry. ✅ *Rate-limiting slice met
-  2026-07-13* ([RATE_LIMITING.md](architecture/RATE_LIMITING.md)). Backups &
+  2026-07-13* ([RATE_LIMITING.md](architecture/operations/RATE_LIMITING.md)). Backups &
   disaster recovery followed: verified nightly `pg_dump`s (arq cron, retention
   pruning), a restore CLI whose target is always explicit, and a recovery
   runbook — with the restore path proven in the test suite, which reads a row
   back out of a database restored from a real dump on every push. ✅
   *Backups/DR slice met 2026-07-14*
-  ([BACKUPS_AND_RECOVERY.md](architecture/BACKUPS_AND_RECOVERY.md), runbook:
+  ([BACKUPS_AND_RECOVERY.md](architecture/operations/BACKUPS_AND_RECOVERY.md), runbook:
   [DISASTER_RECOVERY.md](runbooks/DISASTER_RECOVERY.md)). Row-level security
   followed: Postgres itself now refuses a pinned API session another user's
   rows — policies on the five ownership-carrying tables, sessions pinned
   automatically to the verified JWT subject, the whole test suite running
   under FORCE RLS, and the engine demoted to a non-superuser role (superusers
   bypass RLS — the slice's hard-won lesson). ✅ *Row-level-security slice met
-  2026-07-14* ([ROW_LEVEL_SECURITY.md](architecture/ROW_LEVEL_SECURITY.md)).
+  2026-07-14* ([ROW_LEVEL_SECURITY.md](architecture/security/ROW_LEVEL_SECURITY.md)).
   The Kubernetes deploy followed: production images for the engine (one image —
   API, worker, and migration Job by command) and the web app (Next.js
   standalone), and a Helm chart with `/healthz` probes, a pre-upgrade
   migration Job, one Secret mirroring `.env`, and the engine kept
   ClusterIP-only behind the BFF — images build and answer locally, and CI
   lints and renders the chart on every push. ✅ *Kubernetes-deploy slice met
-  2026-07-15* ([KUBERNETES_DEPLOY.md](architecture/KUBERNETES_DEPLOY.md)).
+  2026-07-15* ([KUBERNETES_DEPLOY.md](architecture/operations/KUBERNETES_DEPLOY.md)).
   Benchmarks followed: `python -m engine.benchmark` measures the three hot
   paths offline (indexing throughput, hybrid-retrieval p50/p95, one golden
   task through the whole run pipeline with the fake model), and the first
   baseline table is recorded in the design note — future regressions are a
   number moving, not a feeling. ✅ *Benchmarks slice met 2026-07-15*
-  ([BENCHMARKS.md](architecture/BENCHMARKS.md)). The security-boundary audit
+  ([BENCHMARKS.md](architecture/operations/BENCHMARKS.md)). The security-boundary audit
   closed the planned workstreams: every claimed boundary (service JWT,
   webhook HMAC, path jail, clone-URL hygiene, sandbox isolation, secrets at
   rest, RLS, rate limiting, PR gates, CORS) verified against the code with a
@@ -124,7 +124,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   once for the route filters and once inside Postgres (`app.org_id`
   alongside `app.user_id`), with conversations and provider keys staying
   personal. ✅ *Organization-sharing slice met 2026-07-16*
-  ([ORGANIZATION_SHARING.md](architecture/ORGANIZATION_SHARING.md)). The
+  ([ORGANIZATION_SHARING.md](architecture/identity-integrations/ORGANIZATION_SHARING.md)). The
   remaining hardening then shipped in a run of focused slices: organization
   members/invitations/roles with a destructive-action admin gate; the CI
   end-to-end smoke (which caught a latent alembic-commit bug); the Redis-shared
@@ -144,7 +144,7 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
   could break) before touching the workspace. Prompt-level by design: no extra
   LLM calls, no pipeline change; the reasoning rides in the model's own first
   turn and is captured by the prompt-snapshot contract. ✅ *Met 2026-07-22.*
-  Design note: [DELIBERATE_REASONING.md](architecture/DELIBERATE_REASONING.md).
+  Design note: [DELIBERATE_REASONING.md](architecture/agents/DELIBERATE_REASONING.md).
 
 ## Standing tracks (every phase)
 

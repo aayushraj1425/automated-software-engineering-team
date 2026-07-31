@@ -4,7 +4,7 @@ Exercises the WorkItem ORM model against a real database: a freshly created
 item gets sensible defaults, its depends_on list round-trips through JSONB, and
 deleting the run that implemented it nulls the link (SET NULL) rather than
 cascading the item away — a planned item outlives the run that built it. Design
-note: docs/architecture/PLANNING_SUITE.md.
+note: docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 import uuid

@@ -1,7 +1,7 @@
 /** A coarse, human "… ago" phrasing of an ISO timestamp — `just now`,
  * `5 minutes ago`, `3 hours ago`, `2 days ago`, and so on. Pure: pass `now`
  * to make it testable without mocking the clock. Returns "" for a null or
- * unparseable timestamp. Design note: docs/architecture/REPOSITORY_INDEX_FRESHNESS.md. */
+ * unparseable timestamp. Design note: docs/architecture/repository-intelligence/REPOSITORY_INDEX_FRESHNESS.md. */
 export function relativeTime(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();

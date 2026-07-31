@@ -3,7 +3,7 @@
 Exercises _dependency_gate against a real per-run workspace: committing a
 vulnerable pin must fail the run and record a dependency.scan event; a clean
 manifest must let the run proceed. Design note:
-docs/architecture/DEPENDENCY_SCANNING.md.
+docs/architecture/execution-qa/DEPENDENCY_SCANNING.md.
 """
 
 import uuid

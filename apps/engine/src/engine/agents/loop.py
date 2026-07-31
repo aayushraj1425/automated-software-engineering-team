@@ -25,7 +25,7 @@ MAX_TURNS = 24
 # Audit callback: (tool name, arguments, result) after every tool call.
 ToolObserver = Callable[[str, dict[str, Any], str], Awaitable[None]]
 # Reasoning callback: the text a model turn wrote alongside its tool calls —
-# the agent's "why" before it acts (docs/architecture/AGENT_REASONING_TIMELINE.md).
+# the agent's "why" before it acts (docs/architecture/agents/AGENT_REASONING_TIMELINE.md).
 ReasoningObserver = Callable[[str], Awaitable[None]]
 
 

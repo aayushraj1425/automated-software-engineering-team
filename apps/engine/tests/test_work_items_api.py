@@ -2,7 +2,7 @@
 
 Each work item hangs off a repository the caller owns. Dependencies must point
 at items in the same repository (no dangling edges for blocker detection).
-Design note: docs/architecture/PLANNING_SUITE.md.
+Design note: docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 import uuid

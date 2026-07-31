@@ -9,7 +9,7 @@ the complete policy set.
 
 This is a frozen copy of the statements in ``engine/db/rls.py`` (the living
 source of truth, which the test suite applies).
-Design note: docs/architecture/ORGANIZATION_SHARING.md.
+Design note: docs/architecture/identity-integrations/ORGANIZATION_SHARING.md.
 
 Revision ID: 0017
 Revises: 0016

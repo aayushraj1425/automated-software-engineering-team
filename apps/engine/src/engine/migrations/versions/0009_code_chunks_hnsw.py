@@ -7,7 +7,7 @@ Create Date: 2026-07-08
 An HNSW index over the embedding column keeps cosine-distance vector search fast
 as repositories outgrow an exact scan. Retrieval already orders by `<=>`, so it
 uses this index automatically. Design note:
-docs/architecture/INCREMENTAL_INDEXING.md.
+docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md.
 """
 
 from collections.abc import Sequence

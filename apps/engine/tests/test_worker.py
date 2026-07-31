@@ -4,7 +4,7 @@ The headline test cancels a run mid-execution — exactly what stopping the
 worker does — and proves the Postgres checkpoint holds: the run is left
 resumable and the worker's re-entrant job function finishes it. The arq
 round trip runs against the real dev Redis and is skipped when it is down.
-Design note: docs/architecture/BACKGROUND_WORKER.md.
+Design note: docs/architecture/agents/BACKGROUND_WORKER.md.
 """
 
 import asyncio

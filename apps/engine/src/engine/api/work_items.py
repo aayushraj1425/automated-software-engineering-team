@@ -4,7 +4,7 @@ Owner-scoped like the repositories and runs APIs. A work item is planned once
 and lives on — created, listed, updated, and reordered on the task board — until
 a coding run implements it. Dependencies must reference items in the same
 repository so blocker detection has no dangling edges. Design note:
-docs/architecture/PLANNING_SUITE.md.
+docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 import uuid

@@ -2,7 +2,7 @@
 
 This is the one /v1/* route that does not carry the BFF service JWT — GitHub
 calls it directly, so it is authenticated by the webhook signature instead
-(see docs/architecture/WEBHOOK_REVIEWER.md). It stays thin: verify, parse,
+(see docs/architecture/execution-qa/WEBHOOK_REVIEWER.md). It stays thin: verify, parse,
 queue a background review, and return 202 well inside GitHub's delivery timeout.
 """
 

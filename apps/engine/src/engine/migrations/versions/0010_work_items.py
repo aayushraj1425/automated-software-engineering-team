@@ -7,7 +7,7 @@ Create Date: 2026-07-10
 One row per planned unit of work. Unlike agent_tasks (which live inside a single
 run), a work item is planned once and persists — estimated, reordered, blocked,
 and eventually linked to the run that implements it. Design note:
-docs/architecture/PLANNING_SUITE.md.
+docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 from collections.abc import Sequence

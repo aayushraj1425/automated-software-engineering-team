@@ -1,7 +1,7 @@
 """The benchmark harness stays runnable — tiny sizes, shape checks only.
 
 Numbers are NOT asserted (timing assertions flake on slow runners); the real
-baselines live in docs/architecture/BENCHMARKS.md. The run-pipeline path is
+baselines live in docs/architecture/operations/BENCHMARKS.md. The run-pipeline path is
 run_golden_task, which the evaluation tests already exercise end to end.
 """
 

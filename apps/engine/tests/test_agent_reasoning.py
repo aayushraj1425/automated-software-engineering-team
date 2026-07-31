@@ -2,7 +2,7 @@
 
 The offline pipeline never triggers this (the fake model returns no tool calls),
 so the loop's emission is proven directly with a stubbed model that returns a
-reasoning-plus-tool turn. Design note: docs/architecture/AGENT_REASONING_TIMELINE.md.
+reasoning-plus-tool turn. Design note: docs/architecture/agents/AGENT_REASONING_TIMELINE.md.
 """
 
 import uuid

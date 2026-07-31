@@ -5,7 +5,7 @@ mode (the default) the work runs in the calling process, exactly as before.
 In `arq` mode the run id — never a payload; the Postgres row is the job's
 state — is enqueued on Redis for the worker process (`engine/worker.py`).
 A broken queue degrades to inline with a warning; it never strands a run.
-Design note: docs/architecture/BACKGROUND_WORKER.md.
+Design note: docs/architecture/agents/BACKGROUND_WORKER.md.
 """
 
 import uuid

@@ -6,7 +6,7 @@ Create Date: 2026-07-12
 
 One row per (user, provider). Only AES-GCM ciphertext and the last four
 characters are stored — never the plaintext key. Design note:
-docs/architecture/PROVIDER_KEYS.md.
+docs/architecture/identity-integrations/PROVIDER_KEYS.md.
 """
 
 from collections.abc import Sequence

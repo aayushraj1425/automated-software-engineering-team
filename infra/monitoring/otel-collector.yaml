@@ -10,7 +10,7 @@
 # and point Prometheus at <collector-host>:9464/metrics.
 #
 # Validate: otelcol validate --config=otel-collector.yaml
-# (docs/architecture/ALERTING.md).
+# (docs/architecture/operations/ALERTING.md).
 
 receivers:
   otlp:

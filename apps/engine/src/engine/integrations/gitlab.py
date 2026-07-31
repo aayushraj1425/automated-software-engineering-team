@@ -3,7 +3,7 @@
 A pure "open this there" function — it never touches the database or a run. In
 dry-run mode (INTEGRATIONS_DRY_RUN=1: tests, offline dev) it skips the network
 and returns a deterministic placeholder, so the publish path runs offline.
-Design note: docs/architecture/SOURCE_HOSTS.md.
+Design note: docs/architecture/agents/SOURCE_HOSTS.md.
 """
 
 import re

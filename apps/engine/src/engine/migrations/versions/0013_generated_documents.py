@@ -7,7 +7,7 @@ Create Date: 2026-07-12
 One row per generated document — a README, API reference, changelog, or
 architecture overview written by the Technical Writer from the repository
 index. Repository-scoped and durable; a snapshot kept until deleted. Design
-note: docs/architecture/DOCUMENTATION_SUITE.md.
+note: docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
 """
 
 from collections.abc import Sequence

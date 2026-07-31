@@ -9,7 +9,8 @@ exception; owner-only (audit is personal, never org-shared).
 
 Frozen copy of the statements in ``engine/db/rls.py`` (the living source of
 truth, which the test suite applies).
-Design note: docs/architecture/ROW_LEVEL_SECURITY.md, docs/architecture/AUDIT_LOG.md.
+Design note: docs/architecture/security/ROW_LEVEL_SECURITY.md,
+docs/architecture/security/AUDIT_LOG.md.
 
 Revision ID: 0024
 Revises: 0023

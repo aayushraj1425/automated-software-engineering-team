@@ -6,7 +6,7 @@ network, so it works offline and is trivially testable. The report is assembled
 from the run record the pipeline already writes, so it is always available, even
 for a run whose workspace is long gone.
 
-Design note: docs/architecture/RUN_REPORT.md.
+Design note: docs/architecture/runs-ui/RUN_REPORT.md.
 """
 
 from collections.abc import Sequence

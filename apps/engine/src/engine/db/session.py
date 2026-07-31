@@ -62,7 +62,7 @@ def bind_session_to_user(session: AsyncSession, user_id: str, org_id: str | None
     policies (db/rls.py) restrict it to that user's rows — even when a query
     forgets its WHERE clause. ``org_id`` (the JWT's membership-checked active
     organization) additionally opens that organization's shared rows on the
-    org-shared tables (docs/architecture/ORGANIZATION_SHARING.md). Unpinned
+    org-shared tables (docs/architecture/identity-integrations/ORGANIZATION_SHARING.md). Unpinned
     sessions are the trusted internal context (runner, webhooks, migrations)
     and behave as before RLS."""
     session.info[_RLS_USER_KEY] = user_id

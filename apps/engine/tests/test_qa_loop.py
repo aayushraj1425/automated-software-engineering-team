@@ -1,7 +1,7 @@
 """The QA self-correction loop: failing sandbox tests route back to the QA
 agent, which fixes and retries, bounded by QA_MAX_ATTEMPTS. The sandbox is faked
 (a scripted sequence of results); the QA fix runs its offline path (LLM_FAKE=1),
-committing into the scratch workspace. Design note: docs/architecture/QA_AGENT.md.
+committing into the scratch workspace. Design note: docs/architecture/execution-qa/QA_AGENT.md.
 """
 
 import uuid

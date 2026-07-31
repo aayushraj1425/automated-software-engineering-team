@@ -5,7 +5,7 @@ A sibling of secrets_scanner: it reads only the *added* lines of a unified diff
 extracts (package, version) pairs from recognized manifests, and matches them
 against a curated, offline advisory list. Deterministic and network-free, so it
 runs in tests like the secrets gate. Design note:
-docs/architecture/DEPENDENCY_SCANNING.md.
+docs/architecture/execution-qa/DEPENDENCY_SCANNING.md.
 """
 
 import re

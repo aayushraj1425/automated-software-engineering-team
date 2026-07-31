@@ -4,7 +4,7 @@ The round-trip test drives the real pg_dump/pg_restore against a scratch
 database it creates itself (never asep_test — other tests are using it),
 restores the dump into a *second* scratch database, and reads the data back
 from the copy. Machines without the PostgreSQL client tools skip cleanly.
-Design note: docs/architecture/BACKUPS_AND_RECOVERY.md.
+Design note: docs/architecture/operations/BACKUPS_AND_RECOVERY.md.
 """
 
 import uuid

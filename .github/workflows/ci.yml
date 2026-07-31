@@ -44,7 +44,7 @@ jobs:
         env:
           # Bootstrap superuser only; the engine connects as the plain asep
           # role created below — superusers bypass row-level security
-          # (docs/architecture/ROW_LEVEL_SECURITY.md)
+          # (docs/architecture/security/ROW_LEVEL_SECURITY.md)
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:

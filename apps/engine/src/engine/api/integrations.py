@@ -4,7 +4,7 @@ Mirrors the provider-keys API. The list never returns a secret config — only
 which services are connected, their non-secret label, and whether they are
 enabled. Setting a connection replaces any previous one for that kind; the test
 endpoint sends a message now so the settings page can prove a webhook works.
-Design note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+Design note: docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 from datetime import datetime

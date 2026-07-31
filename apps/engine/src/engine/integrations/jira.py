@@ -5,7 +5,7 @@ item. Auth is HTTP Basic with an email + API token; the v3 API wants the
 description as an Atlassian Document Format node. In dry-run mode
 (INTEGRATIONS_DRY_RUN=1: tests, offline dev) it skips the network and returns a
 deterministic placeholder, so the whole push path runs without a real Jira site.
-Design note: docs/architecture/EXTERNAL_INTEGRATIONS.md.
+Design note: docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import base64

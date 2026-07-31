@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 /** Organizations: list them, create one, and pick the active one. The active
  * organization becomes session state, and every BFF-signed service JWT
  * carries it in its `org` claim from then on — the seam org-aware sharing
- * builds on (docs/architecture/SIGN_IN_AND_ORGANIZATIONS.md). */
+ * builds on (docs/architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md). */
 export function OrganizationsPanel() {
   const { data: organizations, refetch } = authClient.useListOrganizations();
   const { data: activeOrganization, refetch: refetchActive } = authClient.useActiveOrganization();

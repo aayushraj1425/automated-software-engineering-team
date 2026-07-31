@@ -8,7 +8,7 @@ well as grep on recall and mean reciprocal rank.
 
 Offline (LLM_FAKE=1) the vector arm is noise, so the numbers really measure the
 full-text arm plus the fusion mechanics; a real embedding model shows the
-semantic lift over grep. Design note: docs/architecture/HYBRID_RETRIEVAL.md.
+semantic lift over grep. Design note: docs/architecture/repository-intelligence/HYBRID_RETRIEVAL.md.
 """
 
 import re

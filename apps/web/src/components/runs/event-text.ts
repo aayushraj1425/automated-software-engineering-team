@@ -17,7 +17,7 @@ export function agentName(role: string | null): string {
 /** The distinct agents that appear in a run's events, in first-appearance
  * order, each with how many lines it produced. Run-level and human actions
  * (no agent) collapse into one `null` entry — the "System" chip. Powers the
- * timeline filter. Design note: docs/architecture/TIMELINE_AGENT_FILTER.md. */
+ * timeline filter. Design note: docs/architecture/runs-ui/TIMELINE_AGENT_FILTER.md. */
 export function timelineAgents(
   events: RunEvent[],
 ): { agent: string | null; count: number }[] {
@@ -33,7 +33,7 @@ export function timelineAgents(
 /** The full reasoning text an agent volunteered, for an `agent.reasoning`
  * event; `null` for any other event. The timeline shows a preview and expands
  * to this on demand, so following an agent's thinking isn't cut off at 140
- * characters. Design note: docs/architecture/AGENT_REASONING_TIMELINE.md. */
+ * characters. Design note: docs/architecture/agents/AGENT_REASONING_TIMELINE.md. */
 export function reasoningOf(event: RunEvent): string | null {
   if (event.type !== "agent.reasoning") return null;
   const text = String(event.payload.text ?? "").trim();

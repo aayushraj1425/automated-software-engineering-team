@@ -6,7 +6,7 @@ most recent nightly backup. Expect to lose whatever happened after that
 backup was taken (nightly dumps = up to a day).
 
 **Time needed:** about 10 minutes.
-Design background: [BACKUPS_AND_RECOVERY.md](../architecture/BACKUPS_AND_RECOVERY.md).
+Design background: [BACKUPS_AND_RECOVERY.md](../architecture/operations/BACKUPS_AND_RECOVERY.md).
 
 ```mermaid
 flowchart LR

@@ -4,7 +4,7 @@ Deterministic routing over the task board — no LLM calls live here. The graph
 is compiled around an injected task executor, so routing is testable without
 agents and the Specialist Agents workstream plugs real executors in later.
 
-Semantics (docs/architecture/AGENT_RUNTIME.md):
+Semantics (docs/architecture/agents/AGENT_RUNTIME.md):
 - a task is eligible when it is pending and every dependency is done;
   among eligible tasks the lowest sequence runs first
 - a failed attempt returns the task to pending; after MAX_RETRIES retries

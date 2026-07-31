@@ -2,7 +2,7 @@
 
 Exercises _security_gate against a real per-run workspace: a committed secret
 must fail the run and record a security.scan event; a clean workspace must let
-the run proceed. Design note: docs/architecture/SECRETS_SCANNING.md.
+the run proceed. Design note: docs/architecture/execution-qa/SECRETS_SCANNING.md.
 """
 
 import uuid

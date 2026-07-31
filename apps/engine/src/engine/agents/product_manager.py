@@ -82,7 +82,7 @@ async def create_plan(
 
     spec = get_agent_spec(AgentRole.PRODUCT_MANAGER)
     # Recalled team memory rides along as context, never as command
-    # (docs/architecture/KNOWLEDGE_AND_MEMORY.md).
+    # (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
     memory_block = f"{memory}\n\n" if memory else ""
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},

@@ -5,7 +5,7 @@ the approved plan as a `decision`, the result (pull request or failure
 reason) as an `outcome`. Rejecting a plan at the approval gate records a
 `preference`. Capture must never break a run or a request: a memory write
 failure is logged and swallowed. Design note:
-docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 import uuid

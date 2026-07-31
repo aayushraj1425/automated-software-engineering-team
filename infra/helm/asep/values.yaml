@@ -2,7 +2,7 @@
 # Postgres (+pgvector), Redis, and S3/MinIO are operator-provided — point the
 # env values at them. Two Postgres requirements carry over from dev:
 #   1. The engine's role must be NOSUPERUSER — superusers bypass row-level
-#      security (docs/architecture/ROW_LEVEL_SECURITY.md).
+#      security (docs/architecture/security/ROW_LEVEL_SECURITY.md).
 #   2. The pgvector extension must be available to that role (dev installs it
 #      into template1 so every database inherits it).
 # better-auth's identity tables are created once by the operator:
@@ -45,7 +45,7 @@ engine:
   # probes must be allowed to the engine pods (most CNIs allow node-sourced
   # probes by default — verify on yours). This is the network-isolation half of
   # the BFF→engine trust story; mutual TLS is the stronger, separate follow-up
-  # (needs cert-manager). Design note: docs/architecture/KUBERNETES_DEPLOY.md.
+  # (needs cert-manager). Design note: docs/architecture/operations/KUBERNETES_DEPLOY.md.
   networkPolicy:
     enabled: false
 
@@ -76,7 +76,7 @@ worker:
   # points the worker's DOCKER_HOST at it (SANDBOX_ENABLED=1). Off by default —
   # the sidecar runs *privileged*, a real security tradeoff (Kata, gVisor, or
   # sysbox are hardening options), so opt in deliberately. Design note:
-  # docs/architecture/SANDBOX_EXECUTION.md.
+  # docs/architecture/execution-qa/SANDBOX_EXECUTION.md.
   sandbox:
     enabled: false
     dindImage: docker:27-dind

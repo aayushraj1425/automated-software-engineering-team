@@ -2,7 +2,7 @@
 
 The resolution test monkeypatches litellm's completion call and proves the
 router hands it the caller's key — and falls back to None (the .env keys)
-when the caller has none. Design note: docs/architecture/PROVIDER_KEYS.md.
+when the caller has none. Design note: docs/architecture/identity-integrations/PROVIDER_KEYS.md.
 """
 
 import uuid

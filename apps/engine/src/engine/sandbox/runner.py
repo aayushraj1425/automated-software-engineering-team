@@ -5,7 +5,7 @@ workspace is *copied* in — never mounted — so tests cannot touch the real
 files; dependencies install with the network on, then the network is
 disconnected before the tests run; the container is removed no matter what.
 
-Design note: docs/architecture/SANDBOX_EXECUTION.md.
+Design note: docs/architecture/execution-qa/SANDBOX_EXECUTION.md.
 """
 
 import asyncio

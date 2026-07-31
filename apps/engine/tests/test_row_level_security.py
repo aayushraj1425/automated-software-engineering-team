@@ -4,7 +4,7 @@ conftest applies the policies right after creating the schema, so the entire
 suite already runs under FORCE ROW LEVEL SECURITY; these tests attack the
 seam directly — raw SQL through pinned sessions, the exact shape a buggy
 route (a forgotten WHERE clause) would take. Design note:
-docs/architecture/ROW_LEVEL_SECURITY.md.
+docs/architecture/security/ROW_LEVEL_SECURITY.md.
 """
 
 import uuid

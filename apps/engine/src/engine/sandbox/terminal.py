@@ -5,7 +5,7 @@ around it. Each run gets a lazy session container with the same hardening as
 the QA sandbox plus one stricter choice: ``--network none`` from birth (no
 install phase, no egress, ever). The workspace is copied in, never mounted —
 the terminal is a scratch copy; edits there do not reach the real files.
-Design note: docs/architecture/IN_BROWSER_TERMINAL.md.
+Design note: docs/architecture/runs-ui/IN_BROWSER_TERMINAL.md.
 """
 
 import os

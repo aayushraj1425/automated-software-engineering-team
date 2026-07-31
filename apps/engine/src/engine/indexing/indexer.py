@@ -9,7 +9,7 @@ file counts as new — a full build. Import edges are cheap to recompute, so the
 dependency graph is rebuilt in full each time. Failure marks the repository
 index_failed instead of crashing the API.
 
-Design note: docs/architecture/INCREMENTAL_INDEXING.md.
+Design note: docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md.
 """
 
 import hashlib

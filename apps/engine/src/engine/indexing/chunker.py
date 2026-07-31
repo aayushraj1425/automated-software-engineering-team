@@ -9,7 +9,7 @@ unknown extension, empty parse, or parser error also falls back to line
 windows, so the chunker never fails a file. A chunk stays
 (path, language, line range, text), so the schema does not change.
 
-Design note: docs/architecture/AST_CHUNKING.md.
+Design note: docs/architecture/repository-intelligence/AST_CHUNKING.md.
 """
 
 from collections.abc import Iterator

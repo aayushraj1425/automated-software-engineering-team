@@ -3,7 +3,7 @@
 One row per (user, kind); the secret config is AES-GCM ciphertext of a small
 JSON blob, decrypted only here. The API activates kinds one adapter at a time,
 so ACTIVE_KINDS is the allow-list a PUT is checked against. Design note:
-docs/architecture/EXTERNAL_INTEGRATIONS.md.
+docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md.
 """
 
 import json

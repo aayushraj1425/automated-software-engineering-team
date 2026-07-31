@@ -4,7 +4,7 @@ Set once at an entry point (a chat request, a run's planning or execution) and
 read inside the router — nothing in between needs new parameters, and the
 router stays the single litellm gateway (ADR-0006). A user with no keys rides
 the empty default and the server's .env keys apply. Design note:
-docs/architecture/PROVIDER_KEYS.md.
+docs/architecture/identity-integrations/PROVIDER_KEYS.md.
 """
 
 from contextvars import ContextVar

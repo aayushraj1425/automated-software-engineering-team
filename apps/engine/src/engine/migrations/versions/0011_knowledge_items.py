@@ -8,7 +8,7 @@ One row per memory â€” a decision, a run outcome, a team preference, or a note â
 with a pgvector embedding and a generated full-text column so recall can use
 the same hybrid retrieval as the code index. The optional source-run link is
 the first edge of the knowledge graph; the memory outlives the run (SET NULL).
-Design note: docs/architecture/KNOWLEDGE_AND_MEMORY.md.
+Design note: docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md.
 """
 
 from collections.abc import Sequence

@@ -2,7 +2,7 @@
 
 Off by default (RATE_LIMIT_PER_MINUTE=0), so every other test runs unlimited;
 these tests opt in by monkeypatching the cached settings object. Design note:
-docs/architecture/RATE_LIMITING.md.
+docs/architecture/operations/RATE_LIMITING.md.
 """
 
 import uuid

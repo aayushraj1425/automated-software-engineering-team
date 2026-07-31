@@ -6,7 +6,7 @@ earlier items it depends on. The roadmap is validated (a malformed one gets a
 single corrective round), then written to the durable `work_items` backlog with
 its intra-roadmap dependencies resolved to real ids. With LLM_FAKE=1 a fixed
 roadmap is returned so the path runs offline. Design note:
-docs/architecture/PLANNING_SUITE.md.
+docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 from typing import Any
@@ -94,7 +94,7 @@ async def generate_roadmap(goal: str, repo_context: str = "", memory: str = "") 
     spec = get_agent_spec(AgentRole.SCRUM_MASTER)
     context = f"\n\nRepository context (existing files):\n{repo_context}" if repo_context else ""
     # Recalled team memory rides along as context, never as command
-    # (docs/architecture/KNOWLEDGE_AND_MEMORY.md).
+    # (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
     memory_block = f"\n\n{memory}" if memory else ""
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},

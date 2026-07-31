@@ -141,7 +141,7 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
                 task_id=task_id,
             )
             # The durable security mirror, written in the same transaction
-            # (docs/architecture/AUDIT_LOG.md).
+            # (docs/architecture/security/AUDIT_LOG.md).
             session.add(build_audit_log(run_id, agent, task_id, name, summary, ok, preview))
             await _commit_and_ping(session, run_id)
 
@@ -149,7 +149,8 @@ def _tool_observer(run_id: uuid.UUID, agent: str | None, task_id: uuid.UUID | No
 
 
 # How much reasoning text to keep on a timeline event — enough to read the
-# rationale, capped like other event payloads (docs/architecture/AGENT_REASONING_TIMELINE.md).
+# rationale, capped like other event payloads
+# (docs/architecture/agents/AGENT_REASONING_TIMELINE.md).
 _REASONING_MAX = 2000
 
 
@@ -470,7 +471,7 @@ async def _publish(
     (env token), a GitLab merge request, or a Bitbucket pull request (the
     owner's encrypted connection either way). A repo on none of the hosts —
     or a scratch workspace — just pushes. Design note:
-    docs/architecture/SOURCE_HOSTS.md."""
+    docs/architecture/agents/SOURCE_HOSTS.md."""
     title = request.strip().splitlines()[0][:72]
     body = build_pull_request_body(plan_summary, run_id)
 

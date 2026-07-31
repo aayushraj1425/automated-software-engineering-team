@@ -5,7 +5,7 @@ output; the QA agent reads that output, edits the workspace to fix the real
 defect, and commits — then the runner re-runs the sandbox. The prompt forbids
 gaming the tests (deleting/skipping/weakening them). With LLM_FAKE=1 the fix is
 a deterministic commit so the loop is testable without a model. Design note:
-docs/architecture/QA_AGENT.md.
+docs/architecture/execution-qa/QA_AGENT.md.
 """
 
 from engine.agents.loop import LlmUsage, ReasoningObserver, ToolObserver, run_tool_loop

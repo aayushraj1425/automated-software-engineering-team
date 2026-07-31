@@ -12,7 +12,7 @@ The mirror row is written in the *same transaction* as the timeline event (no
 extra round trip). The acting user reaches the write through ``audit_user_var``,
 a context variable set at each run entrypoint beside ``provider_keys_var``.
 
-Design note: docs/architecture/AUDIT_LOG.md.
+Design note: docs/architecture/security/AUDIT_LOG.md.
 """
 
 import contextvars

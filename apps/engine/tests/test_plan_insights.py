@@ -3,7 +3,7 @@
 No database — plan_insights reads a list of in-memory work items. An item is
 blocked while any dependency is not done; the recommendation is the unblocked,
 highest-priority item that has not started, ties broken by board order. Design
-note: docs/architecture/PLANNING_SUITE.md.
+note: docs/architecture/planning-knowledge/PLANNING_SUITE.md.
 """
 
 import uuid

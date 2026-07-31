@@ -52,7 +52,7 @@ def require_service_auth(request: Request) -> Principal:
 def peek_principal(request: Request) -> Principal | None:
     """The verified caller, if any — used to pin the request's database
     session to that user's rows plus the active organization's shared rows
-    (db/rls.py, docs/architecture/ORGANIZATION_SHARING.md). Verification is
+    (db/rls.py, docs/architecture/identity-integrations/ORGANIZATION_SHARING.md). Verification is
     the same as require_service_auth; an invalid token pins nothing (and the
     route's auth dependency will 401 before the session is ever used)."""
     payload = _decode_bearer(request)

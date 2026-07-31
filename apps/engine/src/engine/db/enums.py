@@ -2,7 +2,7 @@
 
 Stored as plain strings (not native Postgres enums) so adding a value never
 needs a migration; these StrEnums are the single source of truth in code.
-See docs/architecture/AGENT_RUNTIME.md for the lifecycle diagrams.
+See docs/architecture/agents/AGENT_RUNTIME.md for the lifecycle diagrams.
 """
 
 from enum import StrEnum
@@ -40,7 +40,7 @@ class AgentRole(StrEnum):
     TECHNICAL_WRITER = "technical_writer"
 
 
-# ── Planning Suite (docs/architecture/PLANNING_SUITE.md) ────────────────────
+# ── Planning Suite (docs/architecture/planning-knowledge/PLANNING_SUITE.md) ────────────────────
 # A work item is durable and repository-scoped, unlike the per-run AgentTask.
 
 
@@ -75,7 +75,7 @@ class Priority(StrEnum):
     CRITICAL = "critical"
 
 
-# ── Knowledge & Memory (docs/architecture/KNOWLEDGE_AND_MEMORY.md) ──────────
+# ── Knowledge & Memory (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md) ──────────
 # A knowledge item is one durable, repository-scoped memory.
 
 
@@ -93,7 +93,7 @@ class ArtifactKind(StrEnum):
     LOG = "log"
 
 
-# ── Documentation Suite (docs/architecture/DOCUMENTATION_SUITE.md) ──────────
+# ── Documentation Suite (docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md) ──────────
 # A generated document is a human-facing Markdown artifact written by the
 # Technical Writer from the repository index — durable and repository-scoped.
 
@@ -105,7 +105,7 @@ class DocumentKind(StrEnum):
     ARCHITECTURE = "architecture"  # how the modules fit together
 
 
-# ── External Integrations (docs/architecture/EXTERNAL_INTEGRATIONS.md) ──────
+# ── External Integrations (docs/architecture/identity-integrations/EXTERNAL_INTEGRATIONS.md) ──────
 # One connection links a user to an external service. The enum names every
 # planned service so the model stays forward-looking; the API activates them
 # one adapter at a time (this slice: slack).

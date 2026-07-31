@@ -1,7 +1,7 @@
 // Server-side only: which OAuth providers have credentials configured.
 // The sign-in/sign-up pages pass this plain list to their client forms, so
 // the client learns provider *names*, never secrets — and an unconfigured
-// provider shows no dead button (docs/architecture/SIGN_IN_AND_ORGANIZATIONS.md).
+// provider shows no dead button (docs/architecture/identity-integrations/SIGN_IN_AND_ORGANIZATIONS.md).
 
 import { env } from "@/lib/env";
 

@@ -6,7 +6,7 @@ Create Date: 2026-07-07
 
 Adds a generated `content_tsv` column (Postgres keeps it in sync with
 `content`) and a GIN index, powering the full-text arm of hybrid retrieval.
-Design note: docs/architecture/HYBRID_RETRIEVAL.md.
+Design note: docs/architecture/repository-intelligence/HYBRID_RETRIEVAL.md.
 """
 
 from collections.abc import Sequence

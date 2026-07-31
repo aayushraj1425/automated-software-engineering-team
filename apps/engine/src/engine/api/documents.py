@@ -3,7 +3,7 @@
 Owner-scoped like the knowledge and work-items APIs. Generating a document runs
 the Technical Writer over the repository index and stores the Markdown; the page
 then lists, reads, and deletes documents. Design note:
-docs/architecture/DOCUMENTATION_SUITE.md.
+docs/architecture/planning-knowledge/DOCUMENTATION_SUITE.md.
 """
 
 import uuid

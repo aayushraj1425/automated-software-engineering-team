@@ -125,7 +125,7 @@ async def push_branch(ws: Workspace, credential: tuple[str, str] | None = None) 
     With no credential (the default) a GitHub https remote authenticates with
     GITHUB_TOKEN, exactly as before. A caller may pass `(userinfo, token)` — e.g.
     ("oauth2", gitlab_token) — to authenticate any other https remote; the token
-    is redacted from any error either way. Design note: docs/architecture/SOURCE_HOSTS.md.
+    is redacted from any error either way. Design note: docs/architecture/agents/SOURCE_HOSTS.md.
     """
     remotes = await run_git(ws.path, "remote")
     if "origin" not in remotes.split():
