@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from engine.agents.engineer import execute_revision, execute_task
 from engine.agents.loop import LlmUsage
 from engine.agents.product_manager import create_plan
+from engine.agents.pull_request import build_pull_request_body
 from engine.agents.qa import fix_failing_tests
 from engine.agents.reviewer import APPROVE, REQUEST_CHANGES, review_run
 from engine.agents.supervisor import ExecutionOutcome, TaskState, build_supervisor_graph
@@ -465,11 +466,7 @@ async def _publish(
     or a scratch workspace — just pushes. Design note:
     docs/architecture/SOURCE_HOSTS.md."""
     title = request.strip().splitlines()[0][:72]
-    body = (
-        f"{plan_summary}\n\n"
-        f"Opened by the ASEP agent team (run {run_id}).\n"
-        "Review checklist: correctness, scope, security, consistency."
-    )
+    body = build_pull_request_body(plan_summary, run_id)
 
     # GitLab/Bitbucket repos publish with the run owner's encrypted connection.
     host: tuple[str, dict] | None = None
