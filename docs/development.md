@@ -57,9 +57,11 @@ reviews short.
 The pull-request template is the Definition of Done, and it mirrors the order the
 work is best done in:
 
-1. **Design note.** Write a short `docs/architecture/YOUR_FEATURE.md` — what it
-   does, why, and what you deliberately left out. This is a real design step, not
-   paperwork; it's where you catch the wrong approach cheaply.
+1. **Design note.** Write a short note under the matching area folder in
+   `docs/architecture/` (for example `docs/architecture/agents/YOUR_FEATURE.md`)
+   — what it does, why, and what you deliberately left out. See the
+   [architecture index](architecture/README.md) for the areas. This is a real
+   design step, not paperwork; it's where you catch the wrong approach cheaply.
 2. **API and schema.** If the engine's surface changes, update the router and run
    `pnpm generate` so `packages/shared` stays in sync. If the database changes,
    add an Alembic migration.
