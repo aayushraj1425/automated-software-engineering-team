@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import { relativeTime } from "@/lib/relative-time";
 
+import { Button } from "../ui/button";
+import { Card, EmptyState, Skeleton, Spinner } from "../ui/feedback";
 import { StatusChip } from "./status-chip";
 import type { RunSummary } from "./types";
 
@@ -20,10 +22,10 @@ type RunStats = {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-zinc-800 px-4 py-3">
+    <Card className="px-4 py-3">
       <p className="text-lg font-semibold text-zinc-100">{value}</p>
       <p className="text-xs text-zinc-500">{label}</p>
-    </div>
+    </Card>
   );
 }
 
@@ -38,6 +40,7 @@ export function RunsPanel() {
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRuns, setLoadingRuns] = useState(true);
 
   // Stats once on mount; the run list re-fetches when the status filter changes.
   useEffect(() => {
@@ -63,8 +66,12 @@ export function RunsPanel() {
       if (filter) params.set("status", filter);
       if (debouncedSearch) params.set("q", debouncedSearch);
       const query = params.toString() ? `?${params}` : "";
-      const res = await fetch(`/api/runs${query}`);
-      if (!ignore && res.ok) setRuns(await res.json());
+      try {
+        const res = await fetch(`/api/runs${query}`);
+        if (!ignore && res.ok) setRuns(await res.json());
+      } finally {
+        if (!ignore) setLoadingRuns(false);
+      }
     })();
     return () => {
       ignore = true;
@@ -110,13 +117,10 @@ export function RunsPanel() {
           className="w-full resize-none rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
         />
         {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={busy}>
+          {busy && <Spinner className="h-3.5 w-3.5" />}
           {busy ? "Starting…" : "Start run"}
-        </button>
+        </Button>
       </form>
 
       {stats && stats.total > 0 && (
@@ -124,9 +128,7 @@ export function RunsPanel() {
           <Stat label="Runs" value={String(stats.total)} />
           <Stat
             label="Success rate"
-            value={
-              stats.success_rate === null ? "—" : `${Math.round(stats.success_rate * 100)}%`
-            }
+            value={stats.success_rate === null ? "—" : `${Math.round(stats.success_rate * 100)}%`}
           />
           <Stat label="Total spend" value={`$${stats.total_cost_usd.toFixed(2)}`} />
         </section>
@@ -165,30 +167,44 @@ export function RunsPanel() {
             ))}
           </div>
         )}
-        {runs.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            {debouncedSearch
-              ? "No runs match your search."
-              : filter
-                ? "No runs with this status."
-                : "No runs yet."}
-          </p>
-        )}
-        {runs.map((run) => (
-          <button
-            key={run.id}
-            onClick={() => router.push(`/runs/${run.id}`)}
-            className="flex w-full items-center justify-between gap-3 rounded-md border border-zinc-800 px-4 py-3 text-left hover:bg-zinc-900"
-          >
-            <span className="truncate text-sm">{run.request}</span>
-            <span className="flex shrink-0 items-center gap-3">
-              <span className="text-xs text-zinc-600">
-                {relativeTime(run.finished_at ?? run.started_at ?? run.created_at)}
+        {loadingRuns && runs.length === 0 ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-[52px] w-full" />
+            ))}
+          </div>
+        ) : runs.length === 0 ? (
+          <EmptyState
+            title={
+              debouncedSearch
+                ? "No runs match your search."
+                : filter
+                  ? "No runs with this status."
+                  : "No runs yet."
+            }
+            hint={
+              !debouncedSearch && !filter
+                ? "Describe a feature above to watch the agent team build it."
+                : undefined
+            }
+          />
+        ) : (
+          runs.map((run) => (
+            <button
+              key={run.id}
+              onClick={() => router.push(`/runs/${run.id}`)}
+              className="flex w-full items-center justify-between gap-3 rounded-md border border-zinc-800 px-4 py-3 text-left hover:bg-zinc-900"
+            >
+              <span className="truncate text-sm">{run.request}</span>
+              <span className="flex shrink-0 items-center gap-3">
+                <span className="text-xs text-zinc-600">
+                  {relativeTime(run.finished_at ?? run.started_at ?? run.created_at)}
+                </span>
+                <StatusChip status={run.status} />
               </span>
-              <StatusChip status={run.status} />
-            </span>
-          </button>
-        ))}
+            </button>
+          ))
+        )}
       </section>
     </div>
   );

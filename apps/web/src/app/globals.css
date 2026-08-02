@@ -7,3 +7,26 @@
 body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
 }
+
+/* New timeline events fade in as they stream in, so a live run reads as motion
+   rather than sudden jumps. Only newly mounted elements animate. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
+}
