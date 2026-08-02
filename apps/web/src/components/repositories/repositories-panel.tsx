@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { StatusChip } from "@/components/runs/status-chip";
 import { relativeTime } from "@/lib/relative-time";
+import { Button } from "../ui/button";
+import { EmptyState, Skeleton, Spinner } from "../ui/feedback";
 import { DependencyGraphView } from "./dependency-graph";
 import type { DependencyGraph, RepositorySummary, SearchHit } from "./types";
 
@@ -21,10 +23,15 @@ export function RepositoriesPanel() {
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [graph, setGraph] = useState<DependencyGraph | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
+  const [loadingRepos, setLoadingRepos] = useState(true);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/repositories");
-    if (res.ok) setRepositories(await res.json());
+    try {
+      const res = await fetch("/api/repositories");
+      if (res.ok) setRepositories(await res.json());
+    } finally {
+      setLoadingRepos(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -133,77 +140,85 @@ export function RepositoriesPanel() {
             required
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />
-          <button
-            type="submit"
-            disabled={busy}
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={busy} className="shrink-0">
+            {busy && <Spinner className="h-3.5 w-3.5" />}
             {busy ? "Connecting…" : "Connect"}
-          </button>
+          </Button>
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </form>
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Your repositories</h2>
-        {repositories.length === 0 && (
-          <p className="text-sm text-zinc-500">Nothing connected yet.</p>
-        )}
-        {repositories.map((repo) => (
-          <div
-            key={repo.id}
-            onClick={() => selectRepository(repo.id)}
-            className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-4 py-3 ${
-              repo.id === selectedId
-                ? "border-zinc-500 bg-zinc-900"
-                : "border-zinc-800 hover:bg-zinc-900"
-            }`}
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm">{repo.url}</p>
-              <p className="text-xs text-zinc-500">
-                {repo.chunks > 0
-                  ? `${repo.chunks.toLocaleString()} indexed pieces`
-                  : "not indexed yet"}
-                {repo.chunks > 0 && repo.last_indexed_at && (
-                  <> · indexed {relativeTime(repo.last_indexed_at)}</>
-                )}
-              </p>
-              {repo.status === "index_failed" && repo.status_detail && (
-                <p className="mt-1 truncate text-xs text-red-400" title={repo.status_detail}>
-                  Indexing failed: {repo.status_detail}
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <StatusChip status={repo.status} />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void startIndexing(repo.id);
-                }}
-                disabled={repo.status === "indexing"}
-                className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {repo.status === "indexing"
-                  ? "Indexing…"
-                  : repo.chunks > 0
-                    ? "Re-index"
-                    : "Index"}
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void disconnect(repo.id);
-                }}
-                title="Disconnect — run history is kept"
-                className="text-xs text-zinc-600 hover:text-red-400"
-              >
-                disconnect
-              </button>
-            </div>
+        {loadingRepos && repositories.length === 0 ? (
+          <div className="space-y-2">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-[68px] w-full" />
+            ))}
           </div>
-        ))}
+        ) : repositories.length === 0 ? (
+          <EmptyState
+            title="Nothing connected yet."
+            hint="Connect a repository above to index and search it."
+          />
+        ) : (
+          repositories.map((repo) => (
+            <div
+              key={repo.id}
+              onClick={() => selectRepository(repo.id)}
+              className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-4 py-3 ${
+                repo.id === selectedId
+                  ? "border-zinc-500 bg-zinc-900"
+                  : "border-zinc-800 hover:bg-zinc-900"
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm">{repo.url}</p>
+                <p className="text-xs text-zinc-500">
+                  {repo.chunks > 0
+                    ? `${repo.chunks.toLocaleString()} indexed pieces`
+                    : "not indexed yet"}
+                  {repo.chunks > 0 && repo.last_indexed_at && (
+                    <> · indexed {relativeTime(repo.last_indexed_at)}</>
+                  )}
+                </p>
+                {repo.status === "index_failed" && repo.status_detail && (
+                  <p className="mt-1 truncate text-xs text-red-400" title={repo.status_detail}>
+                    Indexing failed: {repo.status_detail}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <StatusChip status={repo.status} />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void startIndexing(repo.id);
+                  }}
+                  disabled={repo.status === "indexing"}
+                >
+                  {repo.status === "indexing"
+                    ? "Indexing…"
+                    : repo.chunks > 0
+                      ? "Re-index"
+                      : "Index"}
+                </Button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void disconnect(repo.id);
+                  }}
+                  title="Disconnect — run history is kept"
+                  className="text-xs text-zinc-600 hover:text-red-400"
+                >
+                  disconnect
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </section>
 
       {selected && (
@@ -220,13 +235,13 @@ export function RepositoriesPanel() {
               minLength={2}
               className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
             />
-            <button
+            <Button
               type="submit"
               disabled={searching || selected.chunks === 0}
-              className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+              className="shrink-0"
             >
               {searching ? "Searching…" : "Search"}
-            </button>
+            </Button>
           </form>
           {selected.chunks === 0 && (
             <p className="text-sm text-zinc-500">Index the repository first, then search.</p>
@@ -244,9 +259,7 @@ export function RepositoriesPanel() {
                   {hit.language} · score {hit.score.toFixed(2)}
                 </span>
               </p>
-              <pre className="overflow-x-auto text-xs leading-5 text-zinc-400">
-                {hit.snippet}
-              </pre>
+              <pre className="overflow-x-auto text-xs leading-5 text-zinc-400">{hit.snippet}</pre>
             </div>
           ))}
         </section>
@@ -256,13 +269,14 @@ export function RepositoriesPanel() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-300">Dependencies</h2>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => void toggleGraph()}
               disabled={graphLoading || selected.chunks === 0}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
             >
               {graphLoading ? "Loading…" : graph ? "Hide graph" : "Show graph"}
-            </button>
+            </Button>
           </div>
           {selected.chunks === 0 && (
             <p className="text-sm text-zinc-500">Index the repository first to see its graph.</p>

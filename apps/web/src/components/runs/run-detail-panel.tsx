@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 
+import { EmptyState, Spinner } from "../ui/feedback";
 import { agentStyle } from "./agent-style";
 import { DiffView } from "./diff-view";
 import {
@@ -120,6 +121,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
   const filesRequestedRef = useRef(false);
+  const timelineEndRef = useRef<HTMLDivElement>(null);
 
   async function openFile(path: string) {
     setOpenPath(path);
@@ -403,8 +405,19 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     })();
   }, [run, runId]);
 
+  const isLive = run !== null && !FINISHED_STATUSES.has(run.status);
+  // Follow the newest event while the run is live — block: "nearest" only scrolls
+  // when the sentinel is off-screen, so a user reading earlier events isn't yanked.
+  useEffect(() => {
+    if (isLive) timelineEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [events.length, isLive]);
+
   if (!run) {
-    return <p className="p-6 text-sm text-zinc-500">Loading run…</p>;
+    return (
+      <div className="flex items-center gap-2 p-6 text-sm text-zinc-500">
+        <Spinner /> Loading run…
+      </div>
+    );
   }
 
   // A finished run's workspace is idle — safe for a human to edit and commit.
@@ -797,7 +810,15 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       )}
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-zinc-300">Timeline</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-zinc-300">Timeline</h2>
+          {isLive && (
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden />
+              Live
+            </span>
+          )}
+        </div>
         {events.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {[
@@ -828,6 +849,9 @@ export function RunDetailPanel({ runId }: { runId: string }) {
             ))}
           </div>
         )}
+        {events.length === 0 && (
+          <EmptyState title="No activity yet" hint="Events stream in as the run gets going." />
+        )}
         <ol className="space-y-1">
           {events
             .filter((event) => agentFilter === undefined || event.agent === agentFilter)
@@ -839,7 +863,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               const isTool = event.type === "tool.called";
               const toolOpen = expandedTools.has(event.id);
               return (
-                <li key={event.id} className="flex gap-2 text-sm">
+                <li key={event.id} className="flex animate-fade-in gap-2 text-sm">
                   <span className="shrink-0 tabular-nums text-xs leading-6 text-zinc-600">
                     {new Date(event.created_at).toLocaleTimeString()}
                   </span>
@@ -890,8 +914,11 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               );
             })}
         </ol>
-        {!FINISHED_STATUSES.has(run.status) && (
-          <p className="animate-pulse text-xs text-zinc-500">Watching for updates…</p>
+        <div ref={timelineEndRef} />
+        {isLive && (
+          <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <Spinner className="h-3 w-3" /> Watching for updates…
+          </p>
         )}
       </section>
     </div>

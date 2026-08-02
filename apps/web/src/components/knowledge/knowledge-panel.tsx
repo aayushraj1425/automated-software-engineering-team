@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "../ui/button";
+import { EmptyState } from "../ui/feedback";
 import {
   MANUAL_KINDS,
   type KnowledgeItem,
@@ -116,8 +118,8 @@ export function KnowledgePanel() {
           </select>
         </div>
         <p className="text-xs text-zinc-500">
-          Decisions and outcomes are remembered automatically as runs finish; notes and
-          preferences are written here. Planning recalls the most relevant memories.
+          Decisions and outcomes are remembered automatically as runs finish; notes and preferences
+          are written here. Planning recalls the most relevant memories.
         </p>
       </section>
 
@@ -129,23 +131,21 @@ export function KnowledgePanel() {
             placeholder="Search the memory, e.g. why did we reject the caching plan?"
             className={inputClasses}
           />
-          <button
-            type="submit"
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900"
-          >
+          <Button type="submit" className="shrink-0">
             Search
-          </button>
+          </Button>
           {searched && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              className="shrink-0"
               onClick={() => {
                 setQuery("");
                 void refresh();
               }}
-              className="shrink-0 rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300"
             >
               Clear
-            </button>
+            </Button>
           )}
         </form>
       )}
@@ -183,13 +183,9 @@ export function KnowledgePanel() {
             maxLength={4000}
             className={inputClasses}
           />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={busy}>
             {busy ? "Saving…" : "Save"}
-          </button>
+          </Button>
           {error && <p className="text-sm text-red-400">{error}</p>}
         </form>
       )}
@@ -199,11 +195,10 @@ export function KnowledgePanel() {
           {searched ? "Most relevant memories" : "Memory"}
         </h2>
         {repositoryId && items.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            {searched
-              ? "Nothing in the memory matches that."
-              : "Nothing remembered yet. Finish a run, or save the first note above."}
-          </p>
+          <EmptyState
+            title={searched ? "Nothing in the memory matches that." : "Nothing remembered yet."}
+            hint={searched ? undefined : "Finish a run, or save the first note above."}
+          />
         )}
         {items.map((item) => (
           <div key={item.id} className="space-y-2 rounded-md border border-zinc-800 p-4">
@@ -236,9 +231,7 @@ export function KnowledgePanel() {
               {item.score !== null && (
                 <span className="text-zinc-500">relevance {item.score.toFixed(2)}</span>
               )}
-              <span className="text-zinc-600">
-                {new Date(item.created_at).toLocaleString()}
-              </span>
+              <span className="text-zinc-600">{new Date(item.created_at).toLocaleString()}</span>
             </div>
           </div>
         ))}
