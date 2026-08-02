@@ -6,14 +6,17 @@ import { useEffect, useRef, useState } from "react";
 import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 
-import { agentName, describeEvent, reasoningOf, REASONING_PREVIEW, timelineAgents } from "./event-text";
-import { StatusChip } from "./status-chip";
+import { agentStyle } from "./agent-style";
+import { DiffView } from "./diff-view";
 import {
-  FINISHED_STATUSES,
-  type RunDetail,
-  type RunEvent,
-  type WorkspaceFile,
-} from "./types";
+  agentName,
+  describeEvent,
+  reasoningOf,
+  REASONING_PREVIEW,
+  timelineAgents,
+} from "./event-text";
+import { StatusChip } from "./status-chip";
+import { FINISHED_STATUSES, type RunDetail, type RunEvent, type WorkspaceFile } from "./types";
 
 const POLL_MS = 1500;
 
@@ -28,11 +31,50 @@ const FILE_STATUSES = new Set([
   "failed",
 ]);
 
-function diffLineClass(line: string): string {
-  if (line.startsWith("+")) return "text-emerald-400";
-  if (line.startsWith("-")) return "text-red-400";
-  if (line.startsWith("@@")) return "text-sky-400";
-  return "text-zinc-400";
+/** Flip an id in a Set-of-ids state — used to expand/collapse reasoning traces
+ * and tool-call details. */
+function toggleId(set: (fn: (prev: Set<number>) => Set<number>) => void, id: number): void {
+  set((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+}
+
+/** The expanded detail of a `tool.called` event: the tool, its argument summary,
+ * and the result preview already carried in the payload. */
+function ToolDetail({ event }: { event: RunEvent }) {
+  const p = event.payload as Record<string, unknown>;
+  const args = (p.args ?? {}) as Record<string, unknown>;
+  const result = p.result ? String(p.result) : "";
+  return (
+    <div className="mt-1 space-y-1 rounded border border-zinc-800 bg-zinc-900/40 p-2 text-xs">
+      <div>
+        <span className="text-zinc-500">tool</span>{" "}
+        <span className="font-mono text-zinc-300">{String(p.tool ?? "")}</span>
+        {p.ok === false && <span className="ml-2 text-red-400">failed</span>}
+      </div>
+      {Object.keys(args).length > 0 && (
+        <div>
+          <span className="text-zinc-500">args</span>
+          <ul className="ml-2 font-mono text-zinc-400">
+            {Object.entries(args).map(([k, v]) => (
+              <li key={k} className="truncate">
+                <span className="text-zinc-500">{k}:</span> {String(v)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result && (
+        <div>
+          <span className="text-zinc-500">result</span>
+          <p className="ml-2 whitespace-pre-wrap font-mono text-zinc-400">{result}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Watches one run live: events stream in over SSE (each one nudges a
@@ -46,6 +88,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [agentFilter, setAgentFilter] = useState<string | null | undefined>(undefined);
   // Ids of reasoning events whose full trace the reader has expanded.
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
+  // Ids of tool.called events whose args/result the reader has expanded.
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [deciding, setDeciding] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -402,8 +446,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         {run.total_input_tokens + run.total_output_tokens > 0 && (
           <p className="text-xs text-zinc-500">
             {run.total_input_tokens.toLocaleString()} tokens in ·{" "}
-            {run.total_output_tokens.toLocaleString()} tokens out · $
-            {run.total_cost_usd.toFixed(4)}
+            {run.total_output_tokens.toLocaleString()} tokens out · ${run.total_cost_usd.toFixed(4)}
           </p>
         )}
         {relativeTime(run.started_at ?? run.created_at) && (
@@ -454,8 +497,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
       {run.status === "awaiting_approval" && (
         <section className="space-y-3 rounded-md border border-violet-900 bg-violet-950/30 p-4">
           <p className="text-sm text-zinc-200">
-            The plan is ready. Nothing runs until you decide — a nearly-right plan can be
-            edited below before approving.
+            The plan is ready. Nothing runs until you decide — a nearly-right plan can be edited
+            below before approving.
           </p>
           <div className="flex gap-3">
             <button
@@ -575,24 +618,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         )}
       </section>
 
-      {diff && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-zinc-300">Changes</h2>
-          <pre className="overflow-x-auto rounded-md border border-zinc-800 p-4 text-xs leading-5">
-            {diff.split("\n").map((line, index) => (
-              <div key={index} className={diffLineClass(line)}>
-                {line || " "}
-              </div>
-            ))}
-          </pre>
-        </section>
-      )}
+      {diff && <DiffView diff={diff} />}
 
       {files && files.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-zinc-300">
-            Files{" "}
-            <span className="font-normal text-zinc-500">— the run&apos;s workspace</span>
+            Files <span className="font-normal text-zinc-500">— the run&apos;s workspace</span>
           </h2>
           <div className="grid gap-3 md:grid-cols-3">
             <ul className="max-h-96 space-y-0.5 overflow-auto rounded-md border border-zinc-800 p-2 text-xs md:col-span-1">
@@ -677,8 +708,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                 </button>
               </div>
               <p className="text-xs text-zinc-600">
-                Commands run in a sandboxed scratch copy of the workspace — no network, and
-                changes here never reach the real files.
+                Commands run in a sandboxed scratch copy of the workspace — no network, and changes
+                here never reach the real files.
               </p>
               {terminalHistory.length > 0 && (
                 <div className="max-h-80 space-y-2 overflow-auto rounded-md bg-zinc-950 p-3 font-mono text-xs">
@@ -780,12 +811,18 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                 key={label}
                 type="button"
                 onClick={() => setAgentFilter(agent)}
-                className={`rounded-full border px-3 py-1 text-xs ${
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs ${
                   agentFilter === agent
                     ? "border-zinc-300 bg-zinc-100 text-zinc-900"
                     : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                 }`}
               >
+                {agent !== undefined && (
+                  <span
+                    className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${agentStyle(agent).dot}`}
+                    aria-hidden
+                  />
+                )}
                 {label}
               </button>
             ))}
@@ -795,40 +832,60 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           {events
             .filter((event) => agentFilter === undefined || event.agent === agentFilter)
             .map((event) => {
+              const style = agentStyle(event.agent);
               const reasoning = reasoningOf(event);
               const expanded = expandedReasoning.has(event.id);
               const long = reasoning !== null && reasoning.length > REASONING_PREVIEW;
+              const isTool = event.type === "tool.called";
+              const toolOpen = expandedTools.has(event.id);
               return (
-                <li key={event.id} className="flex gap-3 text-sm">
+                <li key={event.id} className="flex gap-2 text-sm">
                   <span className="shrink-0 tabular-nums text-xs leading-6 text-zinc-600">
                     {new Date(event.created_at).toLocaleTimeString()}
                   </span>
-                  {reasoning !== null ? (
-                    <span className="text-zinc-300">
-                      {agentName(event.agent)} is thinking:{" "}
-                      <span className="text-zinc-400">
-                        {long && !expanded ? `${reasoning.slice(0, REASONING_PREVIEW)}…` : reasoning}
-                      </span>
-                      {long && (
+                  <span
+                    className={`mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
+                    title={style.label}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 leading-6">
+                    {reasoning !== null ? (
+                      <div
+                        className={`rounded border-l-2 ${style.border} bg-zinc-900/40 px-2 py-1`}
+                      >
+                        <span className={style.text}>{style.label}</span>
+                        <span className="text-zinc-500"> is thinking</span>
+                        <div className="mt-0.5 whitespace-pre-wrap text-zinc-300">
+                          {long && !expanded
+                            ? `${reasoning.slice(0, REASONING_PREVIEW)}…`
+                            : reasoning}
+                          {long && (
+                            <button
+                              type="button"
+                              onClick={() => toggleId(setExpandedReasoning, event.id)}
+                              className="ml-1 text-xs text-zinc-500 hover:text-zinc-300"
+                            >
+                              {expanded ? "show less" : "show more"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : isTool ? (
+                      <div>
                         <button
                           type="button"
-                          onClick={() =>
-                            setExpandedReasoning((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(event.id)) next.delete(event.id);
-                              else next.add(event.id);
-                              return next;
-                            })
-                          }
-                          className="ml-1 text-xs text-zinc-500 hover:text-zinc-300"
+                          onClick={() => toggleId(setExpandedTools, event.id)}
+                          className="text-left text-zinc-300 hover:text-zinc-100"
                         >
-                          {expanded ? "show less" : "show more"}
+                          <span className="text-zinc-500">{toolOpen ? "▾ " : "▸ "}</span>
+                          {describeEvent(event)}
                         </button>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-zinc-300">{describeEvent(event)}</span>
-                  )}
+                        {toolOpen && <ToolDetail event={event} />}
+                      </div>
+                    ) : (
+                      <span className="text-zinc-300">{describeEvent(event)}</span>
+                    )}
+                  </div>
                 </li>
               );
             })}

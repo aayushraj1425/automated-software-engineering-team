@@ -59,6 +59,7 @@ by area. The cross-cutting decisions with their rejected alternatives are in
 
 ## Chat and conversations
 
+- [CHAT_MESSAGE_RENDERING.md](chat/CHAT_MESSAGE_RENDERING.md) — Markdown replies with syntax-highlighted, copyable code blocks.
 - [CONVERSATION_MANAGEMENT.md](chat/CONVERSATION_MANAGEMENT.md) — rename and delete conversations.
 - [CONVERSATION_SEARCH.md](chat/CONVERSATION_SEARCH.md) — searching by title or message text.
 - [CONVERSATION_EXPORT.md](chat/CONVERSATION_EXPORT.md) — exporting a conversation as Markdown.
@@ -66,6 +67,7 @@ by area. The cross-cutting decisions with their rejected alternatives are in
 
 ## Runs UI
 
+- [AGENT_TIMELINE_LEGIBILITY.md](runs-ui/AGENT_TIMELINE_LEGIBILITY.md) — per-agent colours, thinking cards, expandable actions, per-file diffs.
 - [RUN_REPORT.md](runs-ui/RUN_REPORT.md) — the shareable run report.
 - [RUN_STATISTICS.md](runs-ui/RUN_STATISTICS.md) — the runs success-rate and spend summary.
 - [RUN_SEARCH.md](runs-ui/RUN_SEARCH.md) — searching runs by request text.
