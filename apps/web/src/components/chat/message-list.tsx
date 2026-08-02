@@ -1,3 +1,4 @@
+import { MarkdownMessage } from "./markdown-message";
 import type { ChatMessage } from "./types";
 
 export function MessageList({ messages }: { messages: ChatMessage[] }) {
@@ -19,10 +20,14 @@ export function MessageList({ messages }: { messages: ChatMessage[] }) {
                 : "mr-auto max-w-[80%] rounded-2xl rounded-bl-sm border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-100"
             }
           >
-            <p className="whitespace-pre-wrap">
-              {m.content}
-              {m.streaming && <span className="animate-pulse">▍</span>}
-            </p>
+            {m.role === "assistant" ? (
+              <div>
+                <MarkdownMessage content={m.content} />
+                {m.streaming && <span className="animate-pulse text-zinc-400">▍</span>}
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap">{m.content}</p>
+            )}
             {m.citations && m.citations.length > 0 && (
               <div className="mt-2 border-t border-zinc-800 pt-2">
                 <p className="mb-1 text-xs font-medium text-zinc-500">Sources</p>

@@ -17,8 +17,11 @@
     "jose": "^5.9.6",
     "next": "^15.1.6",
     "pg": "^8.13.1",
+    "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@better-auth/cli": "1.4.21",
