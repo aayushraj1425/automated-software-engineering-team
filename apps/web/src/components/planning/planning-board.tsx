@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StatusChip } from "@/components/runs/status-chip";
+import { Button } from "../ui/button";
+import { EmptyState } from "../ui/feedback";
 import {
   ESTIMATES,
   KINDS,
@@ -216,13 +218,9 @@ export function PlanningBoard() {
               minLength={3}
               className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
             />
-            <button
-              type="submit"
-              disabled={generating}
-              className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={generating} className="shrink-0">
               {generating ? "Planning…" : "Generate"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -266,13 +264,9 @@ export function PlanningBoard() {
               placeholder="Milestone (optional)"
               className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="shrink-0 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={busy} className="shrink-0">
               {busy ? "Adding…" : "Add"}
-            </button>
+            </Button>
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
         </form>
@@ -308,9 +302,10 @@ export function PlanningBoard() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Backlog</h2>
         {repositoryId && items.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            Nothing planned yet. Add the first work item above.
-          </p>
+          <EmptyState
+            title="Nothing planned yet."
+            hint="Add the first work item above, or generate a roadmap from a goal."
+          />
         )}
         {items.map((item) => (
           <div

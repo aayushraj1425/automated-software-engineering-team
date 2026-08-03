@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+
 type Connection = {
   kind: string;
   label: string;
@@ -159,18 +161,22 @@ export function IntegrationsPanel() {
             type="password"
             value={webhook}
             onChange={(e) => setWebhook(e.target.value)}
-            placeholder={slack ? "Replace the webhook (https://hooks.slack.com/…)" : "https://hooks.slack.com/…"}
+            placeholder={
+              slack
+                ? "Replace the webhook (https://hooks.slack.com/…)"
+                : "https://hooks.slack.com/…"
+            }
             autoComplete="off"
             className={inputClasses}
           />
-          <button
+          <Button
             type="button"
             onClick={() => void save("slack", { webhook_url: webhook.trim() })}
             disabled={busy === "slack" || !webhook.trim()}
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+            className="shrink-0"
           >
             {busy === "slack" ? "Saving…" : slack ? "Replace" : "Save"}
-          </button>
+          </Button>
           {slack && (
             <>
               <button
@@ -234,14 +240,16 @@ export function IntegrationsPanel() {
               placeholder="Team id"
               className={inputClasses}
             />
-            <button
+            <Button
               type="button"
-              onClick={() => void save("linear", { api_key: apiKey.trim(), team_id: teamId.trim() })}
+              onClick={() =>
+                void save("linear", { api_key: apiKey.trim(), team_id: teamId.trim() })
+              }
               disabled={busy === "linear" || !apiKey.trim() || !teamId.trim()}
-              className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+              className="shrink-0"
             >
               {busy === "linear" ? "Saving…" : linear ? "Replace" : "Save"}
-            </button>
+            </Button>
             {linear && (
               <button
                 type="button"
@@ -310,7 +318,7 @@ export function IntegrationsPanel() {
           />
         </div>
         <div className="flex gap-3">
-          <button
+          <Button
             type="button"
             onClick={() =>
               void save("jira", {
@@ -327,10 +335,10 @@ export function IntegrationsPanel() {
               !jiraToken.trim() ||
               !jiraProject.trim()
             }
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+            className="shrink-0"
           >
             {busy === "jira" ? "Saving…" : jira ? "Replace" : "Save"}
-          </button>
+          </Button>
           {jira && (
             <button
               type="button"
@@ -366,8 +374,8 @@ export function IntegrationsPanel() {
           >
             personal access token
           </a>{" "}
-          (scope <code className="text-zinc-400">api</code>) and a run on a GitLab repository
-          opens a merge request when it finishes.
+          (scope <code className="text-zinc-400">api</code>) and a run on a GitLab repository opens
+          a merge request when it finishes.
         </p>
         <div className="flex gap-3">
           <input
@@ -384,7 +392,7 @@ export function IntegrationsPanel() {
             placeholder="Base URL (optional, defaults to https://gitlab.com)"
             className={inputClasses}
           />
-          <button
+          <Button
             type="button"
             onClick={() =>
               void save("gitlab", {
@@ -393,10 +401,10 @@ export function IntegrationsPanel() {
               })
             }
             disabled={busy === "gitlab" || !gitlabToken.trim()}
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+            className="shrink-0"
           >
             {busy === "gitlab" ? "Saving…" : gitlab ? "Replace" : "Save"}
-          </button>
+          </Button>
           {gitlab && (
             <button
               type="button"
@@ -432,8 +440,8 @@ export function IntegrationsPanel() {
           >
             app password
           </a>{" "}
-          (repositories: write, pull requests: write) and a run on a Bitbucket repository
-          opens a pull request when it finishes.
+          (repositories: write, pull requests: write) and a run on a Bitbucket repository opens a
+          pull request when it finishes.
         </p>
         <div className="flex gap-3">
           <input
@@ -451,7 +459,7 @@ export function IntegrationsPanel() {
             autoComplete="off"
             className={inputClasses}
           />
-          <button
+          <Button
             type="button"
             onClick={() =>
               void save("bitbucket", {
@@ -462,10 +470,10 @@ export function IntegrationsPanel() {
             disabled={
               busy === "bitbucket" || !bitbucketUsername.trim() || !bitbucketPassword.trim()
             }
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+            className="shrink-0"
           >
             {busy === "bitbucket" ? "Saving…" : bitbucket ? "Replace" : "Save"}
-          </button>
+          </Button>
           {bitbucket && (
             <button
               type="button"

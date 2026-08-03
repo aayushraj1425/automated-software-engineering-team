@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { OrganizationMembers } from "@/components/settings/organization-members";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
 /** Organizations: list them, create one, and pick the active one. The active
@@ -51,9 +52,9 @@ export function OrganizationsPanel() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Organizations</h2>
         <p className="text-xs text-zinc-500">
-          Work as yourself or inside an organization. Repositories and agent runs created
-          while an organization is active are shared with its members; conversations and
-          provider keys stay personal.
+          Work as yourself or inside an organization. Repositories and agent runs created while an
+          organization is active are shared with its members; conversations and provider keys stay
+          personal.
         </p>
       </section>
 
@@ -104,13 +105,9 @@ export function OrganizationsPanel() {
             placeholder="New organization name"
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />
-          <button
-            type="submit"
-            disabled={busy || !name.trim()}
-            className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={busy || !name.trim()} className="shrink-0">
             {busy ? "Working…" : "Create"}
-          </button>
+          </Button>
         </form>
 
         {error && <p className="text-sm text-red-400">{error}</p>}

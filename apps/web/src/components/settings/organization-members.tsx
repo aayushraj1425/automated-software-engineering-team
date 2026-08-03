@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
 type Member = {
@@ -179,13 +180,9 @@ export function OrganizationMembers({
           <option value="member">member</option>
           <option value="admin">admin</option>
         </select>
-        <button
-          type="submit"
-          disabled={busy || !inviteEmail.trim()}
-          className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
-        >
+        <Button type="submit" size="sm" disabled={busy || !inviteEmail.trim()} className="shrink-0">
           Invite
-        </button>
+        </Button>
       </form>
       <p className="text-xs text-zinc-600">
         No invitation emails are sent — copy the accept link and share it yourself.

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+
 const PROVIDERS = [
   { id: "anthropic", label: "Anthropic", hint: "sk-ant-…" },
   { id: "openai", label: "OpenAI", hint: "sk-proj-…" },
@@ -66,10 +68,9 @@ export function ProviderKeysPanel() {
     setBusy(provider);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/provider-keys/${provider}${shared ? "?shared=true" : ""}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`/api/provider-keys/${provider}${shared ? "?shared=true" : ""}`, {
+        method: "DELETE",
+      });
       if (!res.ok && res.status !== 204) {
         throw new Error(`Could not remove the key (${res.status})`);
       }
@@ -88,8 +89,8 @@ export function ProviderKeysPanel() {
         <p className="text-xs text-zinc-500">
           Bring your own key and your chats and agent runs spend your quota instead of the
           server&apos;s. Keys are encrypted at rest and never shown again — only the last four
-          characters. A key can be shared with your active organization; your personal key
-          always outranks the team&apos;s, and both outrank the server default.
+          characters. A key can be shared with your active organization; your personal key always
+          outranks the team&apos;s, and both outrank the server default.
         </p>
       </section>
 
@@ -130,22 +131,20 @@ export function ProviderKeysPanel() {
                 autoComplete="off"
                 className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
               />
-              <button
+              <Button
                 type="button"
                 onClick={() => void save(id)}
                 disabled={busy === id || !(drafts[id] ?? "").trim()}
-                className="shrink-0 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
+                className="shrink-0"
               >
                 {busy === id ? "Saving…" : "Save"}
-              </button>
+              </Button>
             </div>
             <label className="flex items-center gap-2 text-xs text-zinc-500">
               <input
                 type="checkbox"
                 checked={shareDrafts[id] ?? false}
-                onChange={(e) =>
-                  setShareDrafts((prev) => ({ ...prev, [id]: e.target.checked }))
-                }
+                onChange={(e) => setShareDrafts((prev) => ({ ...prev, [id]: e.target.checked }))}
               />
               Share with your active organization (any member can use and replace it)
             </label>
