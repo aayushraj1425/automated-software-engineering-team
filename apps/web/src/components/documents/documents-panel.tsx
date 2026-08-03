@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "../ui/button";
+import { EmptyState } from "../ui/feedback";
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -121,8 +123,8 @@ export function DocumentsPanel() {
           </select>
         </div>
         <p className="text-xs text-zinc-500">
-          The Technical Writer reads the repository index and writes documentation about it.
-          Index the repository first so the writer has code to describe.
+          The Technical Writer reads the repository index and writes documentation about it. Index
+          the repository first so the writer has code to describe.
         </p>
       </section>
 
@@ -140,14 +142,9 @@ export function DocumentsPanel() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => void generate()}
-            disabled={busy}
-            className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-900 disabled:opacity-50"
-          >
+          <Button type="button" onClick={() => void generate()} disabled={busy}>
             {busy ? "Writing…" : "Generate"}
-          </button>
+          </Button>
           {error && <p className="w-full text-sm text-red-400">{error}</p>}
         </section>
       )}
@@ -155,9 +152,10 @@ export function DocumentsPanel() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Documents</h2>
         {repositoryId && documents.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            No documents yet. Pick a type above and generate the first one.
-          </p>
+          <EmptyState
+            title="No documents yet."
+            hint="Pick a type above and generate the first one."
+          />
         )}
         {documents.map((doc) => (
           <div key={doc.id} className="space-y-3 rounded-md border border-zinc-800 p-4">
@@ -212,22 +210,23 @@ export function DocumentsPanel() {
                   className="h-80 w-full rounded-md border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-300 outline-none focus:border-zinc-600"
                 />
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={() => void saveEdit(doc.id)}
                     disabled={saving || !draft.trim()}
-                    className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 disabled:opacity-50"
                   >
                     {saving ? "Saving…" : "Save"}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setEditingId(null)}
                     disabled={saving}
-                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-400 disabled:opacity-50"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
