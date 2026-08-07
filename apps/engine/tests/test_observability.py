@@ -60,9 +60,10 @@ async def test_route_template_replaces_the_raw_path(client):
     assert span.attributes["http.response.status_code"] == 404
 
 
-async def test_healthz_is_not_traced(client):
-    resp = await client.get("/healthz")
-    assert resp.status_code == 200
+async def test_probe_paths_are_not_traced(client):
+    for path in ("/healthz", "/readyz"):
+        resp = await client.get(path)
+        assert resp.status_code == 200
     assert not span_exporter.get_finished_spans()
 
 
