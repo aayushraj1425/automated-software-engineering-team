@@ -82,6 +82,39 @@ jobs:
       - run: uv run alembic upgrade head
       - run: uv run pytest
 
+  generated-types:
+    name: Generated API types are up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      # setup-uv publishes no floating major tag — pin the exact release
+      - uses: astral-sh/setup-uv@v8.3.0
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/engine
+      # Regenerate packages/shared from the engine's live OpenAPI spec. A diff
+      # means a route changed without `pnpm generate` being run — the drift that
+      # let /readyz ship without client types. No database is touched: the export
+      # only builds the FastAPI app and serializes app.openapi().
+      - run: pnpm generate
+        env:
+          DATABASE_URL: postgresql+psycopg://asep:asep@localhost:5432/asep
+          LLM_FAKE: "1"
+          ENGINE_SERVICE_SECRET: ci-dummy-service-secret-000000000
+      - name: Fail if the generated types are stale
+        run: |
+          if ! git diff --exit-code -- packages/shared; then
+            echo "::error::packages/shared is out of date — run 'pnpm generate' and commit the result."
+            exit 1
+          fi
+
   e2e:
     name: End-to-end smoke (Playwright, fake model)
     runs-on: ubuntu-latest
