@@ -1,35 +1,26 @@
 import Link from "next/link";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { RunDetailPanel } from "@/components/runs/run-detail-panel";
-import { auth } from "@/lib/auth";
+import { WorkspaceShell } from "@/components/ui/workspace-shell";
+import { requireSession } from "@/lib/require-session";
 
 export const dynamic = "force-dynamic";
 
-export default async function RunDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    redirect("/sign-in");
-  }
+export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireSession();
   const { id } = await params;
   return (
-    <main className="min-h-screen">
-      <div className="border-b border-zinc-800 px-6 py-4">
-        <h1 className="text-sm font-semibold tracking-wide">
-          Run detail{" "}
-          <Link href="/runs" className="ml-3 font-normal text-zinc-500 hover:text-zinc-300">
-            ← all runs
-          </Link>
-        </h1>
-      </div>
+    <WorkspaceShell
+      title="Run detail"
+      action={
+        <Link href="/runs" className="text-sm text-zinc-400 transition-colors hover:text-zinc-200">
+          ← All runs
+        </Link>
+      }
+    >
       {/* key by id so navigating between runs mounts a fresh panel — local
           state (events, diff, files, in-flight flags) never bleeds across runs. */}
       <RunDetailPanel key={id} runId={id} />
-    </main>
+    </WorkspaceShell>
   );
 }

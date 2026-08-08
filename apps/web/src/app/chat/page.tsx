@@ -1,15 +1,9 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/require-session";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    redirect("/sign-in");
-  }
+  const session = await requireSession();
   return <ChatPanel userName={session.user.name ?? session.user.email} />;
 }
