@@ -19,8 +19,16 @@ export function WorkspaceShell({
 }) {
   return (
     <div className="min-h-screen">
+      {/* Keyboard users can jump straight past the nav to the page body. Hidden
+          until focused (Tab from the top of the page), then shown. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-20 focus:rounded-md focus:bg-zinc-100 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-zinc-900"
+      >
+        Skip to content
+      </a>
       <AppNav />
-      <main>
+      <main id="main-content">
         <PageHeader title={title} action={action} />
         {children}
       </main>

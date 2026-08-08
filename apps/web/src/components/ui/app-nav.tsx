@@ -35,7 +35,7 @@ export function AppNav() {
       >
         ASEP
       </Link>
-      <nav className="flex flex-1 items-center gap-1 overflow-x-auto py-2">
+      <nav aria-label="Primary" className="flex flex-1 items-center gap-1 overflow-x-auto py-2">
         {LINKS.map((link) => {
           const active = isActive(pathname, link.href);
           return (
