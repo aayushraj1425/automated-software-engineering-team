@@ -9,6 +9,7 @@
     "/healthz": {
       "get": {
         "summary": "Healthz",
+        "description": "Liveness: the process is up and serving. Deliberately checks nothing\nexternal, so a transient database blip never trips a pod restart \u2014 that is\nwhat readiness is for.",
         "operationId": "healthz_healthz_get",
         "responses": {
           "200": {
@@ -16,11 +17,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Healthz Healthz Get"
+                  "$ref": "#/components/schemas/LivenessStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readyz",
+        "description": "Readiness: the process can serve real traffic, which means the database\nis reachable. Returns 503 when it is not, so an orchestrator or load\nbalancer holds traffic back until the dependency recovers instead of\nrouting requests that would only 500.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessStatus"
                 }
               }
             }
@@ -1227,7 +1253,7 @@
     "/v1/repositories/{repository_id}": {
       "delete": {
         "summary": "Disconnect Repository",
-        "description": "Disconnect: the repository's data (index, work items, knowledge,\ndocuments) goes with it; run history survives detached \u2014 the FK is\nSET NULL by design (docs/architecture/RUN_HISTORY_RETENTION.md).\nDestroying a teammate's shared repository takes an admin\n(ORGANIZATION_ROLES.md); your own stays yours to disconnect.",
+        "description": "Disconnect: the repository's data (index, work items, knowledge,\ndocuments) goes with it; run history survives detached \u2014 the FK is\nSET NULL by design (docs/architecture/runs-ui/RUN_HISTORY_RETENTION.md).\nDestroying a teammate's shared repository takes an admin\n(ORGANIZATION_ROLES.md); your own stays yours to disconnect.",
         "operationId": "disconnect_repository_v1_repositories__repository_id__delete",
         "parameters": [
           {
@@ -3151,6 +3177,19 @@
         ],
         "title": "KnowledgeKind"
       },
+      "LivenessStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "LivenessStatus"
+      },
       "MessageOut": {
         "properties": {
           "id": {
@@ -3397,6 +3436,24 @@
           "pushed"
         ],
         "title": "PushOut"
+      },
+      "ReadinessStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "ReadinessStatus"
       },
       "ReorderIn": {
         "properties": {

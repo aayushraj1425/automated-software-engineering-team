@@ -11,8 +11,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Healthz */
+        /**
+         * Healthz
+         * @description Liveness: the process is up and serving. Deliberately checks nothing
+         *     external, so a transient database blip never trips a pod restart — that is
+         *     what readiness is for.
+         */
         get: operations["healthz_healthz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readyz
+         * @description Readiness: the process can serve real traffic, which means the database
+         *     is reachable. Returns 503 when it is not, so an orchestrator or load
+         *     balancer holds traffic back until the dependency recovers instead of
+         *     routing requests that would only 500.
+         */
+        get: operations["readyz_readyz_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1164,6 +1192,11 @@ export interface components {
          * @enum {string}
          */
         KnowledgeKind: "decision" | "outcome" | "preference" | "note";
+        /** LivenessStatus */
+        LivenessStatus: {
+            /** Status */
+            status: string;
+        };
         /** MessageOut */
         MessageOut: {
             /**
@@ -1273,6 +1306,13 @@ export interface components {
             branch: string;
             /** Pushed */
             pushed: boolean;
+        };
+        /** ReadinessStatus */
+        ReadinessStatus: {
+            /** Status */
+            status: string;
+            /** Database */
+            database: string;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -1620,9 +1660,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["LivenessStatus"];
+                };
+            };
+        };
+    };
+    readyz_readyz_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStatus"];
+                };
+            };
+            /** @description Database unreachable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStatus"];
                 };
             };
         };

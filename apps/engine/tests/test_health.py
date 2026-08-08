@@ -12,10 +12,18 @@ async def test_readyz_reports_ready_when_database_reachable(client):
 
 async def test_readyz_reports_503_when_database_unreachable(client, monkeypatch):
     # A readiness probe's whole job is to fail when the dependency is down, so
-    # traffic is held back. Point the check at an engine whose connection raises.
+    # traffic is held back. Mirror a real outage: acquiring the connection (the
+    # `async with` enter) is what raises, e.g. connection refused.
+    class _BrokenConnection:
+        async def __aenter__(self):
+            raise RuntimeError("connection refused")
+
+        async def __aexit__(self, *exc):
+            return False
+
     class _BrokenEngine:
         def connect(self):
-            raise RuntimeError("database is down")
+            return _BrokenConnection()
 
     monkeypatch.setattr("engine.api.health.get_engine", lambda: _BrokenEngine())
 
