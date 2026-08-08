@@ -74,9 +74,10 @@ async def test_users_have_independent_buckets(client, limited):
     assert (await client.get("/v1/repositories", headers=other)).status_code == 200
 
 
-async def test_healthz_is_never_throttled(client, limited):
+async def test_probe_paths_are_never_throttled(client, limited):
     for _ in range(10):
         assert (await client.get("/healthz")).status_code == 200
+        assert (await client.get("/readyz")).status_code == 200
 
 
 async def test_unverifiable_tokens_share_the_ip_bucket(client, limited):

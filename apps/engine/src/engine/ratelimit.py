@@ -26,6 +26,10 @@ from engine.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Liveness/readiness probes are public and fire every few seconds; exempt them
+# so an orchestrator's health checks are never throttled.
+_PROBE_PATHS = frozenset({"/healthz", "/readyz"})
+
 # Prune idle buckets so the in-process table cannot grow without bound.
 _PRUNE_ABOVE = 5000
 _IDLE_SECONDS = 600.0
@@ -188,7 +192,7 @@ class RateLimitMiddleware:
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
         settings = get_settings()
         per_minute = settings.rate_limit_per_minute
-        if scope["type"] != "http" or scope["path"] == "/healthz" or per_minute <= 0:
+        if scope["type"] != "http" or scope["path"] in _PROBE_PATHS or per_minute <= 0:
             await self.app(scope, receive, send)
             return
 

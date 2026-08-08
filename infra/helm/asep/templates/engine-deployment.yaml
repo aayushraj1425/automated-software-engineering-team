@@ -26,14 +26,17 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "asep.secretName" . }}
-          # /healthz is public by design and excluded from traces and rate
-          # limiting, so probes cost nothing and never 429.
+          # /healthz and /readyz are public by design and excluded from traces
+          # and rate limiting, so probes cost nothing and never 429. Liveness
+          # asks only "is the process up?"; readiness additionally checks the
+          # database, so a pod is pulled from rotation — not restarted — while
+          # its database is unreachable.
           livenessProbe:
             httpGet: { path: /healthz, port: 8000 }
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
-            httpGet: { path: /healthz, port: 8000 }
+            httpGet: { path: /readyz, port: 8000 }
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:

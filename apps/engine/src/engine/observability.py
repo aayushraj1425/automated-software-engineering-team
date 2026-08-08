@@ -25,6 +25,10 @@ from engine.config import get_settings
 
 log = structlog.get_logger(__name__)
 
+# Liveness/readiness probes fire every few seconds; excluded so they don't
+# drown the request traces.
+_PROBE_PATHS = frozenset({"/healthz", "/readyz"})
+
 # The API's global providers are proxies that upgrade when the SDK is set, so
 # instruments created at import start recording after configure_telemetry().
 tracer = trace.get_tracer("engine")
@@ -113,14 +117,15 @@ class TracingMiddleware:
     """One server span + one counter/histogram sample per request.
 
     Pure ASGI (not BaseHTTPMiddleware) so SSE streaming responses pass through
-    untouched. /healthz is excluded — liveness probes would drown the traces.
+    untouched. The probe paths are excluded — liveness/readiness checks fire
+    every few seconds and would drown the traces.
     """
 
     def __init__(self, app: Any) -> None:
         self.app = app
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
-        if scope["type"] != "http" or scope["path"] == "/healthz":
+        if scope["type"] != "http" or scope["path"] in _PROBE_PATHS:
             await self.app(scope, receive, send)
             return
 

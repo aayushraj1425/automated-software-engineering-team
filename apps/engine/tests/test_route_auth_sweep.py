@@ -11,10 +11,11 @@ from fastapi.routing import APIRoute
 
 from engine.main import app
 
-# The only deliberately token-free routes. /healthz is the probe endpoint;
+# The only deliberately token-free routes. /healthz and /readyz are the
+# liveness/readiness probes an orchestrator calls before a token exists;
 # the GitHub webhook authenticates by HMAC signature instead (and fails
 # closed without one, so an unauthenticated call is still refused).
-PUBLIC_PATHS = {"/healthz"}
+PUBLIC_PATHS = {"/healthz", "/readyz"}
 SIGNATURE_AUTHENTICATED_PATHS = {"/v1/webhooks/github"}
 
 
@@ -61,6 +62,7 @@ async def test_every_route_refuses_unauthenticated_callers(client):
     assert not holes, "routes reachable without a service token:\n" + "\n".join(holes)
 
 
-async def test_healthz_is_the_only_public_route(client):
-    response = await client.get("/healthz")
-    assert response.status_code == 200
+async def test_probe_routes_are_public(client):
+    for path in PUBLIC_PATHS:
+        response = await client.get(path)
+        assert response.status_code in (200, 503), path
