@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getSession = vi.fn();
 // Real next/navigation redirect() throws internally to halt rendering; the mock
 // throws so the tests can assert the guard stops there and never returns null.
-// (vi.fn records the url passed by the wrapper below regardless of the body.)
-const redirect = vi.fn(() => {
+// Typed with the url arg (so the wrapper below type-checks) but the body ignores
+// it — vi.fn still records the call for the assertion.
+const redirect = vi.fn<(url: string) => never>(() => {
   throw new Error("NEXT_REDIRECT");
 });
 
