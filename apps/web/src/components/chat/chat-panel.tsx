@@ -162,7 +162,14 @@ export function ChatPanel({ userName }: { userName: string }) {
     <main className="flex h-screen">
       <aside className="flex w-64 flex-col border-r border-zinc-800 bg-zinc-900/40">
         <div className="border-b border-zinc-800 p-4">
-          <h1 className="text-sm font-semibold tracking-wide">ASEP</h1>
+          {/* A link, not a dead heading: it's the way back to the rest of the
+              app from chat's standalone sidebar layout. */}
+          <Link
+            href="/repositories"
+            className="text-sm font-semibold tracking-wide text-zinc-100 hover:text-white"
+          >
+            ASEP
+          </Link>
           <p className="truncate text-xs text-zinc-500">{userName}</p>
         </div>
         <button
@@ -256,7 +263,7 @@ export function ChatPanel({ userName }: { userName: string }) {
           Sign out
         </button>
       </aside>
-      <section className="flex flex-1 flex-col">
+      <section id="main-content" className="flex flex-1 flex-col">
         <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-3">
           <label htmlFor="chat-repository" className="text-xs text-zinc-500">
             Answer from
