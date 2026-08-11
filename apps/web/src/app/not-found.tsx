@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { buttonClassName } from "@/components/ui/button";
+
 /** The 404 page Next renders for an unknown URL or a notFound() call, so a
  * mistyped or stale link lands on a friendly page instead of a bare default. */
 export default function NotFound() {
@@ -11,10 +13,7 @@ export default function NotFound() {
           The page you’re looking for doesn’t exist or may have moved.
         </p>
       </div>
-      <Link
-        href="/"
-        className="inline-flex items-center justify-center rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-white"
-      >
+      <Link href="/" className={buttonClassName()}>
         Back to app
       </Link>
     </main>

@@ -19,6 +19,13 @@ const SIZES: Record<Size, string> = {
   md: "px-4 py-2 text-sm",
 };
 
+/** The button look as a class string, so an element that must not be a <button>
+ * — a Next <Link> styled as a button, say — can share the exact same styling
+ * instead of hand-copying it. Button itself is built from this. */
+export function buttonClassName(variant: Variant = "primary", size: Size = "md"): string {
+  return `inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]}`;
+}
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -29,7 +36,7 @@ export function Button({
   return (
     <button
       type={type ?? "button"}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`${buttonClassName(variant, size)} ${className}`}
       {...props}
     />
   );
