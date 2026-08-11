@@ -28,7 +28,10 @@ export function WorkspaceShell({
         Skip to content
       </a>
       <AppNav />
-      <main id="main-content">
+      {/* tabIndex=-1 so activating the skip link actually moves keyboard focus
+          here, not just the scroll position (some browsers won't focus a
+          non-interactive target otherwise). */}
+      <main id="main-content" tabIndex={-1} className="outline-none">
         <PageHeader title={title} action={action} />
         {children}
       </main>
