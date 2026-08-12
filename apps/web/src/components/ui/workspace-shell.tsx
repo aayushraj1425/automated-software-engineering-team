@@ -19,14 +19,8 @@ export function WorkspaceShell({
 }) {
   return (
     <div className="min-h-screen">
-      {/* Keyboard users can jump straight past the nav to the page body. Hidden
-          until focused (Tab from the top of the page), then shown. */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-20 focus:rounded-md focus:bg-zinc-100 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-zinc-900"
-      >
-        Skip to content
-      </a>
+      {/* The skip link lives in the (workspace) layout so it's shared with chat
+          too; it targets the #main-content below. */}
       <AppNav />
       {/* tabIndex=-1 so activating the skip link actually moves keyboard focus
           here, not just the scroll position (some browsers won't focus a

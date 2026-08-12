@@ -263,7 +263,9 @@ export function ChatPanel({ userName }: { userName: string }) {
           Sign out
         </button>
       </aside>
-      <section id="main-content" className="flex flex-1 flex-col">
+      {/* tabIndex=-1 so the layout's skip link can move keyboard focus here, not
+          just the scroll position. */}
+      <section id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
         <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-3">
           <label htmlFor="chat-repository" className="text-xs text-zinc-500">
             Answer from
