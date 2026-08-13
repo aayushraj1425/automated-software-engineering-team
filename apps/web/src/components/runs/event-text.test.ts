@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import { agentName, describeEvent, reasoningOf, timelineAgents } from "./event-text";
 import type { RunEvent } from "./types";
 
-function event(type: string, payload: Record<string, unknown>, agent: string | null = null): RunEvent {
+function event(
+  type: string,
+  payload: Record<string, unknown>,
+  agent: string | null = null,
+): RunEvent {
   return { id: 1, type, agent, task_id: null, payload, created_at: "2026-07-04T12:00:00Z" };
 }
 
@@ -57,9 +61,9 @@ describe("describeEvent", () => {
     expect(describeEvent(event("run.status_changed", { from: "queued", to: "planning" }))).toBe(
       "Run is now planning",
     );
-    expect(
-      describeEvent(event("plan.created", { tasks: ["a", "b"] }, "product_manager")),
-    ).toBe("Product Manager wrote the plan (2 tasks)");
+    expect(describeEvent(event("plan.created", { tasks: ["a", "b"] }, "product_manager"))).toBe(
+      "Product Manager wrote the plan (2 tasks)",
+    );
     expect(describeEvent(event("run.finished", { status: "completed", error: null }))).toBe(
       "Run finished: completed",
     );
@@ -70,7 +74,9 @@ describe("describeEvent", () => {
 
   it("describes task transitions with the agent's name", () => {
     expect(
-      describeEvent(event("task.status_changed", { to: "in_progress", title: "Build it" }, "backend")),
+      describeEvent(
+        event("task.status_changed", { to: "in_progress", title: "Build it" }, "backend"),
+      ),
     ).toBe('Backend started "Build it"');
     expect(
       describeEvent(event("task.status_changed", { to: "done", result: "did it" }, "backend")),

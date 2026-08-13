@@ -18,9 +18,7 @@ export function agentName(role: string | null): string {
  * order, each with how many lines it produced. Run-level and human actions
  * (no agent) collapse into one `null` entry — the "System" chip. Powers the
  * timeline filter. Design note: docs/architecture/runs-ui/TIMELINE_AGENT_FILTER.md. */
-export function timelineAgents(
-  events: RunEvent[],
-): { agent: string | null; count: number }[] {
+export function timelineAgents(events: RunEvent[]): { agent: string | null; count: number }[] {
   const order: (string | null)[] = [];
   const counts = new Map<string | null, number>();
   for (const event of events) {
@@ -58,7 +56,8 @@ export function describeEvent(event: RunEvent): string {
       const to = String(p.to ?? "");
       const title = p.title ? ` "${String(p.title)}"` : "";
       if (to === "in_progress") return `${agentName(event.agent)} started${title}`;
-      if (to === "done") return `${agentName(event.agent)} finished: ${String(p.result ?? "task done")}`;
+      if (to === "done")
+        return `${agentName(event.agent)} finished: ${String(p.result ?? "task done")}`;
       if (to === "failed") return `${agentName(event.agent)} failed the task`;
       if (to === "skipped")
         return p.reason
@@ -77,8 +76,7 @@ export function describeEvent(event: RunEvent): string {
     }
     case "agent.reasoning": {
       const text = String(p.text ?? "").trim();
-      const shown =
-        text.length > REASONING_PREVIEW ? `${text.slice(0, REASONING_PREVIEW)}…` : text;
+      const shown = text.length > REASONING_PREVIEW ? `${text.slice(0, REASONING_PREVIEW)}…` : text;
       return `${agentName(event.agent)} is thinking: ${shown}`;
     }
     case "review.verdict":

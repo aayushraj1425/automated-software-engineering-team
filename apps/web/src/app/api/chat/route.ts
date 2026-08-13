@@ -30,10 +30,7 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   if (!upstream.ok || !upstream.body) {
-    return Response.json(
-      { error: `Engine error (${upstream.status})` },
-      { status: 502 },
-    );
+    return Response.json({ error: `Engine error (${upstream.status})` }, { status: 502 });
   }
 
   return new Response(upstream.body, {

@@ -1,9 +1,4 @@
-export const DOCUMENT_KINDS = [
-  "readme",
-  "api_reference",
-  "changelog",
-  "architecture",
-] as const;
+export const DOCUMENT_KINDS = ["readme", "api_reference", "changelog", "architecture"] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 /** Human labels for the kind chips and the generate menu. */

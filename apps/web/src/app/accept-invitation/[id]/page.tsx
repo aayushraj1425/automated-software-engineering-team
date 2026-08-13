@@ -9,11 +9,7 @@ import { authClient } from "@/lib/auth-client";
  * organization and switches into it; decline just declines. Signed-out
  * visitors are sent to sign in first — better-auth matches the invitation
  * to the signed-in email (docs/architecture/identity-integrations/ORGANIZATION_ROLES.md). */
-export default function AcceptInvitationPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function AcceptInvitationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
@@ -75,8 +71,8 @@ export default function AcceptInvitationPage({
     <main className="mx-auto max-w-md space-y-4 p-6">
       <h1 className="text-lg font-semibold">Organization invitation</h1>
       <p className="text-sm text-zinc-400">
-        You were invited to join an organization as {session.user.email}. Accepting switches
-        your workspace to it — you can switch back to personal any time in settings.
+        You were invited to join an organization as {session.user.email}. Accepting switches your
+        workspace to it — you can switch back to personal any time in settings.
       </p>
       <div className="flex gap-3">
         <button
