@@ -29,4 +29,11 @@ body {
   .animate-fade-in {
     animation: none;
   }
+  /* Stop the decorative Skeleton shimmer for readers who ask for less motion.
+     Tailwind's utilities animate unconditionally, so honour the preference here.
+     The Spinner (animate-spin) is left alone on purpose — its rotation is the
+     "still loading" signal, not decoration. */
+  .animate-pulse {
+    animation: none;
+  }
 }
