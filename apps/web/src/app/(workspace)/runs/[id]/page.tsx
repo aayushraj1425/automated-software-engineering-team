@@ -3,6 +3,8 @@ import Link from "next/link";
 import { RunDetailPanel } from "@/components/runs/run-detail-panel";
 import { WorkspaceShell } from "@/components/ui/workspace-shell";
 
+export const metadata = { title: "Run detail" };
+
 export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return (
