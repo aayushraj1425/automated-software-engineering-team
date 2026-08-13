@@ -68,7 +68,7 @@ worker:
     persistence:
       enabled: false
       size: 10Gi
-      storageClass: ""  # "" uses the cluster's default StorageClass
+      storageClass: "" # "" uses the cluster's default StorageClass
       accessMode: ReadWriteOnce
       mountPath: /var/backups/asep
   # In-cluster QA sandbox: run agent-written tests in Docker before opening a PR.

@@ -18,9 +18,9 @@ test("sign up, send a message, receive a streamed reply that persists", async ({
   await expect(page.getByText(/canned reply/)).toBeVisible({ timeout: 20_000 });
 
   // The conversation shows up in the sidebar (persisted server-side)
-  await expect(
-    page.getByRole("button", { name: /hello walking skeleton/ }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: /hello walking skeleton/ })).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Reload → history is served from Postgres, not client state
   await page.reload();

@@ -7,6 +7,18 @@ playwright-report/
 test-results/
 pnpm-lock.yaml
 apps/engine/
-packages/shared/src/generated/
+
+# Generated from the engine OpenAPI spec (pnpm generate) — not hand-formatted
+packages/shared/openapi.json
+packages/shared/src/engine-api.d.ts
+
+# Helm chart templates are Go-templated YAML ({{ ... }}), which Prettier can't parse
+infra/helm/asep/templates/
+
+# Prose docs and personal notes aren't build-critical — the gate is for code and
+# config, not documents (a doc edit shouldn't have to please Prettier)
+*.md
+*.html
+
 .turbo/
 .workspaces/
