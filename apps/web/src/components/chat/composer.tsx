@@ -32,12 +32,15 @@ export function Composer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
+          // `isComposing` guards IME input: while composing (e.g. a CJK
+          // candidate), Enter confirms the candidate — it must not also send.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
           }
         }}
         rows={2}
+        aria-label="Message"
         placeholder="Ask ASEP anything…"
         className="min-h-[3rem] flex-1 resize-none rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-zinc-400"
       />
