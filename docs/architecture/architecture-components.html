@@ -37,7 +37,7 @@ flowchart LR
 <p class="caption">Think of it as: what you see, what forwards, what protects.</p>
 <pre class="mermaid">
 flowchart LR
-    P["Pages<br/><code>app/chat, app/runs</code><br/>the screens themselves"]
+    P["Pages<br/><code>app/(workspace)/chat, app/(workspace)/runs</code><br/>the screens themselves"]
     R["Relay routes<br/><code>app/api/chat, app/api/runs</code><br/>forward requests to the engine"]
     H["Helpers<br/><code>lib/auth.ts</code> — the bouncer<br/><code>lib/service-token.ts</code> — the pass-maker"]
     P --> R --> H

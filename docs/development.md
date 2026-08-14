@@ -11,6 +11,7 @@ Everything fans out through Turborepo from the repo root:
 ```sh
 pnpm dev          # web + engine dev servers
 pnpm lint         # ESLint (web) + ruff (engine)
+pnpm format       # Prettier — format code & config (docs excluded); CI runs `pnpm format:check`
 pnpm typecheck    # tsc (web) + pyright (engine)
 pnpm test         # Vitest (web) + pytest (engine)
 pnpm e2e          # Playwright smoke — needs the DB up, uses LLM_FAKE

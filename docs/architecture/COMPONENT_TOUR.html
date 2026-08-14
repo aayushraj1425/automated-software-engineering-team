@@ -228,21 +228,33 @@ and tests in containers is Phase 3.</p>
 <h3>2.8 GitHub Actions — the quality gate (<code>.github/workflows/ci.yml</code>)</h3>
 <pre class="mermaid">
 flowchart LR
-    PUSH["every push and<br/>pull request"] --> J1 & J2 & J3
-    subgraph J1["Job: web"]
+    PUSH["every push and<br/>pull request"] --> J1 & J2 & J3 & J4 & J5 & J6 & J7
+    subgraph J1["Job: format"]
+        f1["prettier --check<br/>(code &amp; config)"]
+    end
+    subgraph J2["Job: web"]
         w1["pnpm install →<br/>eslint → tsc →<br/>vitest → next build"]
     end
-    subgraph J2["Job: engine"]
+    subgraph J3["Job: engine"]
         e1["uv sync → ruff check →<br/>ruff format --check → pyright →<br/>alembic upgrade → pytest"]
         e2["runs against a real<br/>pgvector Postgres<br/>service container, LLM_FAKE=1"]
     end
-    subgraph J3["Job: compose"]
+    subgraph J4["Job: generated-types"]
+        g1["pnpm generate →<br/>git diff must be empty"]
+    end
+    subgraph J5["Job: e2e smoke"]
+        s1["Playwright on the compose<br/>stack, LLM_FAKE=1"]
+    end
+    subgraph J6["Job: compose"]
         c1["the compose file<br/>must parse"]
     end
-    J1 & J2 & J3 --> OK["✅ green main"]
+    subgraph J7["Job: helm"]
+        h1["helm lint + template"]
+    end
+    J1 & J2 & J3 & J4 & J5 & J6 & J7 --> OK["✅ green main"]
 </pre>
 <p class="hint">Concurrency cancels superseded runs. Every pull request carries the
-Definition-of-Done checklist from the PR template. 91 engine tests + 10 web tests
+Definition-of-Done checklist from the PR template. The full engine and web suites
 run on every push — all offline, no secrets needed.</p>
 
 <script type="module">
