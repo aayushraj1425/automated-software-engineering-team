@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { OrganizationMembers } from "@/components/settings/organization-members";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
 import { authClient } from "@/lib/auth-client";
 
 /** Organizations: list them, create one, and pick the active one. The active
@@ -110,7 +111,7 @@ export function OrganizationsPanel() {
           </Button>
         </form>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        <FormError message={error} />
 
         {activeOrganization && (
           <OrganizationMembers

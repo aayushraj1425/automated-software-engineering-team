@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 
-import { EmptyState, Spinner } from "../ui/feedback";
+import { EmptyState, FormError, Spinner } from "../ui/feedback";
 import { agentStyle } from "./agent-style";
 import { DiffView } from "./diff-view";
 import {
@@ -454,7 +454,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           <span className="truncate text-xs text-zinc-500">{run.repository_url}</span>
         </div>
         <h1 className="text-lg font-semibold">{run.request}</h1>
-        {run.error && <p className="text-sm text-red-400">{run.error}</p>}
+        <FormError message={run.error} />
         {run.plan?.summary && <p className="text-sm text-zinc-400">{run.plan.summary}</p>}
         {run.total_input_tokens + run.total_output_tokens > 0 && (
           <p className="text-xs text-zinc-500">
@@ -555,7 +555,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
               </button>
             )}
           </div>
-          {planNote && <p className="text-sm text-red-400">{planNote}</p>}
+          <FormError message={planNote} />
         </section>
       )}
 
@@ -666,7 +666,7 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                   Select a file to read it.
                 </p>
               )}
-              {fileError && <p className="text-sm text-red-400">{fileError}</p>}
+              <FormError message={fileError} />
               {openPath && !fileBody && !fileError && (
                 <p className="rounded-md border border-zinc-800 p-4 text-xs text-zinc-500">
                   Loading {openPath}…

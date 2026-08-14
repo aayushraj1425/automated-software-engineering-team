@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StatusChip } from "@/components/runs/status-chip";
 import { Button } from "../ui/button";
-import { EmptyState } from "../ui/feedback";
+import { EmptyState, FormError } from "../ui/feedback";
 import {
   ESTIMATES,
   KINDS,
@@ -268,7 +268,7 @@ export function PlanningBoard() {
               {busy ? "Adding…" : "Add"}
             </Button>
           </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <FormError message={error} />
         </form>
       )}
 

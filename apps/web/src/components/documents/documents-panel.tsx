@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
-import { EmptyState } from "../ui/feedback";
+import { EmptyState, FormError } from "../ui/feedback";
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -145,7 +145,7 @@ export function DocumentsPanel() {
           <Button type="button" onClick={() => void generate()} disabled={busy}>
             {busy ? "Writing…" : "Generate"}
           </Button>
-          {error && <p className="w-full text-sm text-red-400">{error}</p>}
+          <FormError message={error} className="w-full" />
         </section>
       )}
 

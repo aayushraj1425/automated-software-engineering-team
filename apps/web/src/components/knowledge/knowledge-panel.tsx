@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
-import { EmptyState } from "../ui/feedback";
+import { EmptyState, FormError } from "../ui/feedback";
 import {
   MANUAL_KINDS,
   type KnowledgeItem,
@@ -186,7 +186,7 @@ export function KnowledgePanel() {
           <Button type="submit" disabled={busy}>
             {busy ? "Saving…" : "Save"}
           </Button>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <FormError message={error} />
         </form>
       )}
 

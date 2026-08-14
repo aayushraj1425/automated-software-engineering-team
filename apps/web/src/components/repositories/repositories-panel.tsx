@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StatusChip } from "@/components/runs/status-chip";
 import { relativeTime } from "@/lib/relative-time";
 import { Button } from "../ui/button";
-import { EmptyState, Skeleton, Spinner } from "../ui/feedback";
+import { EmptyState, FormError, Skeleton, Spinner } from "../ui/feedback";
 import { DependencyGraphView } from "./dependency-graph";
 import type { DependencyGraph, RepositorySummary, SearchHit } from "./types";
 
@@ -145,7 +145,7 @@ export function RepositoriesPanel() {
             {busy ? "Connecting…" : "Connect"}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        <FormError message={error} />
       </form>
 
       <section className="space-y-2">

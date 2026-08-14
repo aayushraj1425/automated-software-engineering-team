@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
 import { authClient } from "@/lib/auth-client";
 
 type Member = {
@@ -187,7 +188,7 @@ export function OrganizationMembers({
       <p className="text-xs text-zinc-600">
         No invitation emails are sent — copy the accept link and share it yourself.
       </p>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
     </div>
   );
 }

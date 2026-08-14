@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
 
 type Connection = {
   kind: string;
@@ -488,7 +489,7 @@ export function IntegrationsPanel() {
       </section>
 
       {status && <p className="text-sm text-emerald-400">{status}</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
     </div>
   );
 }

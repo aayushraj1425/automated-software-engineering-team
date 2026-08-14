@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { relativeTime } from "@/lib/relative-time";
 
 import { Button } from "../ui/button";
-import { Card, EmptyState, Skeleton, Spinner } from "../ui/feedback";
+import { Card, EmptyState, FormError, Skeleton, Spinner } from "../ui/feedback";
 import { StatusChip } from "./status-chip";
 import type { RunSummary } from "./types";
 
@@ -116,7 +116,7 @@ export function RunsPanel() {
           rows={3}
           className="w-full resize-none rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        <FormError message={error} />
         <Button type="submit" disabled={busy}>
           {busy && <Spinner className="h-3.5 w-3.5" />}
           {busy ? "Starting…" : "Start run"}

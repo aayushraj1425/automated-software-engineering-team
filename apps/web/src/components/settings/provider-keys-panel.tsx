@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/feedback";
 
 const PROVIDERS = [
   { id: "anthropic", label: "Anthropic", hint: "sk-ant-…" },
@@ -152,7 +153,7 @@ export function ProviderKeysPanel() {
         );
       })}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
     </div>
   );
 }
