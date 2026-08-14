@@ -28,5 +28,8 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 
 /** A pulsing block to hold layout while data loads, so pages don't flash blank. */
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-zinc-900 ${className}`} />;
+  // The `skeleton` marker lets globals.css pause just this decorative pulse
+  // under prefers-reduced-motion, without touching the streaming cursor and the
+  // "Live" dot, which share Tailwind's animate-pulse but are meaningful motion.
+  return <div className={`skeleton animate-pulse rounded-md bg-zinc-900 ${className}`} />;
 }

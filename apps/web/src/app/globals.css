@@ -30,10 +30,11 @@ body {
     animation: none;
   }
   /* Stop the decorative Skeleton shimmer for readers who ask for less motion.
-     Tailwind's utilities animate unconditionally, so honour the preference here.
-     The Spinner (animate-spin) is left alone on purpose — its rotation is the
-     "still loading" signal, not decoration. */
-  .animate-pulse {
+     Scoped to the Skeleton (not Tailwind's shared .animate-pulse) so the
+     streaming cursor and the "Live" run dot — which use the same utility — keep
+     their motion. The Spinner (animate-spin) is likewise left alone: its
+     rotation is the "still loading" signal, not decoration. */
+  .skeleton {
     animation: none;
   }
 }
