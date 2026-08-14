@@ -8,6 +8,7 @@ import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 import { parseSse } from "@/lib/sse";
 
+import { mainContentProps } from "@/components/ui/main-content";
 import type { RepositorySummary } from "@/components/repositories/types";
 
 import { Composer } from "./composer";
@@ -263,9 +264,9 @@ export function ChatPanel({ userName }: { userName: string }) {
           Sign out
         </button>
       </aside>
-      {/* tabIndex=-1 so the layout's skip link can move keyboard focus here, not
-          just the scroll position. */}
-      <section id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
+      {/* The skip-link target — id + tabIndex come from mainContentProps so chat
+          and the shell pages expose the same landmark to the layout's link. */}
+      <section {...mainContentProps} className="flex flex-1 flex-col outline-none">
         <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-3">
           <label htmlFor="chat-repository" className="text-xs text-zinc-500">
             Answer from

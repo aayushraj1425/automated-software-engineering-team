@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { mainContentProps } from "@/components/ui/main-content";
 import { PageHeader } from "@/components/ui/page-header";
 
 /** The frame every signed-in workspace page shares: the top navigation, a
@@ -22,10 +23,9 @@ export function WorkspaceShell({
       {/* The skip link lives in the (workspace) layout so it's shared with chat
           too; it targets the #main-content below. */}
       <AppNav />
-      {/* tabIndex=-1 so activating the skip link actually moves keyboard focus
-          here, not just the scroll position (some browsers won't focus a
-          non-interactive target otherwise). */}
-      <main id="main-content" tabIndex={-1} className="outline-none">
+      {/* The skip-link target — id + tabIndex come from mainContentProps so the
+          link and this landmark stay in lockstep. */}
+      <main {...mainContentProps} className="outline-none">
         <PageHeader title={title} action={action} />
         {children}
       </main>

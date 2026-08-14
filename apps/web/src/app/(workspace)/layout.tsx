@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { MAIN_CONTENT_ID } from "@/components/ui/main-content";
 import { requireSession } from "@/lib/require-session";
 
 // Every route in this group is a signed-in workspace page: it needs a live
@@ -18,7 +19,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
           own <section>), so this moves keyboard focus to the page body wherever
           you are. Hidden until focused (Tab from the top), then shown. */}
       <a
-        href="#main-content"
+        href={`#${MAIN_CONTENT_ID}`}
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-20 focus:rounded-md focus:bg-zinc-100 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-zinc-900"
       >
         Skip to content
