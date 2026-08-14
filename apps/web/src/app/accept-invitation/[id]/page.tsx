@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { FormError } from "@/components/ui/feedback";
 import { authClient } from "@/lib/auth-client";
 
 /** The landing page for a copied invitation link: accept joins the
@@ -92,7 +93,7 @@ export default function AcceptInvitationPage({ params }: { params: Promise<{ id:
           Decline
         </button>
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
     </main>
   );
 }

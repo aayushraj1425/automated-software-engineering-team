@@ -26,6 +26,25 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
+/** An inline "that action failed" message. role="alert" so assistive tech
+ * announces it the moment it appears, rather than the text showing silently.
+ * Renders nothing when there's no message, so call sites drop the `error && …`
+ * guard and just pass the (possibly null) message. */
+export function FormError({
+  message,
+  className = "",
+}: {
+  message?: string | null;
+  className?: string;
+}) {
+  if (!message) return null;
+  return (
+    <p role="alert" className={`text-sm text-red-400 ${className}`}>
+      {message}
+    </p>
+  );
+}
+
 /** A pulsing block to hold layout while data loads, so pages don't flash blank. */
 export function Skeleton({ className = "" }: { className?: string }) {
   // The `skeleton` marker lets globals.css pause just this decorative pulse

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { FormError } from "@/components/ui/feedback";
 import { authClient } from "@/lib/auth-client";
 import type { SignInProvider } from "@/lib/sign-in-providers";
 
@@ -40,7 +41,7 @@ export function SocialSignIn({ providers }: { providers: SignInProvider[] }) {
           {pendingId === provider.id ? "Redirecting…" : `Continue with ${provider.label}`}
         </button>
       ))}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
       <div className="flex items-center gap-3 pt-2 text-xs text-zinc-500">
         <div className="h-px flex-1 bg-zinc-800" />
         or use email
