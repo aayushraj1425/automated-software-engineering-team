@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
+import { useCopyFeedback } from "@/components/ui/use-copy-feedback";
 import { authClient } from "@/lib/auth-client";
 
 type Member = {
@@ -36,7 +37,6 @@ export function OrganizationMembers({
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const pending = invitations.filter((invitation) => invitation.status === "pending");
 
@@ -88,14 +88,6 @@ export function OrganizationMembers({
     onChanged();
   }
 
-  async function copyLink(invitationId: string) {
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/accept-invitation/${invitationId}`,
-    );
-    setCopiedId(invitationId);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
   return (
     <div className="space-y-3 border-t border-zinc-800 pt-3">
       <h3 className="text-xs font-semibold text-zinc-400">Members</h3>
@@ -143,14 +135,7 @@ export function OrganizationMembers({
                 <span className="text-xs text-zinc-600">as {invitation.role}</span>
               </p>
               <div className="flex shrink-0 items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void copyLink(invitation.id)}
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
-                  title="No invitation emails are sent — share this link yourself"
-                >
-                  {copiedId === invitation.id ? "copied!" : "copy accept link"}
-                </button>
+                <CopyAcceptLinkButton invitationId={invitation.id} />
                 <button
                   type="button"
                   onClick={() => void cancelInvitation(invitation.id)}
@@ -190,5 +175,23 @@ export function OrganizationMembers({
       </p>
       <FormError message={error} />
     </div>
+  );
+}
+
+/** The "copy accept link" affordance for one pending invitation. Its own
+ * component so each row owns its short-lived "copied!" state through the shared
+ * useCopyFeedback hook — no parent-level id bookkeeping, and the reset timer is
+ * cancelled on unmount. */
+function CopyAcceptLinkButton({ invitationId }: { invitationId: string }) {
+  const { copied, copy } = useCopyFeedback(2000);
+  return (
+    <button
+      type="button"
+      onClick={() => void copy(`${window.location.origin}/accept-invitation/${invitationId}`)}
+      className="text-xs text-zinc-500 hover:text-zinc-300"
+      title="No invitation emails are sent — share this link yourself"
+    >
+      {copied ? "copied!" : "copy accept link"}
+    </button>
   );
 }
