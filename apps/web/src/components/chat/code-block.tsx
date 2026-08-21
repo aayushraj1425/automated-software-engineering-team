@@ -44,6 +44,7 @@ export function CodeBlock({ code, language }: { code: string; language: string }
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
           className={`w-full border-t border-zinc-800 bg-zinc-900/70 py-1 text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}
         >
           {open ? "show less" : `show ${lines.length - COLLAPSE_LINES} more lines`}

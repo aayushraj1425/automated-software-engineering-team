@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import { CodeBlock } from "./code-block";
 
@@ -9,10 +9,17 @@ describe("CodeBlock", () => {
     expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
   });
 
-  it("collapses a long block behind a show-more toggle", () => {
+  it("collapses a long block behind a show-more toggle that reports its state", () => {
     const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n");
     render(<CodeBlock code={long} language="text" />);
-    expect(screen.getByRole("button", { name: /show \d+ more lines/i })).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /show \d+ more lines/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: /show less/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("leaves a short block fully expanded (no toggle)", () => {

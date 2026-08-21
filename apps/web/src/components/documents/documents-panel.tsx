@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
 import { EmptyState, FormError } from "../ui/feedback";
+import { focusRing } from "../ui/focus-ring";
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -163,7 +164,8 @@ export function DocumentsPanel() {
               <button
                 type="button"
                 onClick={() => setOpenId((current) => (current === doc.id ? null : doc.id))}
-                className="text-left text-sm text-zinc-200 hover:text-white"
+                aria-expanded={openId === doc.id}
+                className={`rounded text-left text-sm text-zinc-200 hover:text-white ${focusRing}`}
               >
                 {doc.title}
               </button>
@@ -186,7 +188,8 @@ export function DocumentsPanel() {
               <button
                 type="button"
                 onClick={() => setOpenId((current) => (current === doc.id ? null : doc.id))}
-                className="text-zinc-500 hover:text-zinc-300"
+                aria-expanded={openId === doc.id}
+                className={`rounded text-zinc-500 hover:text-zinc-300 ${focusRing}`}
               >
                 {openId === doc.id ? "hide" : "read"}
               </button>

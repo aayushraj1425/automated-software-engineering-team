@@ -7,6 +7,7 @@ import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
 
 import { EmptyState, FormError, Spinner } from "../ui/feedback";
+import { focusRing } from "../ui/focus-ring";
 import { agentStyle } from "./agent-style";
 import { DiffView } from "./diff-view";
 import {
@@ -887,7 +888,8 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                             <button
                               type="button"
                               onClick={() => toggleId(setExpandedReasoning, event.id)}
-                              className="ml-1 text-xs text-zinc-500 hover:text-zinc-300"
+                              aria-expanded={expanded}
+                              className={`ml-1 rounded text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}
                             >
                               {expanded ? "show less" : "show more"}
                             </button>
@@ -899,9 +901,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                         <button
                           type="button"
                           onClick={() => toggleId(setExpandedTools, event.id)}
-                          className="text-left text-zinc-300 hover:text-zinc-100"
+                          aria-expanded={toolOpen}
+                          className={`rounded text-left text-zinc-300 hover:text-zinc-100 ${focusRing}`}
                         >
-                          <span className="text-zinc-500">{toolOpen ? "▾ " : "▸ "}</span>
+                          <span aria-hidden className="text-zinc-500">
+                            {toolOpen ? "▾ " : "▸ "}
+                          </span>
                           {describeEvent(event)}
                         </button>
                         {toolOpen && <ToolDetail event={event} />}
