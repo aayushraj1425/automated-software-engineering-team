@@ -3,6 +3,7 @@
 import { Highlight, themes } from "prism-react-renderer";
 import { useState } from "react";
 
+import { focusRing } from "../ui/focus-ring";
 import { CopyButton } from "../ui/copy-button";
 
 const COLLAPSE_LINES = 16;
@@ -43,7 +44,7 @@ export function CodeBlock({ code, language }: { code: string; language: string }
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="w-full border-t border-zinc-800 bg-zinc-900/70 py-1 text-xs text-zinc-500 hover:text-zinc-300"
+          className={`w-full border-t border-zinc-800 bg-zinc-900/70 py-1 text-xs text-zinc-500 hover:text-zinc-300 ${focusRing}`}
         >
           {open ? "show less" : `show ${lines.length - COLLAPSE_LINES} more lines`}
         </button>

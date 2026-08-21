@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
+import { focusRing } from "./focus-ring";
+
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
@@ -23,7 +25,7 @@ const SIZES: Record<Size, string> = {
  * — a Next <Link> styled as a button, say — can share the exact same styling
  * instead of hand-copying it. Button itself is built from this. */
 export function buttonClassName(variant: Variant = "primary", size: Size = "md"): string {
-  return `inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]}`;
+  return `inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed ${focusRing} ${VARIANTS[variant]} ${SIZES[size]}`;
 }
 
 export function Button({

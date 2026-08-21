@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { signOut } from "@/lib/auth-client";
+import { focusRing } from "./focus-ring";
 
 /** The one top navigation bar shared by every workspace page. Before this, each
  * page hand-rolled its own header with the links in a different order and no way
@@ -31,7 +32,7 @@ export function AppNav() {
     <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-zinc-800 bg-zinc-950/80 px-4 backdrop-blur">
       <Link
         href="/chat"
-        className="mr-1 shrink-0 px-2 py-3 text-sm font-semibold tracking-wide text-zinc-100"
+        className={`mr-1 shrink-0 rounded-md px-2 py-3 text-sm font-semibold tracking-wide text-zinc-100 ${focusRing}`}
       >
         ASEP
       </Link>
@@ -43,7 +44,7 @@ export function AppNav() {
               key={link.href}
               href={link.href}
               aria-current={active ? "page" : undefined}
-              className={`shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors ${focusRing} ${
                 active
                   ? "bg-zinc-800 text-zinc-100"
                   : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -57,7 +58,7 @@ export function AppNav() {
       <button
         type="button"
         onClick={() => void signOut({ fetchOptions: { onSuccess: () => location.assign("/") } })}
-        className="shrink-0 px-3 py-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-200"
+        className={`shrink-0 rounded-md px-3 py-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-200 ${focusRing}`}
       >
         Sign out
       </button>
