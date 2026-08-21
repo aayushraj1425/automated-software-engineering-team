@@ -26,10 +26,25 @@ _RLS_ORG_KEY = "rls_org_id"
 _RLS_SERVICE_KEY = "rls_service"
 
 
+def _create_engine(url: str) -> AsyncEngine:
+    """Every engine shares the same pool policy (config.py): pre-ping to skip
+    dead connections, a sized pool that overflows under load, and recycling so
+    an idle-timed-out socket is never handed back."""
+    settings = get_settings()
+    return create_async_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_recycle=settings.db_pool_recycle_seconds,
+        pool_timeout=settings.db_pool_timeout_seconds,
+    )
+
+
 def get_engine() -> AsyncEngine:
     global _engine, _sessionmaker
     if _engine is None:
-        _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        _engine = _create_engine(get_settings().database_url)
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine
 
@@ -50,7 +65,7 @@ def get_api_sessionmaker() -> async_sessionmaker[AsyncSession]:
     if not url:
         return get_sessionmaker()
     if _api_engine is None:
-        _api_engine = create_async_engine(url, pool_pre_ping=True)
+        _api_engine = _create_engine(url)
         _api_sessionmaker = async_sessionmaker(_api_engine, expire_on_commit=False)
     assert _api_sessionmaker is not None
     return _api_sessionmaker

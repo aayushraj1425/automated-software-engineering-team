@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     # connect as a non-owner role that cannot touch policies or claim the
     # service context. Empty = single-role mode (everything on database_url).
     database_url_api: str = ""
+    # Connection pool sizing (SCALING.md). Each engine keeps `db_pool_size`
+    # connections open and opens up to `db_max_overflow` more under load, so a
+    # replica's ceiling is (db_pool_size + db_max_overflow) per engine — and
+    # there are two when database_url_api is set. Keep the total across every
+    # replica under Postgres `max_connections`. Connections are recycled after
+    # `db_pool_recycle_seconds` so a proxy or database idle-timeout never hands
+    # back a dead socket; a checkout waits at most `db_pool_timeout_seconds`
+    # for a free connection before raising instead of blocking forever.
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle_seconds: int = 1800
+    db_pool_timeout_seconds: int = 30
     redis_url: str = "redis://localhost:6379/0"
 
     engine_service_secret: str = "dev-only-service-secret-change-me-00"
