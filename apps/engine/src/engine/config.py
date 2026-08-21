@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     backup_s3_region: str = "us-east-1"
     backup_s3_access_key_id: str = ""
     backup_s3_secret_access_key: str = ""
+    # Per-request LLM timeout in seconds (0 = no limit). A provider that stalls
+    # mid-request would otherwise hang the call — and the worker and database
+    # connection it holds — indefinitely; this caps the wait so the run fails
+    # loudly instead. The rate-limit retry waits (router.py) are separate and
+    # longer on purpose.
+    llm_request_timeout_seconds: int = 120
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"

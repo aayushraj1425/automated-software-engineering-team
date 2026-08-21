@@ -113,7 +113,11 @@ class ModelRouter:
 
             response = await _retry_rate_limits(
                 lambda: litellm.acompletion(
-                    model=model, messages=messages, stream=True, api_key=api_key_for_model(model)
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    api_key=api_key_for_model(model),
+                    timeout=settings.llm_request_timeout_seconds or None,
                 )
             )
             chunks = 0
@@ -148,7 +152,10 @@ class ModelRouter:
             # The caller's own key wins over the server's .env key (PROVIDER_KEYS.md).
             response = await _retry_rate_limits(
                 lambda: litellm.acompletion(
-                    model=model, messages=messages, api_key=api_key_for_model(model)
+                    model=model,
+                    messages=messages,
+                    api_key=api_key_for_model(model),
+                    timeout=settings.llm_request_timeout_seconds or None,
                 )
             )
             content = response.choices[0].message.content  # type: ignore[union-attr]
@@ -198,6 +205,7 @@ class ModelRouter:
                     messages=messages,
                     tools=tools or None,
                     api_key=api_key_for_model(model),
+                    timeout=settings.llm_request_timeout_seconds or None,
                 )
             )
             message = response.choices[0].message  # type: ignore[union-attr]
@@ -266,6 +274,7 @@ class ModelRouter:
                 model=settings.model_embedding,
                 input=texts,
                 api_key=api_key_for_model(settings.model_embedding),
+                timeout=settings.llm_request_timeout_seconds or None,
             )
         )
         vectors = [item["embedding"] for item in response.data]  # type: ignore[union-attr]
