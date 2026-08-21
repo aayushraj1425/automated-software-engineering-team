@@ -6,6 +6,7 @@ import { downloadTextFile } from "@/lib/download";
 import { type DiffFile, parseUnifiedDiff } from "@/lib/parse-diff";
 
 import { CopyButton } from "../ui/copy-button";
+import { focusRing } from "../ui/focus-ring";
 
 function diffLineClass(line: string): string {
   if (line.startsWith("+++") || line.startsWith("---")) return "text-zinc-500";
@@ -35,7 +36,7 @@ export function DiffView({ diff }: { diff: string }) {
         <button
           type="button"
           onClick={() => downloadTextFile("changes.diff", diff, "text/x-patch")}
-          className="rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+          className={`rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 ${focusRing}`}
         >
           Download .diff
         </button>
@@ -59,9 +60,12 @@ function FileSection({ file, defaultOpen }: { file: DiffFile; defaultOpen: boole
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex min-w-0 items-center gap-2 text-left"
+          aria-expanded={open}
+          className={`flex min-w-0 items-center gap-2 rounded text-left ${focusRing}`}
         >
-          <span className="shrink-0 text-zinc-500">{open ? "▾" : "▸"}</span>
+          <span aria-hidden className="shrink-0 text-zinc-500">
+            {open ? "▾" : "▸"}
+          </span>
           <span className="truncate font-mono text-xs text-zinc-300">{file.path}</span>
           <span className="shrink-0 text-xs">
             <span className="text-emerald-400">+{file.additions}</span>{" "}
