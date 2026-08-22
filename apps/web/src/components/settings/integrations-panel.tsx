@@ -162,6 +162,7 @@ export function IntegrationsPanel() {
             type="password"
             value={webhook}
             onChange={(e) => setWebhook(e.target.value)}
+            aria-label="Slack webhook URL"
             placeholder={
               slack
                 ? "Replace the webhook (https://hooks.slack.com/…)"
@@ -230,6 +231,7 @@ export function IntegrationsPanel() {
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
+            aria-label="Linear API key"
             placeholder={linear ? "Replace the API key (lin_api_…)" : "API key (lin_api_…)"}
             autoComplete="off"
             className={inputClasses}
@@ -238,6 +240,7 @@ export function IntegrationsPanel() {
             <input
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
+              aria-label="Linear team id"
               placeholder="Team id"
               className={inputClasses}
             />
@@ -293,18 +296,21 @@ export function IntegrationsPanel() {
           <input
             value={jiraUrl}
             onChange={(e) => setJiraUrl(e.target.value)}
+            aria-label="Jira site URL"
             placeholder="https://your-site.atlassian.net"
             className={inputClasses}
           />
           <input
             value={jiraProject}
             onChange={(e) => setJiraProject(e.target.value)}
+            aria-label="Jira project key"
             placeholder="Project key (e.g. ENG)"
             className={inputClasses}
           />
           <input
             value={jiraEmail}
             onChange={(e) => setJiraEmail(e.target.value)}
+            aria-label="Jira email"
             placeholder="Email"
             autoComplete="off"
             className={inputClasses}
@@ -313,6 +319,7 @@ export function IntegrationsPanel() {
             type="password"
             value={jiraToken}
             onChange={(e) => setJiraToken(e.target.value)}
+            aria-label="Jira API token"
             placeholder={jira ? "Replace the API token" : "API token"}
             autoComplete="off"
             className={inputClasses}
@@ -383,6 +390,7 @@ export function IntegrationsPanel() {
             type="password"
             value={gitlabToken}
             onChange={(e) => setGitlabToken(e.target.value)}
+            aria-label="GitLab access token"
             placeholder={gitlab ? "Replace the token (glpat-…)" : "Personal access token (glpat-…)"}
             autoComplete="off"
             className={inputClasses}
@@ -390,6 +398,7 @@ export function IntegrationsPanel() {
           <input
             value={gitlabUrl}
             onChange={(e) => setGitlabUrl(e.target.value)}
+            aria-label="GitLab base URL"
             placeholder="Base URL (optional, defaults to https://gitlab.com)"
             className={inputClasses}
           />
@@ -448,6 +457,7 @@ export function IntegrationsPanel() {
           <input
             value={bitbucketUsername}
             onChange={(e) => setBitbucketUsername(e.target.value)}
+            aria-label="Bitbucket username"
             placeholder="Username"
             autoComplete="off"
             className={inputClasses}
@@ -456,6 +466,7 @@ export function IntegrationsPanel() {
             type="password"
             value={bitbucketPassword}
             onChange={(e) => setBitbucketPassword(e.target.value)}
+            aria-label="Bitbucket app password"
             placeholder={bitbucket ? "Replace the app password" : "App password"}
             autoComplete="off"
             className={inputClasses}

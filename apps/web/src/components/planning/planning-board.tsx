@@ -189,6 +189,7 @@ export function PlanningBoard() {
           <select
             value={repositoryId ?? ""}
             onChange={(e) => setRepositoryId(e.target.value || null)}
+            aria-label="Repository"
             className={selectClasses}
           >
             {repositories.length === 0 && <option value="">No repositories connected</option>}
@@ -213,6 +214,7 @@ export function PlanningBoard() {
             <input
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
+              aria-label="Roadmap goal"
               placeholder="A one-line goal, e.g. Let users reset their password by email"
               required
               minLength={3}
@@ -231,6 +233,7 @@ export function PlanningBoard() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-label="Work item title"
             placeholder="What needs doing, e.g. Add password reset"
             required
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
@@ -239,6 +242,7 @@ export function PlanningBoard() {
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as WorkItemKind)}
+              aria-label="Kind"
               className={selectClasses}
             >
               {KINDS.map((k) => (
@@ -250,6 +254,7 @@ export function PlanningBoard() {
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as Priority)}
+              aria-label="Priority"
               className={selectClasses}
             >
               {PRIORITIES.map((p) => (
@@ -261,6 +266,7 @@ export function PlanningBoard() {
             <input
               value={milestone}
               onChange={(e) => setMilestone(e.target.value)}
+              aria-label="Milestone"
               placeholder="Milestone (optional)"
               className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
             />

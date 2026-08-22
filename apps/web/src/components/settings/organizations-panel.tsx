@@ -103,6 +103,7 @@ export function OrganizationsPanel() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
+            aria-label="New organization name"
             placeholder="New organization name"
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />

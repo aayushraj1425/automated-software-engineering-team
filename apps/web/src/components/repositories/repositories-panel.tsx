@@ -136,6 +136,7 @@ export function RepositoriesPanel() {
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            aria-label="Repository URL"
             placeholder="Repository URL, e.g. https://github.com/you/your-repo"
             required
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
@@ -230,6 +231,7 @@ export function RepositoriesPanel() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search the code"
               placeholder="Ask the code a question, e.g. where are items listed?"
               required
               minLength={2}

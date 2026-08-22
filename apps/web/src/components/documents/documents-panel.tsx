@@ -113,6 +113,7 @@ export function DocumentsPanel() {
           <select
             value={repositoryId ?? ""}
             onChange={(e) => setRepositoryId(e.target.value || null)}
+            aria-label="Repository"
             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
           >
             {repositories.length === 0 && <option value="">No repositories connected</option>}
@@ -135,6 +136,7 @@ export function DocumentsPanel() {
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as DocumentKind)}
+            aria-label="Document type"
             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
           >
             {DOCUMENT_KINDS.map((k) => (
@@ -209,6 +211,7 @@ export function DocumentsPanel() {
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  aria-label="Document content"
                   spellCheck={false}
                   className="h-80 w-full rounded-md border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-5 text-zinc-300 outline-none focus:border-zinc-600"
                 />

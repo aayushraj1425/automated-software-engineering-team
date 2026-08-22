@@ -107,6 +107,7 @@ export function KnowledgePanel() {
           <select
             value={repositoryId ?? ""}
             onChange={(e) => setRepositoryId(e.target.value || null)}
+            aria-label="Repository"
             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
           >
             {repositories.length === 0 && <option value="">No repositories connected</option>}
@@ -128,6 +129,7 @@ export function KnowledgePanel() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search the memory"
             placeholder="Search the memory, e.g. why did we reject the caching plan?"
             className={inputClasses}
           />
@@ -157,6 +159,7 @@ export function KnowledgePanel() {
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as KnowledgeKind)}
+              aria-label="Memory type"
               className="shrink-0 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs outline-none focus:border-zinc-500"
             >
               {MANUAL_KINDS.map((k) => (
@@ -168,6 +171,7 @@ export function KnowledgePanel() {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              aria-label="Title"
               placeholder="A short title, e.g. Deploys happen on Fridays"
               required
               maxLength={256}
@@ -177,6 +181,7 @@ export function KnowledgePanel() {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            aria-label="Memory"
             placeholder="The memory itself — a meeting note, a team preference, a lesson learned"
             required
             rows={3}

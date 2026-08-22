@@ -128,6 +128,7 @@ export function ProviderKeysPanel() {
                 type="password"
                 value={drafts[id] ?? ""}
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
+                aria-label={`${label} API key`}
                 placeholder={hasAny ? `Replace a key (${hint})` : `Paste a key (${hint})`}
                 autoComplete="off"
                 className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"

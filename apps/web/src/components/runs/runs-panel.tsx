@@ -104,6 +104,7 @@ export function RunsPanel() {
         <input
           value={repositoryUrl}
           onChange={(e) => setRepositoryUrl(e.target.value)}
+          aria-label="Repository URL"
           placeholder="Repository URL, e.g. https://github.com/you/your-repo"
           required
           className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
@@ -111,6 +112,7 @@ export function RunsPanel() {
         <textarea
           value={request}
           onChange={(e) => setRequest(e.target.value)}
+          aria-label="What you want built"
           placeholder="Describe the feature you want, e.g. Add a /status endpoint that returns the app version"
           required
           rows={3}
@@ -140,6 +142,7 @@ export function RunsPanel() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search runs"
             placeholder="Search runs by what you asked for…"
             className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
           />
