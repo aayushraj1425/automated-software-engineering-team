@@ -31,19 +31,41 @@ FAKE_REPLY = (
 # Free-tier and burst-heavy providers throttle hard; wait and retry before
 # failing a whole agent run over a temporary 429.
 RATE_LIMIT_DELAYS_S = (15, 30, 60)
+# Transient provider failures (a dropped connection, a request timeout, a 5xx)
+# deserve a quick retry rather than failing the run — short backoff, and a
+# separate budget so a burst of 429s can't spend the retries meant for a flaky
+# connection (and vice versa).
+TRANSIENT_DELAYS_S = (1, 2, 4)
 
 
-async def _retry_rate_limits[T](call: Callable[[], Awaitable[T]]) -> T:
-    """Run an LLM call, sleeping through provider rate limits before giving up."""
+async def _call_with_retries[T](call: Callable[[], Awaitable[T]]) -> T:
+    """Run an LLM call, retrying through provider rate limits (long waits) and
+    transient failures (short backoff) before giving up. Each failure class has
+    its own attempt budget; anything else propagates immediately."""
     import litellm
 
-    for attempt, delay in enumerate(RATE_LIMIT_DELAYS_S, start=1):
+    rate_limit_delays = iter(RATE_LIMIT_DELAYS_S)
+    transient_delays = iter(TRANSIENT_DELAYS_S)
+    while True:
         try:
             return await call()
         except litellm.exceptions.RateLimitError:
-            log.warning("llm.rate_limited", attempt=attempt, retry_in_s=delay)
+            delay = next(rate_limit_delays, None)
+            if delay is None:
+                raise
+            log.warning("llm.rate_limited", retry_in_s=delay)
             await asyncio.sleep(delay)
-    return await call()
+        except (
+            litellm.exceptions.Timeout,
+            litellm.exceptions.APIConnectionError,
+            litellm.exceptions.ServiceUnavailableError,
+            litellm.exceptions.InternalServerError,
+        ) as error:
+            delay = next(transient_delays, None)
+            if delay is None:
+                raise
+            log.warning("llm.transient_error", error=type(error).__name__, retry_in_s=delay)
+            await asyncio.sleep(delay)
 
 
 def _fake_embedding(text: str) -> list[float]:
@@ -111,7 +133,7 @@ class ModelRouter:
 
             import litellm
 
-            response = await _retry_rate_limits(
+            response = await _call_with_retries(
                 lambda: litellm.acompletion(
                     model=model,
                     messages=messages,
@@ -150,7 +172,7 @@ class ModelRouter:
             import litellm
 
             # The caller's own key wins over the server's .env key (PROVIDER_KEYS.md).
-            response = await _retry_rate_limits(
+            response = await _call_with_retries(
                 lambda: litellm.acompletion(
                     model=model,
                     messages=messages,
@@ -199,7 +221,7 @@ class ModelRouter:
             import litellm
 
             started = time.monotonic()
-            response = await _retry_rate_limits(
+            response = await _call_with_retries(
                 lambda: litellm.acompletion(
                     model=model,
                     messages=messages,
@@ -269,7 +291,7 @@ class ModelRouter:
         import litellm
 
         started = time.monotonic()
-        response = await _retry_rate_limits(
+        response = await _call_with_retries(
             lambda: litellm.aembedding(
                 model=settings.model_embedding,
                 input=texts,
