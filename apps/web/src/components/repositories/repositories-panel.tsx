@@ -6,6 +6,7 @@ import { StatusChip } from "@/components/runs/status-chip";
 import { relativeTime } from "@/lib/relative-time";
 import { Button } from "../ui/button";
 import { EmptyState, FormError, Skeleton, Spinner } from "../ui/feedback";
+import { focusRing } from "../ui/focus-ring";
 import { DependencyGraphView } from "./dependency-graph";
 import type { DependencyGraph, RepositorySummary, SearchHit } from "./types";
 
@@ -166,14 +167,18 @@ export function RepositoriesPanel() {
           repositories.map((repo) => (
             <div
               key={repo.id}
-              onClick={() => selectRepository(repo.id)}
-              className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-4 py-3 ${
+              className={`flex items-center justify-between gap-3 rounded-md border px-4 py-3 ${
                 repo.id === selectedId
                   ? "border-zinc-500 bg-zinc-900"
                   : "border-zinc-800 hover:bg-zinc-900"
               }`}
             >
-              <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => selectRepository(repo.id)}
+                aria-pressed={repo.id === selectedId}
+                className={`min-w-0 flex-1 rounded text-left ${focusRing}`}
+              >
                 <p className="truncate text-sm">{repo.url}</p>
                 <p className="text-xs text-zinc-500">
                   {repo.chunks > 0
@@ -188,16 +193,13 @@ export function RepositoriesPanel() {
                     Indexing failed: {repo.status_detail}
                   </p>
                 )}
-              </div>
+              </button>
               <div className="flex shrink-0 items-center gap-3">
                 <StatusChip status={repo.status} />
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void startIndexing(repo.id);
-                  }}
+                  onClick={() => void startIndexing(repo.id)}
                   disabled={repo.status === "indexing"}
                 >
                   {repo.status === "indexing"
@@ -207,12 +209,10 @@ export function RepositoriesPanel() {
                       : "Index"}
                 </Button>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void disconnect(repo.id);
-                  }}
+                  type="button"
+                  onClick={() => void disconnect(repo.id)}
                   title="Disconnect — run history is kept"
-                  className="text-xs text-zinc-600 hover:text-red-400"
+                  className={`rounded text-xs text-zinc-600 hover:text-red-400 ${focusRing}`}
                 >
                   disconnect
                 </button>

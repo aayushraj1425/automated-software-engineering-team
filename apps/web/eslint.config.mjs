@@ -21,6 +21,7 @@ const eslintConfig = [
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...compat.extends("plugin:jsx-a11y/recommended"),
 ];
 
 export default eslintConfig;
