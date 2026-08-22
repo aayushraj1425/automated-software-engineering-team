@@ -19,7 +19,12 @@ log = structlog.get_logger(__name__)
 
 API_BASE = "https://api.github.com"
 
-_GITHUB_URL = re.compile(r"github\.com[:/](?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)(?:\.git)?/?$")
+# owner/repo are the first two path segments after github.com; anything after
+# them — a trailing slash, a /tree/... path, a ?query, a #fragment, or a .git
+# suffix — is ignored, so a URL copied from the browser address bar still parses.
+_GITHUB_URL = re.compile(
+    r"github\.com[:/](?P<owner>[^/\s]+)/(?P<repo>[^/\s#?]+?)(?:\.git)?(?:[/?#]|$)"
+)
 
 
 class PullRequestError(Exception):
