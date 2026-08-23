@@ -114,6 +114,28 @@ class ModelRouter:
         s = get_settings()
         return {"planner": s.model_planner, "coder": s.model_coder, "cheap": s.model_cheap}[tier]
 
+    def _record_stream_usage(self, span: trace.Span, tier: Tier, model: str, usage: Any) -> None:
+        """Record a streamed reply's tokens and cost the same way the non-stream
+        paths do. No-op when the provider returned no usage chunk, so a provider
+        that ignores include_usage costs nothing but a missing metric."""
+        if usage is None:
+            return
+        import litellm
+
+        input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        output_tokens = getattr(usage, "completion_tokens", 0) or 0
+        try:
+            prompt_cost, completion_cost = litellm.cost_per_token(
+                model=model, prompt_tokens=input_tokens, completion_tokens=output_tokens
+            )
+            cost = float(prompt_cost + completion_cost)
+        except Exception:  # cost tables lag behind new models; tokens still count
+            cost = 0.0
+        span.set_attribute("llm.input_tokens", input_tokens)
+        span.set_attribute("llm.output_tokens", output_tokens)
+        span.set_attribute("llm.cost_usd", cost)
+        record_llm_call(tier, model, cost, input_tokens, output_tokens)
+
     async def stream(self, tier: Tier, messages: list[dict[str, Any]]) -> AsyncIterator[str]:
         settings = get_settings()
         model = self.resolve(tier)
@@ -140,14 +162,24 @@ class ModelRouter:
                     stream=True,
                     api_key=api_key_for_model(model),
                     timeout=settings.llm_request_timeout_seconds or None,
+                    # Ask for a final usage-bearing chunk so streamed replies
+                    # count toward the spend metrics like non-streamed ones do.
+                    stream_options={"include_usage": True},
                 )
             )
             chunks = 0
+            usage: Any = None
             async for chunk in response:  # type: ignore[union-attr]
+                # The usage-only final chunk (include_usage) carries no choices.
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage
+                if not chunk.choices:  # type: ignore[union-attr]
+                    continue
                 delta = chunk.choices[0].delta.content  # type: ignore[union-attr]
                 if delta:
                     chunks += 1
                     yield delta
+            self._record_stream_usage(span, tier, model, usage)
             span.set_attribute("llm.chunks", chunks)
             log.info(
                 "llm.stream",
