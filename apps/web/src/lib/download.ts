@@ -5,8 +5,14 @@ export function downloadTextFile(filename: string, text: string, type = "text/ma
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  // The anchor must be in the document for the click to trigger a download in
+  // some browsers (notably Firefox); remove it again right after.
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  // Revoke on the next tick, not synchronously: some browsers abort the
+  // download if the object URL is revoked before they have read the blob.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** Fetch an endpoint that returns `{ markdown, filename }` and save it as a
