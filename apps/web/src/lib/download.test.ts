@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { downloadTextFile } from "./download";
+import { downloadMarkdownFrom, downloadTextFile } from "./download";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -51,5 +51,65 @@ describe("downloadTextFile", () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalled();
     vi.runAllTimers();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:fake");
+  });
+});
+
+// downloadMarkdownFrom is called fire-and-forget (`void downloadMarkdownFrom(...)`),
+// so its whole contract is to be a no-op on any failure: never reject, never save a
+// file named "undefined". These tests pin each failure mode alongside the happy path.
+describe("downloadMarkdownFrom", () => {
+  it("saves the returned markdown under the returned filename", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ markdown: "# report", filename: "run-42.md" }),
+      })),
+    );
+
+    await downloadMarkdownFrom("/api/runs/42/report");
+
+    const anchor = click.mock.instances[0] as unknown as HTMLAnchorElement;
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(anchor.download).toBe("run-42.md");
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing when the response is not ok", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, json: async () => ({ markdown: "x", filename: "y.md" }) })),
+    );
+
+    await downloadMarkdownFrom("/api/runs/42/report");
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the body is missing the expected fields", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ markdown: 123, filename: null }) })),
+    );
+
+    await downloadMarkdownFrom("/api/runs/42/report");
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("swallows a network error instead of rejecting", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    await expect(downloadMarkdownFrom("/api/runs/42/report")).resolves.toBeUndefined();
+    expect(click).not.toHaveBeenCalled();
   });
 });

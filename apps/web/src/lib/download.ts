@@ -16,10 +16,24 @@ export function downloadTextFile(filename: string, text: string, type = "text/ma
 }
 
 /** Fetch an endpoint that returns `{ markdown, filename }` and save it as a
- * file. A no-op if the request fails — the caller need not handle the error. */
+ * file. A no-op if anything goes wrong — a failed request, a body that isn't
+ * the expected shape, or a network error — so the fire-and-forget callers never
+ * see an unhandled rejection or a download named "undefined". */
 export async function downloadMarkdownFrom(url: string): Promise<void> {
-  const res = await fetch(url);
-  if (!res.ok) return;
-  const { markdown, filename } = (await res.json()) as { markdown: string; filename: string };
-  downloadTextFile(filename, markdown);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data: unknown = await res.json();
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      typeof (data as Record<string, unknown>).markdown === "string" &&
+      typeof (data as Record<string, unknown>).filename === "string"
+    ) {
+      const { markdown, filename } = data as { markdown: string; filename: string };
+      downloadTextFile(filename, markdown);
+    }
+  } catch {
+    // network error or a body that wasn't JSON — nothing to download
+  }
 }
