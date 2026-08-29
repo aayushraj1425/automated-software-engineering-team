@@ -127,6 +127,17 @@ describe("describeEvent", () => {
     expect(line.length).toBeLessThan(180);
   });
 
+  it("humanizes every underscore in a status, not just the first", () => {
+    // Statuses are documented to grow without a migration (db/enums.py), so a
+    // future multi-word status must still read cleanly, not keep a stray "_".
+    expect(describeEvent(event("run.status_changed", { to: "awaiting_plan_approval" }))).toBe(
+      "Run is now awaiting plan approval",
+    );
+    expect(describeEvent(event("task.status_changed", { to: "waiting_on_review" }))).toBe(
+      "Task is now waiting on review",
+    );
+  });
+
   it("falls back to the raw type for unknown events", () => {
     expect(describeEvent(event("something.new", {}))).toBe("something.new");
   });

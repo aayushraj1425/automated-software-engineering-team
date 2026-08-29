@@ -25,7 +25,7 @@ export function StatusChip({ status }: { status: string }) {
         COLORS[status] ?? "bg-zinc-800 text-zinc-300"
       }`}
     >
-      {status.replace("_", " ")}
+      {status.replace(/_/g, " ")}
     </span>
   );
 }

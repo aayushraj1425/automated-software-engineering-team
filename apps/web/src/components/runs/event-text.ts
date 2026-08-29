@@ -45,7 +45,7 @@ export function describeEvent(event: RunEvent): string {
     case "run.started":
       return `Run started: "${String(p.request ?? "")}"`;
     case "run.status_changed":
-      return `Run is now ${String(p.to ?? "?").replace("_", " ")}`;
+      return `Run is now ${String(p.to ?? "?").replace(/_/g, " ")}`;
     case "plan.created":
       return `${agentName(event.agent)} wrote the plan (${
         Array.isArray(p.tasks) ? p.tasks.length : 0
@@ -63,7 +63,7 @@ export function describeEvent(event: RunEvent): string {
         return p.reason
           ? `Task${title} skipped: ${String(p.reason)}`
           : `Task skipped (the run stopped first)`;
-      return `Task is now ${to.replace("_", " ")}`;
+      return `Task is now ${to.replace(/_/g, " ")}`;
     }
     case "task.attempt_failed":
       return `${agentName(event.agent)} hit an error and will retry: ${String(p.error ?? "")}`;
