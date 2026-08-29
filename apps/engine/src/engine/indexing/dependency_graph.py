@@ -165,11 +165,18 @@ def _resolve_fqn(fqn: str, symbols: _SymbolIndex) -> list[str]:
 
 
 def _repository_files(root: Path) -> set[str]:
+    # Prune skip directories from the walk in place (see chunker.iter_source_files
+    # for the same reasoning): a repo's .git and node_modules can hold hundreds of
+    # thousands of files, and rglob would descend and stat every one only to drop
+    # it by name. The result is an unordered set, so no sorting is needed.
     files: set[str] = set()
-    for file in root.rglob("*"):
-        if any(part in SKIP_DIRS for part in file.parts) or not file.is_file():
-            continue
-        files.add(file.relative_to(root).as_posix())
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        base = Path(dirpath)
+        for name in filenames:
+            file = base / name
+            if file.is_file():  # skip broken symlinks and the like
+                files.add(file.relative_to(root).as_posix())
     return files
 
 

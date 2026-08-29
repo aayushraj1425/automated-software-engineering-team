@@ -173,6 +173,18 @@ def test_dependency_graph_resolves_kotlin_imports(tmp_path):
     assert ("app/App.kt", "app/App.kt") not in edges  # no self-edges
 
 
+def test_dependency_graph_skips_vendored_directories(tmp_path):
+    # Files inside a skip dir must never be walked: a.js imports ./b, which would
+    # otherwise resolve to a first-party edge. Pruning the dir means neither file
+    # is seen, so there are no edges at all.
+    pkg = tmp_path / "node_modules" / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "a.js").write_text("import './b'\nexport const y = 1;\n")
+    (pkg / "b.js").write_text("export const x = 1;\n")
+
+    assert build_dependency_graph(tmp_path) == []
+
+
 async def test_connect_index_and_search(client, tmp_path):
     origin = prepare_fixture_repo(tmp_path / "origin")
     headers = auth_headers(f"user_{uuid.uuid4().hex[:8]}")
