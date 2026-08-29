@@ -12,6 +12,7 @@ windows, so the chunker never fails a file. A chunk stays
 Design note: docs/architecture/repository-intelligence/AST_CHUNKING.md.
 """
 
+import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
@@ -126,10 +127,8 @@ def iter_source_files(root: Path) -> Iterator[tuple[Path, str, str]]:
     so the chunker and the incremental indexer always agree on which files count.
     """
     files_seen = 0
-    for file in sorted(root.rglob("*")):
-        if any(part in SKIP_DIRS for part in file.parts):
-            continue
-        if not file.is_file():
+    for file in _walk_indexable(root):
+        if not file.is_file():  # skip broken symlinks and the like
             continue
         language = LANGUAGES.get(file.suffix.lower())
         if language is None or file.stat().st_size > MAX_FILE_BYTES:
@@ -138,6 +137,21 @@ def iter_source_files(root: Path) -> Iterator[tuple[Path, str, str]]:
         if files_seen > MAX_FILES:
             break
         yield file, file.relative_to(root).as_posix(), language
+
+
+def _walk_indexable(root: Path) -> list[Path]:
+    """Every file under ``root``, sorted, with SKIP_DIRS pruned *before*
+    descending. os.walk lets us drop those directories from the traversal in
+    place, so a large repo's .git or node_modules — often hundreds of thousands
+    of files — is never walked or stat-ed, unlike rglob which enumerates them
+    only to discard by name. Sorting the collected files reproduces rglob's
+    ordering exactly, so which files fall under MAX_FILES is unchanged."""
+    files: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        base = Path(dirpath)
+        files.extend(base / name for name in filenames)
+    return sorted(files)
 
 
 def chunk_repository(root: Path) -> list[Chunk]:

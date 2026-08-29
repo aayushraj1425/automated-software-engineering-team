@@ -43,11 +43,17 @@ def test_chunker_windows_languages_and_skips(tmp_path):
     (tmp_path / "image.bin").write_bytes(b"\x00\x01")
     (tmp_path / "node_modules").mkdir()
     (tmp_path / "node_modules" / "dep.js").write_text("module.exports = 1;")
+    # A skip dir nested below the root must be pruned too, not just at the top.
+    (tmp_path / "src" / "vendor").mkdir(parents=True)
+    (tmp_path / "src" / "vendor" / "node_modules").mkdir()
+    (tmp_path / "src" / "vendor" / "node_modules" / "buried.js").write_text("export const x = 1;")
+    (tmp_path / "src" / "app.py").write_text("print('hi')\n")
 
     chunks = chunk_repository(tmp_path)
 
     paths = {chunk.path for chunk in chunks}
-    assert paths == {"big.py", "notes.md"}  # binaries and node_modules skipped
+    # binaries and node_modules (top-level and nested) skipped; real code kept
+    assert paths == {"big.py", "notes.md", "src/app.py"}
     big = [chunk for chunk in chunks if chunk.path == "big.py"]
     # No definitions in this file, so it falls back to overlapping line windows.
     assert [chunk.start_line for chunk in big] == [1, 51, 101]
