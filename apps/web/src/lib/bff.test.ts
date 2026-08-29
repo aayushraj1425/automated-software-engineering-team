@@ -96,6 +96,36 @@ describe("proxyToEngine", () => {
     expect(init.body).toBe(JSON.stringify({ decision: "approve" }));
   });
 
+  it("returns 504 when the engine call times out", async () => {
+    getSession.mockResolvedValue(LOGGED_IN);
+    fetchMock.mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
+
+    const res = await proxyToEngine(new Request("http://web/api/runs"), "/v1/runs");
+
+    expect(res.status).toBe(504);
+    expect(await res.json()).toEqual({ error: "Engine timed out" });
+  });
+
+  it("returns 502 when the engine is unreachable", async () => {
+    getSession.mockResolvedValue(LOGGED_IN);
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const res = await proxyToEngine(new Request("http://web/api/runs"), "/v1/runs");
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "Engine unavailable" });
+  });
+
+  it("aborts the engine call on a timeout signal", async () => {
+    getSession.mockResolvedValue(LOGGED_IN);
+    fetchMock.mockResolvedValue(jsonResponse("[]", 200));
+
+    await proxyToEngine(new Request("http://web/api/runs"), "/v1/runs");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("returns 400 on an unreadable body and never calls the engine", async () => {
     getSession.mockResolvedValue(LOGGED_IN);
     const req = new Request("http://web/api/runs/1/decision", {

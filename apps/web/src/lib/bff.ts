@@ -50,12 +50,27 @@ export async function proxyToEngine(
   const token = await signServiceToken(session, { orgRole: options.orgRole });
   headers.authorization = `Bearer ${token}`;
 
-  const upstream = await fetch(`${env.ENGINE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body,
-    cache: "no-store",
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${env.ENGINE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body,
+      cache: "no-store",
+      // A hung engine must not hold a Next.js request open forever; abort and
+      // report a gateway error the browser can retry rather than a stalled tab.
+      signal: AbortSignal.timeout(env.ENGINE_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // The engine is unreachable (down, refused) or too slow (timeout). Relay a
+    // gateway status with a JSON body so every /api/* caller — which reads the
+    // response as JSON — gets a consistent shape instead of an unhandled 500.
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return Response.json(
+      { error: timedOut ? "Engine timed out" : "Engine unavailable" },
+      { status: timedOut ? 504 : 502 },
+    );
+  }
 
   if (upstream.status === 204) {
     return new Response(null, { status: 204 });

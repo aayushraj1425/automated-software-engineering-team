@@ -11,6 +11,9 @@ export const env = {
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "dev-only-secret-change-me-0000000000",
   BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   ENGINE_URL: process.env.ENGINE_URL ?? "http://localhost:8000",
+  // Cap how long a BFF proxy call waits on the engine, so a hung engine can't
+  // pin a Next.js request open indefinitely. Streaming routes set their own.
+  ENGINE_TIMEOUT_MS: Number(process.env.ENGINE_TIMEOUT_MS ?? "30000"),
   ENGINE_SERVICE_SECRET:
     process.env.ENGINE_SERVICE_SECRET ?? "dev-only-service-secret-change-me-00",
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
