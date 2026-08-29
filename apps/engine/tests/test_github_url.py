@@ -19,10 +19,18 @@ from engine.github import parse_github_repo
         "https://github.com/octocat/hello-world?tab=readme-ov-file",
         "https://github.com/octocat/hello-world#readme",
         "  https://github.com/octocat/hello-world  ",  # stray whitespace
+        "https://GitHub.com/octocat/hello-world",  # mixed-case host
+        "https://GITHUB.COM/octocat/hello-world",  # upper-case host
     ],
 )
 def test_extracts_owner_and_repo(url):
     assert parse_github_repo(url) == ("octocat", "hello-world")
+
+
+def test_owner_and_repo_keep_their_case_even_with_a_mixed_case_host():
+    # The host match is case-insensitive, but owner/repo are case-sensitive on
+    # GitHub, so their original casing must survive.
+    assert parse_github_repo("https://GITHUB.COM/OctoCat/Hello-World") == ("OctoCat", "Hello-World")
 
 
 def test_keeps_a_dotted_repo_name_intact():

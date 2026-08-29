@@ -22,8 +22,11 @@ API_BASE = "https://api.github.com"
 # owner/repo are the first two path segments after github.com; anything after
 # them — a trailing slash, a /tree/... path, a ?query, a #fragment, or a .git
 # suffix — is ignored, so a URL copied from the browser address bar still parses.
+# The host is matched case-insensitively (domains are case-insensitive, and
+# people do paste "GitHub.com"); the owner/repo groups keep their original case.
 _GITHUB_URL = re.compile(
-    r"github\.com[:/](?P<owner>[^/\s]+)/(?P<repo>[^/\s#?]+?)(?:\.git)?(?:[/?#]|$)"
+    r"github\.com[:/](?P<owner>[^/\s]+)/(?P<repo>[^/\s#?]+?)(?:\.git)?(?:[/?#]|$)",
+    re.IGNORECASE,
 )
 
 
@@ -137,6 +140,9 @@ async def open_pull_request(
         )
     if response.status_code != 201:
         raise PullRequestError(f"GitHub refused the pull request: {_refusal_detail(response)}")
-    url = response.json()["html_url"]
+    # Read the URL defensively (like post_pull_request_review): a 201 with an
+    # unexpected body should not turn into a raw KeyError on the success path.
+    payload = response.json()
+    url = payload.get("html_url", "") if isinstance(payload, dict) else ""
     log.info("pr.opened", repo=f"{owner}/{repo}", branch=branch, url=url)
     return url
