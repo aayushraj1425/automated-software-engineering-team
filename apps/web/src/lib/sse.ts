@@ -18,15 +18,31 @@ export async function* parseSse(stream: ReadableStream<Uint8Array>): AsyncGenera
         const raw = buffer.slice(0, sep);
         buffer = buffer.slice(sep + 2);
         let event = "message";
-        let data = "";
+        const dataLines: string[] = [];
         for (const line of raw.split("\n")) {
           if (line.startsWith("event:")) event = line.slice(6).trim();
-          else if (line.startsWith("data:")) data += line.slice(5).trim();
+          // Per the SSE spec a frame may carry several data: lines that join
+          // with newlines; concatenating them directly would corrupt the JSON.
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
         }
-        if (data) yield { event, data: JSON.parse(data) };
+        if (dataLines.length === 0) continue;
+        const parsed = tryParse(dataLines.join("\n"));
+        // A single corrupt frame must not abort a whole live run: skip it and
+        // keep reading rather than rejecting the generator mid-stream.
+        if (parsed !== undefined) yield { event, data: parsed };
       }
     }
   } finally {
     reader.releaseLock();
+  }
+}
+
+/** Parse one frame's JSON payload, returning undefined (not throwing) on a
+ * malformed frame so the caller can skip it and keep the stream alive. */
+function tryParse(data: string): Record<string, unknown> | undefined {
+  try {
+    return JSON.parse(data);
+  } catch {
+    return undefined;
   }
 }

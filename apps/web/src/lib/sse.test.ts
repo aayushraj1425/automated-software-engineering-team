@@ -39,4 +39,23 @@ describe("parseSse", () => {
     for await (const e of parseSse(stream)) events.push(e);
     expect(events.map((e) => e.data.text)).toEqual(["a", "b"]);
   });
+
+  it("skips a corrupt frame instead of aborting the stream", async () => {
+    const stream = streamOf(
+      'event: token\ndata: {"text":"a"}\n\n',
+      "event: token\ndata: {not json\n\n",
+      'event: token\ndata: {"text":"b"}\n\n',
+    );
+    const events = [];
+    for await (const e of parseSse(stream)) events.push(e);
+    // The good frames on either side of the bad one still arrive.
+    expect(events.map((e) => e.data.text)).toEqual(["a", "b"]);
+  });
+
+  it("joins multiple data lines with newlines before parsing", async () => {
+    const stream = streamOf('event: token\ndata: {"text":\ndata: "ab"}\n\n');
+    const events = [];
+    for await (const e of parseSse(stream)) events.push(e);
+    expect(events).toEqual([{ event: "token", data: { text: "ab" } }]);
+  });
 });
