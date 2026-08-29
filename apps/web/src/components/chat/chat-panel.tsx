@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "@/lib/auth-client";
 import { downloadMarkdownFrom } from "@/lib/download";
 import { relativeTime } from "@/lib/relative-time";
+import { isScrolledToBottom } from "@/lib/scroll";
 import { parseSse } from "@/lib/sse";
 
 import { mainContentProps } from "@/components/ui/main-content";
@@ -24,6 +25,9 @@ export function ChatPanel({ userName }: { userName: string }) {
   const [repositoryId, setRepositoryId] = useState<string>("");
   const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Follow new messages only while the reader is at the bottom; the moment they
+  // scroll up to read history, stop yanking them back down on every token.
+  const followRef = useRef(true);
 
   const refreshConversations = useCallback(async () => {
     const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : "";
@@ -46,7 +50,7 @@ export function ChatPanel({ userName }: { userName: string }) {
   }, [refreshConversations]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    if (followRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
   async function openConversation(id: string) {
@@ -99,6 +103,8 @@ export function ChatPanel({ userName }: { userName: string }) {
 
   async function send(text: string) {
     setBusy(true);
+    // Sending is an explicit "take me to the newest" gesture: resume following.
+    followRef.current = true;
     const userMsg: ChatMessage = { id: `local-${Date.now()}`, role: "user", content: text };
     const draftId = `draft-${Date.now()}`;
     setMessages((prev) => [
@@ -286,7 +292,13 @@ export function ChatPanel({ userName }: { userName: string }) {
             ))}
           </select>
         </div>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
+        <div
+          ref={scrollRef}
+          onScroll={(e) => {
+            followRef.current = isScrolledToBottom(e.currentTarget);
+          }}
+          className="flex-1 overflow-y-auto p-6"
+        >
           <MessageList messages={messages} />
         </div>
         <Composer disabled={busy} onSend={(t) => void send(t)} />
