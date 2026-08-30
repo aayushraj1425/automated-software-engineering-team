@@ -12,6 +12,9 @@ const COLORS: Record<string, string> = {
   blocked: "bg-zinc-800 text-zinc-400",
   in_progress: "bg-amber-950 text-amber-300",
   skipped: "bg-zinc-800 text-zinc-400",
+  // Work-item states (planning board): proposed is tentative, ready is a go.
+  proposed: "bg-blue-950 text-blue-300",
+  ready: "bg-teal-950 text-teal-300",
   connected: "bg-zinc-800 text-zinc-300",
   indexing: "bg-amber-950 text-amber-300",
   indexed: "bg-emerald-950 text-emerald-300",
