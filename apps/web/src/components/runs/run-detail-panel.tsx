@@ -9,6 +9,7 @@ import { relativeTime } from "@/lib/relative-time";
 import { EmptyState, FormError, Spinner } from "../ui/feedback";
 import { focusRing } from "../ui/focus-ring";
 import { agentStyle } from "./agent-style";
+import { DeploymentPanel } from "./deployment-panel";
 import { DiffView } from "./diff-view";
 import {
   agentName,
@@ -17,18 +18,34 @@ import {
   REASONING_PREVIEW,
   timelineAgents,
 } from "./event-text";
+import { levelName, shortModel } from "./roster";
 import { StatusChip } from "./status-chip";
-import { FINISHED_STATUSES, type RunDetail, type RunEvent, type WorkspaceFile } from "./types";
+import { TeamRoster } from "./team-roster";
+import {
+  FINISHED_STATUSES,
+  type CatalogModel,
+  type RunDetail,
+  type RunEvent,
+  type WorkspaceFile,
+} from "./types";
 
 const POLL_MS = 1500;
 
 // The diff exists once the engineers have worked (and the workspace remains).
-const DIFF_STATUSES = new Set(["reviewing", "completed", "failed"]);
+const DIFF_STATUSES = new Set([
+  "reviewing",
+  "awaiting_deploy_approval",
+  "deploying",
+  "completed",
+  "failed",
+]);
 // The workspace exists from planning onward (until a rejected run deletes it).
 const FILE_STATUSES = new Set([
   "awaiting_approval",
   "executing",
   "reviewing",
+  "awaiting_deploy_approval",
+  "deploying",
   "completed",
   "failed",
 ]);
@@ -119,6 +136,13 @@ export function RunDetailPanel({ runId }: { runId: string }) {
   const [planNote, setPlanNote] = useState<string | null>(null);
   const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogModel[] | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [rosterBusy, setRosterBusy] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [deployBusy, setDeployBusy] = useState(false);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const catalogRequestedRef = useRef(false);
   const cursorRef = useRef(0);
   const diffRequestedRef = useRef(false);
   const filesRequestedRef = useRef(false);
@@ -287,20 +311,95 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     }
   }
 
+  async function reloadRun() {
+    const res = await fetch(`/api/runs/${runId}`);
+    if (res.ok) setRun(await res.json());
+  }
+
   async function decide(approved: boolean) {
     setDeciding(true);
+    setPlanNote(null);
     try {
       const res = await fetch(`/api/runs/${runId}/decision`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ approved }),
       });
-      if (res.ok) {
-        const updated: RunDetail = await res.json();
-        setRun((prev) => (prev ? { ...prev, status: updated.status } : prev));
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.detail ?? `Could not record your decision (${res.status})`);
       }
+      setRun((prev) => (prev ? { ...prev, status: body.status } : prev));
+    } catch (err) {
+      setPlanNote(err instanceof Error ? err.message : "Could not record your decision");
     } finally {
       setDeciding(false);
+    }
+  }
+
+  async function changeComplexity(complexity: string) {
+    setDeciding(true);
+    setPlanNote(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/triage`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ complexity }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.detail ?? "Could not change complexity");
+      setRun((prev) => (prev ? { ...prev, ...body } : prev));
+      // A new complexity can mean a different team; fetch the roster it produced.
+      await reloadRun();
+    } catch (err) {
+      setPlanNote(err instanceof Error ? err.message : "Could not change complexity");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
+  /** Save per-seat model overrides. The engine answers with the full run detail,
+   * which replaces the local copy so the roster always shows what was stored. An
+   * empty map restores auto selection. */
+  async function changeRoster(modelOverrides: Record<string, string>) {
+    setRosterBusy(true);
+    setRosterError(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/roster`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model_overrides: modelOverrides }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.detail ?? `Could not change the models (${res.status})`);
+      setRun(body as RunDetail);
+    } catch (err) {
+      setRosterError(err instanceof Error ? err.message : "Could not change the models");
+    } finally {
+      setRosterBusy(false);
+    }
+  }
+
+  /** The second human approval, for the preview deploy. */
+  async function decideDeploy(approved: boolean) {
+    setDeployBusy(true);
+    setDeployError(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/deploy-decision`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ approved }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.detail ?? `Could not record the deploy decision (${res.status})`);
+      }
+      // The engine returns only a short summary, so refetch the full run.
+      await reloadRun();
+    } catch (err) {
+      setDeployError(err instanceof Error ? err.message : "Could not record the deploy decision");
+    } finally {
+      setDeployBusy(false);
     }
   }
 
@@ -406,6 +505,23 @@ export function RunDetailPanel({ runId }: { runId: string }) {
     })();
   }, [run, runId]);
 
+  // The catalog feeds the roster's model selects; it is only needed while the
+  // plan awaits approval, so it is fetched once, then.
+  useEffect(() => {
+    if (!run || catalogRequestedRef.current || run.status !== "awaiting_approval") return;
+    catalogRequestedRef.current = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/models");
+        const body = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(body?.detail ?? body?.error ?? `HTTP ${res.status}`);
+        setCatalog(body as CatalogModel[]);
+      } catch (err) {
+        setCatalogError(err instanceof Error ? err.message : "could not load the catalog");
+      }
+    })();
+  }, [run]);
+
   const isLive = run !== null && !FINISHED_STATUSES.has(run.status);
   // Follow the newest event while the run is live — block: "nearest" only scrolls
   // when the sentinel is off-screen, so a user reading earlier events isn't yanked.
@@ -457,6 +573,12 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         <h1 className="text-lg font-semibold">{run.request}</h1>
         <FormError message={run.error} />
         {run.plan?.summary && <p className="text-sm text-zinc-400">{run.plan.summary}</p>}
+        {run.complexity && (
+          <p className="text-sm text-zinc-400">
+            <span className="capitalize">{run.complexity}</span> · {run.triage_reason}
+            {run.test_only && " · Report only; no code changes"}
+          </p>
+        )}
         {run.total_input_tokens + run.total_output_tokens > 0 && (
           <p className="text-xs text-zinc-500">
             {run.total_input_tokens.toLocaleString()} tokens in ·{" "}
@@ -508,16 +630,46 @@ export function RunDetailPanel({ runId }: { runId: string }) {
         </div>
       </header>
 
+      {run.test_report && (
+        <section className="space-y-2 rounded-md border border-zinc-700 p-4">
+          <h2 className="font-medium">Test report: {run.test_report.status}</h2>
+          <p className="text-sm text-zinc-400">Scope: {run.test_report.scope}</p>
+          <p className="text-sm text-zinc-400">
+            Command: {run.test_report.test_command ?? "not run"}
+          </p>
+          {run.test_report.reason && <p className="text-sm">{run.test_report.reason}</p>}
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs text-zinc-300">
+            {run.test_report.output || "No test output."}
+          </pre>
+        </section>
+      )}
+
       {run.status === "awaiting_approval" && (
         <section className="space-y-3 rounded-md border border-violet-900 bg-violet-950/30 p-4">
           <p className="text-sm text-zinc-200">
             The plan is ready. Nothing runs until you decide — a nearly-right plan can be edited
             below before approving.
           </p>
+          {run.complexity && (
+            <label className="flex items-center gap-3 text-sm text-zinc-300">
+              Task complexity
+              <select
+                aria-label="Task complexity"
+                value={run.complexity}
+                disabled={deciding || editingPlan || rosterBusy}
+                onChange={(event) => void changeComplexity(event.target.value)}
+                className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
+              >
+                <option value="quick">Quick</option>
+                <option value="standard">Standard</option>
+                <option value="complex">Complex</option>
+              </select>
+            </label>
+          )}
           <div className="flex gap-3">
             <button
               onClick={() => void decide(true)}
-              disabled={deciding || editingPlan}
+              disabled={deciding || editingPlan || rosterBusy}
               className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Approve plan
@@ -559,6 +711,35 @@ export function RunDetailPanel({ runId }: { runId: string }) {
           <FormError message={planNote} />
         </section>
       )}
+
+      {run.design_note && (
+        <section className="space-y-2" aria-label="Design note">
+          <h2 className="text-sm font-semibold text-zinc-300">
+            Design note <span className="font-normal text-zinc-500">— Principal Engineer</span>
+          </h2>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-800 p-3 font-sans text-sm text-zinc-300">
+            {run.design_note}
+          </pre>
+        </section>
+      )}
+
+      <TeamRoster
+        team={run.team ?? []}
+        overrides={run.model_overrides ?? {}}
+        catalog={catalog}
+        catalogError={catalogError}
+        editable={run.status === "awaiting_approval" && !editingPlan}
+        busy={rosterBusy || deciding}
+        error={rosterError}
+        onChange={(overrides) => void changeRoster(overrides)}
+      />
+
+      <DeploymentPanel
+        run={run}
+        busy={deployBusy}
+        error={deployError}
+        onDecide={(approved) => void decideDeploy(approved)}
+      />
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Task board</h2>
@@ -624,7 +805,11 @@ export function RunDetailPanel({ runId }: { runId: string }) {
                 <p className="truncate text-sm">
                   {task.sequence}. {task.title}
                 </p>
-                <p className="text-xs text-zinc-500">{agentName(task.role)}</p>
+                <p className="text-xs text-zinc-500">
+                  {agentName(task.role)}
+                  {task.level && ` · ${levelName(task.level)}`}
+                  {task.model && ` · ${shortModel(task.model)}`}
+                </p>
               </div>
               <StatusChip status={task.status} />
             </div>

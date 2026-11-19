@@ -1,5 +1,7 @@
 import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import { OrganizationsPanel } from "@/components/settings/organizations-panel";
+import { ModelPolicyPanel } from "@/components/settings/model-policy-panel";
+import { PreviewCredentialPanel } from "@/components/settings/preview-credential-panel";
 import { ProviderKeysPanel } from "@/components/settings/provider-keys-panel";
 import { WorkspaceShell } from "@/components/ui/workspace-shell";
 
@@ -10,6 +12,8 @@ export default function SettingsPage() {
     <WorkspaceShell title="Settings">
       <OrganizationsPanel />
       <ProviderKeysPanel />
+      <ModelPolicyPanel />
+      <PreviewCredentialPanel />
       <IntegrationsPanel />
     </WorkspaceShell>
   );

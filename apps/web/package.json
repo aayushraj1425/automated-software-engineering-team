@@ -12,6 +12,7 @@
     "auth:migrate": "npx @better-auth/cli migrate --config src/lib/auth.ts -y"
   },
   "dependencies": {
+    "@asep/shared": "workspace:*",
     "better-auth": "1.4.21",
     "dotenv": "^16.4.7",
     "jose": "^5.9.6",

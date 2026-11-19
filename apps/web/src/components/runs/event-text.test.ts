@@ -138,6 +138,56 @@ describe("describeEvent", () => {
     );
   });
 
+  it("describes model picks and team assembly", () => {
+    expect(
+      describeEvent(
+        event(
+          "model.selected",
+          { model: "anthropic/claude-opus-5-5", reason: "auto: cheapest at strength 4" },
+          "backend",
+        ),
+      ),
+    ).toBe("Backend uses claude-opus-5-5 (auto: cheapest at strength 4)");
+    expect(
+      describeEvent(event("team.assembled", { template: "complex", roles: ["backend"] })),
+    ).toBe("complex team: Backend");
+    expect(
+      describeEvent(
+        event("team.assembled", {
+          template: "complex",
+          seats: [{ key: "principal_engineer:principal" }, "backend:senior"],
+        }),
+      ),
+    ).toBe("complex team: Principal Engineer (Principal), Backend (Senior)");
+    expect(describeEvent(event("team.updated", { by: "u1" }))).toBe(
+      "You changed the team's models",
+    );
+  });
+
+  it("describes the preview deploy and keeps simulated runs distinct", () => {
+    expect(describeEvent(event("deploy.started", { namespace: "asep-preview-1" }))).toBe(
+      "Preview deploy started in asep-preview-1",
+    );
+    expect(describeEvent(event("deploy.started", { simulated: true }))).toBe(
+      "Simulated preview deploy started (no real cloud)",
+    );
+    expect(
+      describeEvent(event("deploy.finished", { status: "deployed", url: "https://p.example.com" })),
+    ).toBe("Preview deploy finished: https://p.example.com");
+    expect(describeEvent(event("deploy.finished", { status: "simulated" }))).toBe(
+      "Simulated preview deploy finished (no real cloud)",
+    );
+    expect(
+      describeEvent(event("deploy.finished", { status: "failed", error: "helm failed" })),
+    ).toBe("Preview deploy failed: helm failed");
+    expect(describeEvent(event("deploy.approved", { by: "u1" }))).toBe(
+      "You approved the preview deploy",
+    );
+    expect(describeEvent(event("deploy.rejected", { by: "u1" }))).toBe(
+      "You rejected the preview deploy, run cancelled",
+    );
+  });
+
   it("falls back to the raw type for unknown events", () => {
     expect(describeEvent(event("something.new", {}))).toBe("something.new");
   });

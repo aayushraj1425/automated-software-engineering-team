@@ -38,6 +38,12 @@ export function RunsPanel() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [request, setRequest] = useState("");
+  const [previewMode, setPreviewMode] = useState("infer");
+  const [chartPath, setChartPath] = useState("deploy/helm");
+  const [valuesFile, setValuesFile] = useState("");
+  const [image, setImage] = useState("");
+  const [ttlHours, setTtlHours] = useState(24);
+  const [smokePaths, setSmokePaths] = useState("/healthz");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingRuns, setLoadingRuns] = useState(true);
@@ -86,9 +92,32 @@ export function RunsPanel() {
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ request, repository_url: repositoryUrl }),
+        body: JSON.stringify({
+          request,
+          repository_url: repositoryUrl,
+          ...(previewMode !== "infer" && { preview_requested: previewMode === "request" }),
+          ...(previewMode === "request" && {
+            preview_options: {
+              chart_path: chartPath.trim(),
+              values_file: valuesFile.trim() || null,
+              image: image.trim() || null,
+              ttl_hours: ttlHours,
+              smoke_paths: smokePaths
+                .split(",")
+                .map((path) => path.trim())
+                .filter(Boolean),
+            },
+          }),
+        }),
       });
-      if (!res.ok) throw new Error(`Could not start the run (${res.status})`);
+      if (!res.ok) {
+        const failure = await res.json().catch(() => null);
+        throw new Error(
+          typeof failure?.detail === "string"
+            ? failure.detail
+            : `Could not start the run (${res.status})`,
+        );
+      }
       const run: RunSummary = await res.json();
       router.push(`/runs/${run.id}`);
     } catch (err) {
@@ -118,6 +147,60 @@ export function RunsPanel() {
           rows={3}
           className="w-full resize-none rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
         />
+        <label className="block space-y-1 text-xs text-zinc-400">
+          <span>Preview deployment</span>
+          <select
+            value={previewMode}
+            onChange={(e) => setPreviewMode(e.target.value)}
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          >
+            <option value="infer">Infer from the request</option>
+            <option value="off">Do not deploy</option>
+            <option value="request">Request a preview</option>
+          </select>
+        </label>
+        {previewMode === "request" && (
+          <fieldset className="space-y-3 rounded-md border border-zinc-800 p-3">
+            <legend className="px-1 text-xs text-zinc-400">Preview settings</legend>
+            <p className="text-xs text-zinc-500">
+              Uses your organization&apos;s preview cluster and requires a second approval. Publish
+              the image first, or use the image already set in your chart.
+            </p>
+            {[
+              { label: "Helm chart path", value: chartPath, set: setChartPath, required: true },
+              { label: "Values file (optional)", value: valuesFile, set: setValuesFile },
+              { label: "Published image (optional)", value: image, set: setImage },
+              {
+                label: "Smoke paths (comma separated)",
+                value: smokePaths,
+                set: setSmokePaths,
+                required: true,
+              },
+            ].map(({ label, value, set, required }) => (
+              <label key={label} className="block space-y-1 text-xs text-zinc-400">
+                <span>{label}</span>
+                <input
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  required={required}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+                />
+              </label>
+            ))}
+            <label className="block space-y-1 text-xs text-zinc-400">
+              <span>Lifetime in hours</span>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                required
+                value={ttlHours}
+                onChange={(e) => setTtlHours(Number(e.target.value))}
+                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              />
+            </label>
+          </fieldset>
+        )}
         <FormError message={error} />
         <Button type="submit" disabled={busy}>
           {busy && <Spinner className="h-3.5 w-3.5" />}

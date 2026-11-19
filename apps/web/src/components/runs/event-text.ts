@@ -1,3 +1,4 @@
+import { seatLabel, shortModel } from "./roster";
 import type { RunEvent } from "./types";
 
 /** How many characters of an agent's reasoning to show before truncating —
@@ -50,6 +51,50 @@ export function describeEvent(event: RunEvent): string {
       return `${agentName(event.agent)} wrote the plan (${
         Array.isArray(p.tasks) ? p.tasks.length : 0
       } tasks)`;
+    case "model.selected": {
+      const reason = p.reason ? ` (${String(p.reason)})` : "";
+      return `${agentName(event.agent)} uses ${shortModel(String(p.model ?? "?"))}${reason}`;
+    }
+    case "run.triaged":
+      return `Task classified as ${String(p.complexity)}: ${String(p.reason ?? "")}`;
+    case "run.escalated":
+      return `Team expanded from ${String(p.from)} to ${String(p.to)}: ${String(p.reason ?? "")}`;
+    case "team.assembled": {
+      // `roles` is the older payload; newer ones may list `seats` as keys or objects.
+      const seats = Array.isArray(p.seats)
+        ? p.seats.map((seat) =>
+            typeof seat === "string" ? seat : String((seat as { key?: unknown })?.key ?? ""),
+          )
+        : null;
+      const names = seats
+        ? seats.filter(Boolean).map(seatLabel)
+        : Array.isArray(p.roles)
+          ? p.roles.map(String).map(agentName)
+          : [];
+      return `${String(p.template ?? "standard")} team: ${names.length ? names.join(", ") : "ready"}`;
+    }
+    case "team.updated":
+      return "You changed the team's models";
+    case "deploy.started": {
+      const where = p.namespace ? ` in ${String(p.namespace)}` : "";
+      return p.simulated === true
+        ? `Simulated preview deploy started${where} (no real cloud)`
+        : `Preview deploy started${where}`;
+    }
+    case "deploy.finished": {
+      const status = String(p.status ?? "");
+      if (status === "simulated") return "Simulated preview deploy finished (no real cloud)";
+      if (status === "failed")
+        return `Preview deploy failed${p.error ? `: ${String(p.error)}` : ""}`;
+      if (status === "deleted") return "Preview environment removed";
+      return `Preview deploy finished${p.url ? `: ${String(p.url)}` : ""}`;
+    }
+    case "deploy.approved":
+      return "You approved the preview deploy";
+    case "deploy.rejected":
+      return "You rejected the preview deploy, run cancelled";
+    case "tests.reported":
+      return `Tests ${String(p.status)}: ${String(p.reason || p.test_command || "see report")}`;
     case "task.created":
       return `${agentName(event.agent)} added a task: "${String(p.title ?? "")}"`;
     case "task.status_changed": {

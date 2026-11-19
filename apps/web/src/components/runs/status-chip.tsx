@@ -2,6 +2,8 @@ const COLORS: Record<string, string> = {
   queued: "bg-zinc-800 text-zinc-300",
   planning: "bg-sky-950 text-sky-300",
   awaiting_approval: "bg-violet-950 text-violet-300",
+  awaiting_deploy_approval: "bg-fuchsia-950 text-fuchsia-300",
+  deploying: "bg-cyan-950 text-cyan-300",
   executing: "bg-amber-950 text-amber-300",
   reviewing: "bg-violet-950 text-violet-300",
   completed: "bg-emerald-950 text-emerald-300",

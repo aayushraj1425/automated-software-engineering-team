@@ -17,6 +17,14 @@ describe("StatusChip", () => {
     expect(screen.getByText("ready").className).toContain("text-teal-300");
   });
 
+  it("colours the deploy approval statuses instead of the default gray", () => {
+    const { rerender } = render(<StatusChip status="awaiting_deploy_approval" />);
+    expect(screen.getByText("awaiting deploy approval").className).toContain("text-fuchsia-300");
+
+    rerender(<StatusChip status="deploying" />);
+    expect(screen.getByText("deploying").className).toContain("text-cyan-300");
+  });
+
   it("humanizes every underscore in a status id", () => {
     render(<StatusChip status="awaiting_approval" />);
     expect(screen.getByText("awaiting approval")).toBeInTheDocument();

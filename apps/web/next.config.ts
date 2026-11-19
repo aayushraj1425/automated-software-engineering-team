@@ -7,9 +7,9 @@ import type { NextConfig } from "next";
 loadEnv({ path: path.resolve(process.cwd(), "../../.env") });
 
 const nextConfig: NextConfig = {
-  // Production image (infra/docker/web.Dockerfile) runs the self-contained
-  // .next/standalone server instead of the whole monorepo.
-  output: "standalone",
+  // The Linux production image runs the standalone server. Windows uses
+  // next start: standalone tracing requires symlinks unavailable on some hosts.
+  output: process.platform === "win32" ? undefined : "standalone",
 };
 
 export default nextConfig;

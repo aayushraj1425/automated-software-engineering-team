@@ -9,6 +9,11 @@ const PROVIDERS = [
   { id: "anthropic", label: "Anthropic", hint: "sk-ant-…" },
   { id: "openai", label: "OpenAI", hint: "sk-proj-…" },
   { id: "gemini", label: "Google Gemini", hint: "AIza…" },
+  {
+    id: "openai_compatible",
+    label: "OpenAI-compatible endpoint",
+    hint: "endpoint key, if required",
+  },
 ] as const;
 
 type StoredKey = {
