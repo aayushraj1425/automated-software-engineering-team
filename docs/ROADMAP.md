@@ -18,6 +18,19 @@ template). The task-level view lives in [BACKLOG.md](BACKLOG.md).
 | **7** | **Production Hardening** *(complete 2026-07-22 — observability + alerting with LLM cost metrics, Redis-shared rate limiting, off-host backups + PVC, row-level security with organization sharing and roles, the Kubernetes deploy with engine NetworkPolicy isolation, the DinD-capable in-cluster QA sandbox, a secret-gated real-model eval workflow, benchmarks, and the security audit; only certificate-manager mTLS and load-calibrated resource limits stay operator-gated)* | medium | K8s + Helm, OTel metrics/monitoring/alerting, backups + disaster recovery, RBAC depth + row-level security, security audit, performance benchmarks | production deployment |
 | **8** | **Deliberate Reasoning** *(complete 2026-07-22)* | small | Every agent role reasons through an explicit chain of thought and *simulates* — predicts the outcome of its intended action — before acting, via the role prompts; the project's wrap-up quality pass | AI software engineer quality; deliberate, auditable decisions |
 
+## Phase 9 — Adaptive Agent Teams
+
+Implementation integrates configurable Quick/Standard/Complex stage lists,
+per-seat model selection and history, Principal design and final review, editable
+approval rosters, separate preview approval, Helm deployment and smoke evidence,
+retryable cleanup, organization model policy and signed open source evaluation.
+See [Running adaptive teams](architecture/agents/ADAPTIVE_TEAMS.md) and
+[ADR-0011](architecture/adr/0011-adaptive-teams-and-seat-models.md).
+
+Live provider golden runs, a real preview URL and local-model certification are
+deferred by the user's 2026-11-17 decision. Those live exit criteria remain open;
+offline simulations do not satisfy them. Preview charts require a published image.
+
 ## Phase exit criteria
 
 - **Phase 0 — Foundation:** compose healthy; `pnpm dev` boots web+engine; signed-in user

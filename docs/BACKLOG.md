@@ -1,11 +1,28 @@
 # Backlog
 
-**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-07-26
+**Status:** Living document — the persistent, prioritized backlog · **Last updated:** 2026-11-17
 Work is grouped into named workstreams per phase. Each workstream is marked
 **blocking** (the phase cannot ship without it), **planned** (in scope for the phase),
 or **stretch**. Pull requests reference items by name, e.g.
 *"Backlog: Agent Runtime — Postgres checkpointing per run"*.
 Completed work moves to §Done.
+
+## Phase 9 — Adaptive Agent Teams
+
+- [x] Model catalog, per-seat selection, budget estimates, fallback history and organization policy.
+- [x] Rules-first triage, labelled evaluation, Quick editing and report-only templates, escalation.
+- [x] Template execution, Principal design/review, task levels/models and recovery checkpoints.
+- [x] Approval roster model overrides and preview configuration/second approval controls.
+- [x] Kubernetes preview adapter, validated manifests, smoke evidence, expiry and merged-PR cleanup.
+- [x] OpenAI-compatible endpoints and signed real-evaluation gate for open source auto selection.
+- [ ] Live Quick/Standard/Complex model golden runs — deferred by the user on 2026-11-17.
+- [ ] Sandbox-cluster deploy, passing live smoke checks and teardown — deferred by the user.
+- [ ] Real Ollama/vLLM golden-task certification — deferred by the user; no model is certified by fake results.
+- [ ] Optional monthly organization budget with concurrent spend reservations — deferred design scope.
+
+Setup and verification: [Running adaptive teams](architecture/agents/ADAPTIVE_TEAMS.md).
+The preview adapter needs an existing image; building and publishing images is a
+separate future capability.
 
 ## Phase 0 — Foundation
 

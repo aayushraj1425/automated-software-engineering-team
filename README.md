@@ -51,6 +51,9 @@ Two design commitments make it trustworthy rather than just impressive:
   terminal on the run page; outbound Slack, Linear, and Jira integrations.
 - **Run in production.** Kubernetes + Helm, row-level security, OpenTelemetry
   metrics and alerting, verified backups, and rate limiting.
+- **Size the team to the task.** Quick, Standard and Complex templates, per-seat
+  models, editable approval rosters, Principal design and review, and separately
+  approved preview deployment. See [Adaptive teams setup](docs/architecture/agents/ADAPTIVE_TEAMS.md).
 
 The full history of what shipped and when lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)
 and [`docs/BACKLOG.md`](docs/BACKLOG.md).

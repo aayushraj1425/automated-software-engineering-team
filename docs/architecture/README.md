@@ -19,6 +19,14 @@ by area. The cross-cutting decisions with their rejected alternatives are in
 
 ## The agent runtime and run pipeline
 
+- [ADAPTIVE_TEAMS.md](agents/ADAPTIVE_TEAMS.md) — setup, template checks, preview configuration, and model certification.
+- [ADAPTIVE_TEAM_RUNTIME.md](agents/ADAPTIVE_TEAM_RUNTIME.md) — stage checkpoints, Principal review, escalation, and recovery.
+- [MODEL_CATALOG.md](agents/MODEL_CATALOG.md) — configuring per-seat model selection and running its checks.
+- [OPEN_SOURCE_MODELS.md](agents/OPEN_SOURCE_MODELS.md) — local endpoints, signed evaluations, and organization model policy.
+- [TRIAGE_AND_QUICK_RUNS.md](agents/TRIAGE_AND_QUICK_RUNS.md) — rules-first triage, single-agent test reports, approval, and escalation.
+- [TRIAGE_RULES_AND_QUICK_TEAM.md](agents/TRIAGE_RULES_AND_QUICK_TEAM.md) — labelled triage evaluation and Quick template variants.
+- [PREVIEW_DEPLOY_ADAPTER.md](agents/PREVIEW_DEPLOY_ADAPTER.md) — validated Helm previews, smoke checks, and cleanup.
+
 - [AGENT_RUNTIME.md](agents/AGENT_RUNTIME.md) — the run/task/event domain model and the pipeline lifecycle.
 - [BACKGROUND_WORKER.md](agents/BACKGROUND_WORKER.md) — running runs on the arq queue vs. inline.
 - [RUN_RECOVERY.md](agents/RUN_RECOVERY.md) — resuming an interrupted run from the task board.
@@ -67,6 +75,7 @@ by area. The cross-cutting decisions with their rejected alternatives are in
 
 ## Runs UI
 
+- [APPROVAL_ROSTER_AND_DEPLOY_CONTROLS.md](runs-ui/APPROVAL_ROSTER_AND_DEPLOY_CONTROLS.md) — editable seat models and separate preview approval.
 - [AGENT_TIMELINE_LEGIBILITY.md](runs-ui/AGENT_TIMELINE_LEGIBILITY.md) — per-agent colours, thinking cards, expandable actions, per-file diffs.
 - [RUN_REPORT.md](runs-ui/RUN_REPORT.md) — the shareable run report.
 - [RUN_STATISTICS.md](runs-ui/RUN_STATISTICS.md) — the runs success-rate and spend summary.
@@ -110,7 +119,7 @@ by area. The cross-cutting decisions with their rejected alternatives are in
 
 ## Decision records
 
-The [`adr/`](adr) folder holds the ten Architecture Decision Records — the
+The [`adr/`](adr) folder holds the Architecture Decision Records — the
 choices that shaped everything above, each with the alternatives that were
 rejected and why. Read these when you want to understand *why the foundations are
 the way they are*, not just how a feature works.
