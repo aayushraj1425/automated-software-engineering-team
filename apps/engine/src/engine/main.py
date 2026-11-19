@@ -2,9 +2,13 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from engine.agents.preview_cleanup import cleanup_expired_previews
 from engine.agents.recovery import recover_interrupted_runs
 from engine.api import (
     chat,
@@ -13,6 +17,9 @@ from engine.api import (
     health,
     integrations,
     knowledge,
+    model_policy,
+    models,
+    preview_credentials,
     provider_keys,
     repositories,
     runs,
@@ -30,6 +37,14 @@ from engine.ratelimit import RateLimitMiddleware, dispose_ratelimit
 from engine.security.crypto import warn_if_derived_key
 
 
+async def _maintain_previews() -> None:
+    while True:
+        # Failed teardown retains durable state for the next scheduled retry.
+        with suppress(Exception):
+            await cleanup_expired_previews()
+        await asyncio.sleep(300)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(get_settings().log_level)
@@ -44,9 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # mode only: in queue mode the worker owns runs, and the API must not
     # resume one a healthy worker may still be executing (BACKGROUND_WORKER.md).
     recovery: asyncio.Task | None = None
+    preview_maintenance: asyncio.Task | None = None
     if get_settings().run_recovery_enabled and get_settings().run_queue == "inline":
         recovery = asyncio.create_task(recover_interrupted_runs())
+    if not get_settings().llm_fake:
+        preview_maintenance = asyncio.create_task(_maintain_previews())
     yield
+    if preview_maintenance is not None:
+        preview_maintenance.cancel()
+        with suppress(asyncio.CancelledError):
+            await preview_maintenance
     if recovery is not None and not recovery.done():
         recovery.cancel()
         with suppress(asyncio.CancelledError):
@@ -63,6 +85,20 @@ app = FastAPI(
     description="AI engine for the ASEP platform: chat, agents, repository intelligence.",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    if request.url.path == "/v1/preview-credentials":
+        # FastAPI's default includes the invalid input; never echo a kubeconfig.
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "Invalid preview credential payload; expected a bounded kubeconfig string"
+            },
+        )
+    return await request_validation_exception_handler(request, exc)
+
 
 # Added first, so it sits innermost — inside the tracing span, making 429s
 # visible in the request metrics. Off until RATE_LIMIT_PER_MINUTE is set
@@ -92,4 +128,7 @@ app.include_router(work_items.router)
 app.include_router(knowledge.router)
 app.include_router(documents.router)
 app.include_router(provider_keys.router)
+app.include_router(preview_credentials.router)
+app.include_router(models.router)
+app.include_router(model_policy.router)
 app.include_router(integrations.router)

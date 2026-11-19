@@ -16,20 +16,26 @@ from typing import Any, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import CursorResult, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from engine.agents.teams_types import Seat
+from engine.agents.triage import Complexity, template_for
 from engine.auth import Principal, require_service_auth
-from engine.db.enums import RunStatus, TaskStatus
+from engine.config import get_settings
+from engine.db.enums import AgentRole, RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask, Repository
 from engine.db.session import get_session, session_scope
 from engine.db.visibility import can_access, visible_clause
+from engine.deploy.contracts import PreviewDeployment, PreviewOptions
 from engine.events.bus import RunEventSubscription, publish_run_ping
 from engine.integrations.hosts import host_connection, push_credential
 from engine.jobs import dispatch_execute, dispatch_plan
 from engine.knowledge.capture import capture_plan_rejected
+from engine.llm.catalog import SeatLevel
 from engine.reporting import build_run_report
+from engine.security.preview_credentials import load_preview_credentials
 from engine.workspace.jail import JailViolation, resolve_inside
 from engine.workspace.manager import (
     Workspace,
@@ -47,10 +53,35 @@ MAX_VIEW_BYTES = 200_000
 router = APIRouter()
 
 
+def _model_overrides(value: dict[str, str]) -> dict[str, str]:
+    for key, model in value.items():
+        role, separator, level = key.partition(":")
+        if not separator:
+            raise ValueError("Seat keys must use role:level")
+        AgentRole(role)
+        SeatLevel(level)
+        if not model.strip() or len(model) > 256:
+            raise ValueError("Model ids must be nonempty and at most 256 characters")
+    return value
+
+
 class RunCreate(BaseModel):
     request: str = Field(min_length=1, max_length=4000)
     repository_url: str = Field(min_length=8, max_length=512)
     max_cost_usd: Decimal | None = Field(default=None, gt=0)
+    complexity: Complexity | None = None
+    model_overrides: dict[str, str] = Field(default_factory=dict, max_length=24)
+    preview_requested: bool | None = None
+    preview_options: PreviewOptions | None = None
+    _validate_overrides = field_validator("model_overrides")(_model_overrides)
+
+    @model_validator(mode="after")
+    def _preview_requires_complex_team(self):
+        if self.preview_requested:
+            if self.complexity not in (None, Complexity.COMPLEX):
+                raise ValueError("Preview deployment requires Complex task complexity")
+            self.complexity = Complexity.COMPLEX
+        return self
 
     @field_validator("request", "repository_url")
     @classmethod
@@ -72,6 +103,8 @@ class TaskOut(BaseModel):
     depends_on: list[str]
     result: str | None
     attempts: int
+    level: str = "engineer"
+    model: str | None = None
 
 
 class RunOut(BaseModel):
@@ -84,6 +117,10 @@ class RunOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    complexity: Complexity | None = None
+    triage_reason: str | None = None
+    team_template: str = "standard"
+    test_only: bool = False
 
 
 class RunDetailOut(RunOut):
@@ -92,6 +129,16 @@ class RunDetailOut(RunOut):
     total_cost_usd: float
     total_input_tokens: int
     total_output_tokens: int
+    test_report: dict[str, Any] | None = None
+    team: list[Seat] = Field(default_factory=list)
+    model_overrides: dict[str, str] = Field(default_factory=dict)
+    design_note: str | None = None
+    stages_completed: list[str] = Field(default_factory=list)
+    preview_requested: bool | None = None
+    preview_options: PreviewOptions | None = None
+    preview_deployment: PreviewDeployment | None = None
+    deployment_status: str = "not_requested"
+    deployment_source_sha: str | None = None
 
 
 class DiffOut(BaseModel):
@@ -169,6 +216,10 @@ def _run_out(run: AgentRun, repository_url: str) -> RunOut:
         created_at=run.created_at,
         started_at=run.started_at,
         finished_at=run.finished_at,
+        complexity=Complexity(run.complexity) if run.complexity else None,
+        triage_reason=run.triage_reason,
+        team_template=run.team_template,
+        test_only=run.test_only,
     )
 
 
@@ -198,6 +249,8 @@ async def create_run(
     principal: Principal = Depends(require_service_auth),
     db: AsyncSession = Depends(get_session),
 ) -> RunOut:
+    if body.preview_requested and not get_settings().llm_fake and not principal.org_id:
+        raise HTTPException(status_code=400, detail="Choose an organization for a live preview run")
     url = body.repository_url.strip()
     # Reuse any visible connection of the same URL — own or org-shared —
     # preferring an owned row when both exist.
@@ -228,6 +281,10 @@ async def create_run(
         request=body.request.strip(),
         status=RunStatus.QUEUED,
         max_cost_usd=body.max_cost_usd,
+        complexity=body.complexity,
+        model_overrides=body.model_overrides,
+        preview_requested=body.preview_requested,
+        preview_options=body.preview_options.model_dump() if body.preview_options else None,
     )
     db.add(run)
     await db.commit()
@@ -262,6 +319,10 @@ async def rerun_run(
         request=source.request,
         status=RunStatus.QUEUED,
         max_cost_usd=source.max_cost_usd,
+        complexity=source.complexity,
+        model_overrides=dict(source.model_overrides or {}),
+        preview_requested=source.preview_requested,
+        preview_options=dict(source.preview_options) if source.preview_options else None,
     )
     db.add(run)
     await db.commit()
@@ -309,6 +370,7 @@ async def edit_plan(
     retitle, re-describe, or drop tasks (PLAN_EDITING.md). Only while the
     run awaits approval — before that there is no plan, after that it runs."""
     run = await _visible_run(db, run_id, principal)
+    await db.refresh(run, with_for_update=True)
     if run.status != RunStatus.AWAITING_APPROVAL:
         raise HTTPException(status_code=409, detail="The plan can only be edited before approval")
 
@@ -367,6 +429,214 @@ async def edit_plan(
 
 class DecisionIn(BaseModel):
     approved: bool
+
+
+class TriageUpdate(BaseModel):
+    complexity: Complexity
+
+
+class RosterUpdate(BaseModel):
+    model_overrides: dict[str, str] = Field(default_factory=dict, max_length=24)
+    _validate_overrides = field_validator("model_overrides")(_model_overrides)
+
+
+@router.patch("/v1/runs/{run_id}/roster")
+async def update_roster(
+    run_id: uuid.UUID,
+    body: RosterUpdate,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunDetailOut:
+    from engine.agents.teams import assemble_run_team
+
+    run = await _visible_run(db, run_id, principal)
+    await db.refresh(run, with_for_update=True)
+    if run.status != RunStatus.AWAITING_APPROVAL:
+        raise HTTPException(status_code=409, detail="Models can only change before plan approval")
+    keys = {seat["key"] for seat in run.team}
+    if set(body.model_overrides) - keys:
+        raise HTTPException(status_code=422, detail="Unknown seat key")
+    run.model_overrides = body.model_overrides
+    try:
+        run.team = await assemble_run_team(db, run)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    db.add(AgentEvent(run_id=run_id, type="team.updated", payload={"by": principal.user_id}))
+    await db.commit()
+    await publish_run_ping(run_id)
+    return await get_run(run_id, principal, db)
+
+
+async def _deployment_source_sha(db: AsyncSession, run_id: uuid.UUID) -> str | None:
+    payload = (
+        await db.execute(
+            select(AgentEvent.payload)
+            .where(AgentEvent.run_id == run_id, AgentEvent.type == "deploy.approval_requested")
+            .order_by(AgentEvent.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    value = payload.get("source_sha") if isinstance(payload, dict) else None
+    return value if isinstance(value, str) else None
+
+
+@router.post("/v1/runs/{run_id}/deploy-decision")
+async def decide_deployment(
+    run_id: uuid.UUID,
+    body: DecisionIn,
+    background: BackgroundTasks,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunOut:
+    run = await _visible_run(db, run_id, principal)
+    await db.refresh(run, with_for_update=True)
+    if principal.user_id != run.user_id and not principal.is_org_admin:
+        raise HTTPException(
+            status_code=403, detail="Only the run owner or an org admin may approve deploy"
+        )
+    if run.status != RunStatus.AWAITING_DEPLOY_APPROVAL:
+        raise HTTPException(
+            status_code=409, detail="This run is not waiting for deployment approval"
+        )
+    if body.approved:
+        if not get_settings().llm_fake:
+            try:
+                await load_preview_credentials(db, run.org_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from None
+        ws = _load_run_workspace(run)
+        checked_sha = await _deployment_source_sha(db, run_id)
+        current_sha = (await run_git(ws.path, "rev-parse", "HEAD")).strip()
+        dirty = (await run_git(ws.path, "status", "--porcelain")).strip()
+        if not checked_sha or checked_sha != current_sha or dirty:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Workspace differs from the checked deployment commit; "
+                    "rerun checks before deploying"
+                ),
+            )
+        run.deployment_approved_sha = checked_sha
+        run.deployment_approved_at = datetime.now(UTC)
+        run.deployment_approved_by = principal.user_id
+        run.deployment_status = "approved"
+        run.status = RunStatus.EXECUTING
+        background.add_task(dispatch_execute, run.id)
+    else:
+        run.deployment_status = "rejected"
+        run.status = RunStatus.CANCELLED
+        run.finished_at = datetime.now(UTC)
+        db.add(
+            AgentEvent(
+                run_id=run.id,
+                type="run.finished",
+                payload={
+                    "status": RunStatus.CANCELLED,
+                    "error": None,
+                },
+            )
+        )
+    db.add(
+        AgentEvent(
+            run_id=run.id,
+            type="deploy.approved" if body.approved else "deploy.rejected",
+            payload={"by": principal.user_id, "source_sha": run.deployment_approved_sha},
+        )
+    )
+    db.add(
+        AgentEvent(
+            run_id=run.id,
+            type="run.status_changed",
+            payload={
+                "from": RunStatus.AWAITING_DEPLOY_APPROVAL,
+                "to": run.status,
+            },
+        )
+    )
+    await db.commit()
+    await publish_run_ping(run.id)
+    repo = await _run_repository(db, run)
+    return _run_out(run, repo.url if repo else DISCONNECTED_REPOSITORY)
+
+
+@router.patch("/v1/runs/{run_id}/triage")
+async def update_triage(
+    run_id: uuid.UUID,
+    body: TriageUpdate,
+    background: BackgroundTasks,
+    principal: Principal = Depends(require_service_auth),
+    db: AsyncSession = Depends(get_session),
+) -> RunOut:
+    run = await _visible_run(db, run_id, principal)
+    # Serialize with plan edits and the atomic approval claim.
+    await db.refresh(run, with_for_update=True)
+    if run.status != RunStatus.AWAITING_APPROVAL:
+        raise HTTPException(status_code=409, detail="Complexity can only change before approval")
+    tasks = (await db.execute(select(AgentTask).where(AgentTask.run_id == run.id))).scalars().all()
+    active = [task for task in tasks if task.status != TaskStatus.SKIPPED]
+    if (
+        body.complexity == Complexity.QUICK
+        and not run.test_only
+        and (len(active) > 2 or len({(task.role, task.level) for task in active}) > 1)
+    ):
+        raise HTTPException(
+            status_code=409, detail="Quick needs at most two tasks for one engineer"
+        )
+    previous = run.complexity
+    run.complexity = body.complexity
+    run.team_template = template_for(run.complexity, run.test_only)
+    run.triage_reason = "human complexity override"
+    if (
+        run.team
+        and run.complexity == Complexity.COMPLEX
+        and not run.test_only
+        and not run.design_note
+    ):
+        from engine.jobs import dispatch_prepare_approval
+
+        # Keep the existing edited board; prepare its missing design before approval.
+        run.status = RunStatus.PLANNING
+        background.add_task(dispatch_prepare_approval, run.id)
+        db.add(
+            AgentEvent(
+                run_id=run.id,
+                type="run.status_changed",
+                payload={
+                    "from": RunStatus.AWAITING_APPROVAL,
+                    "to": RunStatus.PLANNING,
+                },
+            )
+        )
+    elif run.team:
+        from engine.agents.teams import assemble_run_team
+
+        try:
+            run.team = await assemble_run_team(db, run)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        valid_keys = {seat["key"] for seat in run.team}
+        run.model_overrides = {
+            key: model for key, model in run.model_overrides.items() if key in valid_keys
+        }
+    db.add(
+        AgentEvent(
+            run_id=run.id,
+            type="run.triaged",
+            payload={
+                "from": previous,
+                "complexity": run.complexity,
+                "reason": run.triage_reason,
+                "source": "human",
+                "by": principal.user_id,
+                "test_only": run.test_only,
+                "team_template": run.team_template,
+            },
+        )
+    )
+    await db.commit()
+    await publish_run_ping(run.id)
+    repo = await _run_repository(db, run)
+    return _run_out(run, repo.url if repo else DISCONNECTED_REPOSITORY)
 
 
 @router.post("/v1/runs/{run_id}/decision")
@@ -530,6 +800,23 @@ async def get_run(
     return RunDetailOut(
         **base.model_dump(),
         plan=run.plan,
+        test_report=run.test_report,
+        team=[Seat.model_validate(seat) for seat in run.team],
+        model_overrides=run.model_overrides,
+        design_note=run.design_note,
+        stages_completed=run.stages_completed,
+        preview_requested=run.preview_requested,
+        preview_options=PreviewOptions.model_validate(run.preview_options)
+        if run.preview_options
+        else None,
+        preview_deployment=(
+            PreviewDeployment.model_validate(run.preview_deployment)
+            if run.preview_deployment
+            else None
+        ),
+        deployment_status=run.deployment_status,
+        deployment_source_sha=run.deployment_approved_sha
+        or (await _deployment_source_sha(db, run_id)),
         total_cost_usd=float(run.total_cost_usd),
         total_input_tokens=run.total_input_tokens,
         total_output_tokens=run.total_output_tokens,
@@ -544,6 +831,8 @@ async def get_run(
                 depends_on=list(t.depends_on),
                 result=t.result,
                 attempts=t.attempts,
+                level=t.level,
+                model=t.model,
             )
             for t in tasks
         ],
@@ -557,6 +846,7 @@ _ACTIVE_RUN_STATUSES = {
     RunStatus.PLANNING,
     RunStatus.EXECUTING,
     RunStatus.REVIEWING,
+    RunStatus.DEPLOYING,
 }
 
 
@@ -576,6 +866,13 @@ async def delete_run(
             status_code=409,
             detail="This run is still working — wait for it to finish before deleting it",
         )
+    if run.preview_deployment and run.deployment_status != "deleted":
+        from engine.agents.preview_cleanup import cleanup_run_preview
+
+        if not await cleanup_run_preview(run.id):
+            raise HTTPException(
+                status_code=409, detail="Preview cleanup must finish before deleting the run"
+            )
     await asyncio.to_thread(remove_workspace, run.id)
     await db.delete(run)
     await db.commit()

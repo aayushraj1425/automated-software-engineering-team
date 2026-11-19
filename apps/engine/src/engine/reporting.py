@@ -60,6 +60,48 @@ def build_run_report(
     if summary:
         lines += ["", "## Plan", "", str(summary).strip()]
 
+    if run.design_note:
+        lines += ["", "## Principal Engineer design", "", run.design_note]
+    if run.team:
+        lines += ["", "## Team", ""]
+        for seat in run.team:
+            lines.append(
+                f"- {seat.get('role', 'agent')} ({seat.get('level', 'engineer')}): "
+                f"{seat.get('model') or 'no model required'}"
+            )
+    if run.preview_deployment:
+        preview = run.preview_deployment
+        lines += [
+            "",
+            "## Preview",
+            "",
+            f"**Status:** {preview.get('status', 'unknown')}",
+            f"**Namespace:** {preview.get('namespace', 'none')}",
+        ]
+        if preview.get("url"):
+            lines.append(f"**URL:** {preview['url']}")
+        if preview.get("expires_at"):
+            lines.append(f"**Expires:** {preview['expires_at']}")
+        smoke = preview.get("smoke")
+        if isinstance(smoke, dict):
+            lines.append(f"**Cloud smoke tests:** {'passed' if smoke.get('passed') else 'failed'}")
+        if preview.get("status") == "simulated":
+            lines.append("Offline simulation; no live cloud resource was deployed.")
+
+    if run.test_report:
+        report = run.test_report
+        lines += [
+            "",
+            "## Test report",
+            "",
+            f"**Tests:** {report.get('status', 'unknown')}",
+            f"**Scope:** {report.get('scope', 'repository test suite')}",
+            f"**Command:** {report.get('test_command') or 'not run'}",
+            f"**Reason:** {report.get('reason') or 'none'}",
+            "",
+            str(report.get("output") or "_No test output._"),
+        ]
+
     if tasks:
         lines += ["", "## Tasks", ""]
         for task in tasks:

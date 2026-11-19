@@ -27,7 +27,7 @@ from arq.connections import RedisSettings
 from arq.cron import cron
 
 from engine.agents.recovery import reset_interrupted_execution, reset_interrupted_planning
-from engine.agents.runner import execute_tasks, plan_run
+from engine.agents.runner import execute_tasks, plan_run, prepare_approval_team
 from engine.backup import create_backup
 from engine.config import get_settings
 from engine.db.session import dispose_engine
@@ -54,6 +54,21 @@ async def execute_tasks_job(ctx: dict[str, Any], run_id: str) -> None:
     await execute_tasks(run_uuid)
 
 
+async def prepare_approval_team_job(ctx: dict[str, Any], run_id: str) -> None:
+    """Write the missing design note and roster for a planned run the API parked in
+    PLANNING. Re-delivery is safe: a run no longer in PLANNING is left alone, and
+    nothing here touches the human-edited task board."""
+    await prepare_approval_team(uuid.UUID(run_id))
+
+
+async def cleanup_expired_previews_job(ctx: dict[str, Any]) -> None:
+    """Hourly sweep: tear down preview environments past their expiry (and retry
+    failed teardowns). The helper keeps failed records for the next sweep."""
+    from engine.agents.preview_cleanup import cleanup_expired_previews
+
+    await cleanup_expired_previews()
+
+
 async def backup_database_job(ctx: dict[str, Any]) -> None:
     """Nightly Postgres dump (docs/architecture/operations/BACKUPS_AND_RECOVERY.md).
     pg_dump is a blocking subprocess, so it runs on a thread; a failure is
@@ -75,12 +90,13 @@ async def _on_shutdown(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     """arq entrypoint: `uv run arq engine.worker.WorkerSettings`."""
 
-    functions = [plan_run_job, execute_tasks_job]
+    functions = [plan_run_job, execute_tasks_job, prepare_approval_team_job]
     # Nightly at 03:00 on the worker's clock (UTC in containers), only when
     # backups are switched on — the CLI path works either way.
-    cron_jobs = (
-        [cron(backup_database_job, hour=3, minute=0)] if get_settings().backup_enabled else []
-    )
+    cron_jobs = [
+        *([cron(backup_database_job, hour=3, minute=0)] if get_settings().backup_enabled else []),
+        cron(cleanup_expired_previews_job, minute=17),
+    ]
     queue_name = QUEUE_NAME
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     on_startup = _on_startup

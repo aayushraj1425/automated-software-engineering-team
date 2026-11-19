@@ -166,6 +166,8 @@ _ACTIVE_RUN_STATUSES = (
     RunStatus.AWAITING_APPROVAL,
     RunStatus.EXECUTING,
     RunStatus.REVIEWING,
+    RunStatus.AWAITING_DEPLOY_APPROVAL,
+    RunStatus.DEPLOYING,
 )
 
 

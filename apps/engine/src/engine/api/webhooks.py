@@ -12,6 +12,7 @@ from collections import OrderedDict
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
+from engine.agents.preview_cleanup import cleanup_pull_request_preview
 from engine.agents.webhook_review import review_pull_request
 from engine.config import get_settings
 from engine.github import verify_webhook_signature
@@ -67,6 +68,18 @@ async def github_webhook(
         raise HTTPException(status_code=400, detail="Body is not valid JSON") from None
 
     action = payload.get("action")
+    pull_request = payload.get("pull_request")
+    if action == "closed" and isinstance(pull_request, dict) and pull_request.get("merged") is True:
+        coords = _pull_request_coords(payload)
+        if coords is None:
+            raise HTTPException(status_code=400, detail="Malformed pull_request payload")
+        if _already_queued(x_github_delivery):
+            return {"status": "ignored", "reason": "delivery already processed"}
+        owner, repo, number = coords
+        background.add_task(
+            cleanup_pull_request_preview, f"https://github.com/{owner}/{repo}/pull/{number}"
+        )
+        return {"status": "queued", "reason": "merged pull request preview cleanup"}
     if action not in _REVIEWABLE_ACTIONS:
         return {"status": "ignored", "reason": f"action {action!r} needs no review"}
 

@@ -16,7 +16,7 @@ import structlog
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 
-from engine.agents.runner import execute_tasks, plan_run
+from engine.agents.runner import execute_tasks, plan_run, prepare_approval_team
 from engine.config import get_settings
 
 log = structlog.get_logger()
@@ -24,6 +24,7 @@ log = structlog.get_logger()
 QUEUE_NAME = "asep:runs"
 PLAN_JOB = "plan_run_job"
 EXECUTE_JOB = "execute_tasks_job"
+PREPARE_JOB = "prepare_approval_team_job"
 
 _pool: ArqRedis | None = None
 
@@ -54,6 +55,11 @@ async def dispatch_plan(run_id: uuid.UUID) -> None:
 async def dispatch_execute(run_id: uuid.UUID) -> None:
     """Start executing the approved run — worker or inline, same as planning."""
     await _dispatch(EXECUTE_JOB, run_id, execute_tasks)
+
+
+async def dispatch_prepare_approval(run_id: uuid.UUID) -> None:
+    """Finish approval preparation (design note and roster) after a complexity change."""
+    await _dispatch(PREPARE_JOB, run_id, prepare_approval_team)
 
 
 async def _dispatch(
