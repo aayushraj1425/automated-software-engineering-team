@@ -18,7 +18,7 @@ Semantics (docs/architecture/agents/AGENT_RUNTIME.md):
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 
 from langgraph.graph import END, StateGraph
 
@@ -37,6 +37,9 @@ class TaskState(TypedDict):
     depends_on: list[str]
     attempts: int
     result: str | None
+    # The seat level the Product Manager assigned (engineer or senior). Routing
+    # ignores it: order stays by dependency; only the model choice reads it.
+    level: NotRequired[str]
 
 
 class SupervisorState(TypedDict):

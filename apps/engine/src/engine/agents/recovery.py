@@ -17,7 +17,7 @@ import uuid
 import structlog
 from sqlalchemy import delete, select
 
-from engine.agents.runner import execute_tasks, plan_run
+from engine.agents.runner import execute_tasks, plan_run, prepare_approval_team
 from engine.db.enums import RunStatus, TaskStatus
 from engine.db.models import AgentEvent, AgentRun, AgentTask
 from engine.db.session import session_scope
@@ -29,7 +29,22 @@ log = structlog.get_logger()
 # Planning produced nothing durable yet — start these over.
 _REPLAN_STATES = (RunStatus.QUEUED, RunStatus.PLANNING)
 # The board (and the workspace's commits) checkpoint these — resume them.
-_RESUME_STATES = (RunStatus.EXECUTING, RunStatus.REVIEWING)
+# DEPLOYING resumes too: the saved approval and the preview record make the deploy
+# step safe to re-enter (the adapter is idempotent per run). A run waiting in
+# awaiting_deploy_approval is parked for a human and is never touched.
+_RESUME_STATES = (RunStatus.EXECUTING, RunStatus.REVIEWING, RunStatus.DEPLOYING)
+
+
+def _awaiting_design():
+    """SQL test for approval preparation: a plan exists, the run is now Complex,
+    and its Principal design note has not been written yet. A real planning pass
+    has no plan until it commits straight to awaiting_approval, so planning never
+    looks like this."""
+    return (
+        AgentRun.plan.is_not(None)
+        & (AgentRun.team_template == "complex")
+        & AgentRun.design_note.is_(None)
+    )
 
 
 async def recover_interrupted_runs() -> list[uuid.UUID]:
@@ -45,15 +60,20 @@ async def recover_interrupted_runs() -> list[uuid.UUID]:
     async with session_scope() as session:
         rows = (
             await session.execute(
-                select(AgentRun.id, AgentRun.status).where(
+                select(AgentRun.id, AgentRun.status, _awaiting_design()).where(
                     AgentRun.status.in_(_REPLAN_STATES + _RESUME_STATES)
                 )
             )
         ).all()
 
     recovered: list[uuid.UUID] = []
-    for run_id, status in rows:
-        if status in _REPLAN_STATES:
+    for run_id, status, preparing in rows:
+        if status == RunStatus.PLANNING and preparing:
+            # A planned run raised to Complex without a design note is approval
+            # preparation; finish it instead of discarding the human-edited plan.
+            await prepare_approval_team(run_id)
+            recovered.append(run_id)
+        elif status in _REPLAN_STATES:
             if await reset_interrupted_planning(run_id, include_queued=True):
                 await plan_run(run_id)
                 recovered.append(run_id)
@@ -80,6 +100,8 @@ async def reset_interrupted_planning(run_id: uuid.UUID, include_queued: bool = F
         states = _REPLAN_STATES if include_queued else (RunStatus.PLANNING,)
         if run is None or run.status not in states:
             return False
+        if run.plan and run.team_template == "complex" and not run.design_note:
+            return False  # approval preparation, not planning: the plan is the human's
         found_in = run.status
         await session.execute(delete(AgentTask).where(AgentTask.run_id == run_id))
         run.plan = None
@@ -102,7 +124,8 @@ async def reset_interrupted_execution(run_id: uuid.UUID, quiet_when_clean: bool 
 
     The interrupted task repeats (in-progress back to pending); done tasks
     keep their commits; a reviewing run falls straight through the Supervisor
-    to review. With `quiet_when_clean` (worker re-entry), an executing run
+    to review; a deploying run re-enters the preview stage with its approval
+    intact. With `quiet_when_clean` (worker re-entry), an executing run
     with nothing in progress is a first delivery, not an interruption — it is
     left untouched and gets no recovery event.
     """

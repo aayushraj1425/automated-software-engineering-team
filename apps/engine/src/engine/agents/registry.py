@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from engine.db.enums import AgentRole
+from engine.llm.catalog import SeatLevel
 from engine.llm.router import Tier
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -35,6 +36,20 @@ class AgentSpec:
     model_tier: Tier
     tools: tuple[str, ...]
     prompt_file: str
+    # The default level of the role's seat. Engineer roles get their level per
+    # task from the Product Manager's plan; this is the fallback.
+    level: SeatLevel | None = None
+
+    @property
+    def seat_level(self) -> SeatLevel:
+        return (
+            self.level
+            or {
+                "planner": SeatLevel.SENIOR,
+                "coder": SeatLevel.ENGINEER,
+                "cheap": SeatLevel.SUPPORT,
+            }[self.model_tier]
+        )
 
     @property
     def system_prompt(self) -> str:
@@ -51,12 +66,29 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
     spec.role: spec
     for spec in (
         AgentSpec(
+            role=AgentRole.PRINCIPAL_ENGINEER,
+            model_tier="planner",
+            tools=(*_READ_TOOLS, "git_diff"),
+            prompt_file="principal_engineer.md",
+            level=SeatLevel.PRINCIPAL,
+        ),
+        AgentSpec(
+            role=AgentRole.RELEASE_ENGINEER,
+            model_tier="coder",
+            # preview_check is read-only: it validates the chart, needs no credentials
+            # and contacts no cluster (deploy/preview.py).
+            tools=(*_READ_TOOLS, "git_diff", "preview_check"),
+            prompt_file="release_engineer.md",
+            level=SeatLevel.SENIOR,
+        ),
+        AgentSpec(
             role=AgentRole.SUPERVISOR,
             model_tier="cheap",
             # The supervisor routes deterministically on the task board; its
             # only judgement calls (summaries, failure notes) are cheap.
             tools=("update_task_status",),
             prompt_file="supervisor.md",
+            level=SeatLevel.SUPPORT,
         ),
         AgentSpec(
             role=AgentRole.PRODUCT_MANAGER,
@@ -65,24 +97,28 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             # plan's JSON contract — the PM never adds tasks piecemeal.
             tools=_READ_TOOLS,
             prompt_file="product_manager.md",
+            level=SeatLevel.SENIOR,
         ),
         AgentSpec(
             role=AgentRole.BACKEND,
             model_tier="coder",
             tools=_ENGINEER_TOOLS,
             prompt_file="backend.md",
+            level=SeatLevel.ENGINEER,
         ),
         AgentSpec(
             role=AgentRole.FRONTEND,
             model_tier="coder",
             tools=_ENGINEER_TOOLS,
             prompt_file="frontend.md",
+            level=SeatLevel.ENGINEER,
         ),
         AgentSpec(
             role=AgentRole.DEVOPS,
             model_tier="coder",
             tools=_ENGINEER_TOOLS,
             prompt_file="devops.md",
+            level=SeatLevel.ENGINEER,
         ),
         AgentSpec(
             role=AgentRole.REVIEWER,
@@ -91,6 +127,7 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             # the reviewer never edits the workspace itself.
             tools=(*_READ_TOOLS, "git_diff"),
             prompt_file="reviewer.md",
+            level=SeatLevel.SENIOR,
         ),
         AgentSpec(
             role=AgentRole.QA,
@@ -99,6 +136,7 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             # (read, edit, commit) — minus task-board tools it never touches.
             tools=(*_READ_TOOLS, *_WRITE_TOOLS, *_GIT_TOOLS),
             prompt_file="qa.md",
+            level=SeatLevel.ENGINEER,
         ),
         AgentSpec(
             role=AgentRole.SCRUM_MASTER,
@@ -107,6 +145,7 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             # for context and returns a roadmap; it never edits the workspace.
             tools=_READ_TOOLS,
             prompt_file="scrum_master.md",
+            level=SeatLevel.SENIOR,
         ),
         AgentSpec(
             role=AgentRole.TECHNICAL_WRITER,
@@ -115,6 +154,7 @@ _REGISTRY: dict[AgentRole, AgentSpec] = {
             # for context and returns prose; it never edits the workspace.
             tools=_READ_TOOLS,
             prompt_file="technical_writer.md",
+            level=SeatLevel.SENIOR,
         ),
     )
 }

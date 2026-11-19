@@ -356,6 +356,27 @@ async def git_diff(ws: Workspace) -> str:
         raise ToolError(str(exc)) from exc
 
 
+async def preview_check(
+    ws: Workspace, chart_path: str = "deploy/helm", values_file: str = ""
+) -> str:
+    """Deploy-only, read-only: would the preview adapter accept this chart?
+
+    Takes no credentials and contacts no cluster. It runs the same static and
+    rendered-manifest rules the privileged adapter applies (PREVIEW_DEPLOY_ADAPTER.md).
+    """
+    from pydantic import ValidationError
+
+    from engine.deploy.contracts import PreviewOptions
+    from engine.deploy.preview import check_chart
+
+    try:
+        options = PreviewOptions(chart_path=chart_path, values_file=values_file or None)
+    except ValidationError as exc:
+        raise ToolError(f"invalid preview options: {exc.errors()[0]['msg']}") from exc
+    report = await check_chart(ws.path, options, run_id=ws.run_id)
+    return report.summary()
+
+
 def _safe(ws: Workspace, path: str):
     try:
         return resolve_inside(ws.path, path)
@@ -500,6 +521,19 @@ TOOLS: dict[str, tuple[Any, dict]] = {
                 "reason": {"type": "string", "description": "Why the task is unnecessary."},
             },
             ["sequence", "status"],
+        ),
+    ),
+    "preview_check": (
+        preview_check,
+        _schema(
+            "preview_check",
+            "Check whether the repository's Helm chart is safe to deploy as a "
+            "preview. Read-only: it never deploys and needs no credentials.",
+            {
+                "chart_path": {**_PATH, "description": "Chart folder, default deploy/helm."},
+                "values_file": {**_PATH, "description": "Optional values file for the preview."},
+            },
+            [],
         ),
     ),
 }

@@ -7,6 +7,7 @@ executing garbage. With LLM_FAKE=1 a fixed plan is returned so the whole
 pipeline runs offline.
 """
 
+from dataclasses import replace
 from typing import Any
 
 from engine.agents.loop import (
@@ -19,8 +20,12 @@ from engine.agents.loop import (
 from engine.agents.registry import get_agent_spec
 from engine.config import get_settings
 from engine.db.enums import AgentRole
+from engine.llm.catalog import SeatLevel
 from engine.workspace.manager import Workspace
 
+# Levels a task may ask for. Senior is for the hardest or cross-service work;
+# Principal and Support seats never take tasks from the board.
+TASK_LEVELS = frozenset({"engineer", "senior"})
 ENGINEER_ROLES = frozenset(
     str(role) for role in (AgentRole.BACKEND, AgentRole.FRONTEND, AgentRole.DEVOPS)
 )
@@ -34,10 +39,13 @@ PLAN_FORMAT = """Reply with only a JSON object, nothing around it:
       "title": "<short imperative title>",
       "role": "backend" | "frontend" | "devops",
       "description": "<what to change, where, and what done means>",
+      "level": "engineer" | "senior",
       "depends_on": [<sequence numbers of earlier tasks this one needs, 1-based>]
     }
   ]
-}"""
+}
+Use level "engineer" for normal tasks. Use "senior" only for the hardest tasks or
+changes that cross services. When unsure, use "engineer"."""
 
 
 class PlanError(Exception):
@@ -68,6 +76,17 @@ _OFFLINE_PLAN: dict[str, Any] = {
     ],
 }
 
+# The Complex offline plan gives the hardest task to a Senior seat, so offline runs
+# exercise task levels and the roster too.
+_OFFLINE_COMPLEX_PLAN: dict[str, Any] = {
+    **_OFFLINE_PLAN,
+    "summary": "Offline Complex plan (LLM_FAKE=1): follows the Principal's design note.",
+    "tasks": [
+        {**task, "level": "senior"} if task["role"] == "devops" else task
+        for task in _OFFLINE_PLAN["tasks"]
+    ],
+}
+
 
 async def create_plan(
     request: str,
@@ -76,28 +95,60 @@ async def create_plan(
     on_tool: ToolObserver | None = None,
     memory: str = "",
     on_reasoning: ReasoningObserver | None = None,
+    quick: bool = False,
+    design_note: str = "",
+    complex_run: bool = False,
 ) -> dict[str, Any]:
     if get_settings().llm_fake:
-        return validate_plan(_OFFLINE_PLAN)
+        if quick:
+            return validate_plan(
+                {
+                    "summary": "Offline Quick plan: one engineer implements and tests the request.",
+                    "tasks": [
+                        {
+                            "title": "Implement the small change",
+                            "role": "backend",
+                            "description": request,
+                            "depends_on": [],
+                        }
+                    ],
+                }
+            )
+        return validate_plan(_OFFLINE_COMPLEX_PLAN if complex_run else _OFFLINE_PLAN)
 
     spec = get_agent_spec(AgentRole.PRODUCT_MANAGER)
+    if quick:
+        # The same Engineer plans and implements, with read-only planning tools.
+        spec = replace(spec, role=AgentRole.BACKEND, model_tier="coder", level=SeatLevel.ENGINEER)
     # Recalled team memory rides along as context, never as command
     # (docs/architecture/planning-knowledge/KNOWLEDGE_AND_MEMORY.md).
     memory_block = f"{memory}\n\n" if memory else ""
+    if design_note:
+        memory_block += (
+            "The Principal Engineer's design note is binding context for this plan. "
+            "Split the work along it and give hard or cross-service tasks level senior:\n"
+            f"{design_note}\n\n"
+        )
+    if quick:
+        memory_block += (
+            "Prefer at most two tasks for a single backend engineer using the backend role. "
+            "If more tasks or specialists are needed, return the complete plan "
+            "so it can escalate.\n\n"
+        )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": spec.system_prompt},
         {"role": "user", "content": f"{memory_block}Feature request:\n{request}\n\n{PLAN_FORMAT}"},
     ]
     reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
     try:
-        return validate_plan(parse_plan(reply))
+        return validate_plan(parse_plan(reply), quick=quick)
     except PlanError as exc:
         # One corrective round: show the model its mistake and ask again.
         messages.append(
             {"role": "user", "content": f"That plan was rejected: {exc}\n\n{PLAN_FORMAT}"}
         )
         reply = await run_tool_loop(spec, ws, messages, usage, on_tool, on_reasoning)
-        return validate_plan(parse_plan(reply))
+        return validate_plan(parse_plan(reply), quick=quick)
 
 
 def parse_plan(reply: str) -> dict[str, Any]:
@@ -123,7 +174,7 @@ def _coerce_summary(summary: Any) -> str:
     return ""
 
 
-def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
+def validate_plan(plan: dict[str, Any], quick: bool = False) -> dict[str, Any]:
     summary = _coerce_summary(plan.get("summary"))
     tasks = plan.get("tasks")
     if not summary:
@@ -150,10 +201,15 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
             raise PlanError(
                 f"task {sequence} dependencies must be sequence numbers of earlier tasks"
             )
+        level = task.get("level") or "engineer"
+        if level not in TASK_LEVELS:
+            raise PlanError(f"task {sequence} has level {level!r}; allowed: {sorted(TASK_LEVELS)}")
         clean_tasks.append(
             {
                 "title": title.strip()[:256],
                 "role": role,
+                # Quick work always runs on one regular Engineer.
+                "level": "engineer" if quick else level,
                 "description": str(task.get("description") or "").strip(),
                 "depends_on": depends_on,
             }

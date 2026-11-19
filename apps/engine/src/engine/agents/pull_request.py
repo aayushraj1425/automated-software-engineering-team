@@ -33,15 +33,21 @@ DEFINITION_OF_DONE: tuple[str, ...] = (
 )
 
 
-def build_pull_request_body(plan_summary: str, run_id: uuid.UUID) -> str:
+def build_pull_request_body(
+    plan_summary: str, run_id: uuid.UUID, preview: str | None = None
+) -> str:
     """The markdown body for the run's pull/merge request: a Summary section (the
-    plan), an attribution line, and the Definition-of-Done checklist for the
+    plan), an attribution line, optional preview-deployment evidence (markdown
+    from the release module: URL, expiry and smoke results, or a simulated label),
+    and the Definition-of-Done checklist for the
     reviewer to verify."""
     checklist = "\n".join(f"- [ ] {item}" for item in DEFINITION_OF_DONE)
+    evidence = f"{preview.strip()}\n\n" if preview and preview.strip() else ""
     return (
         "## Summary\n\n"
         f"{plan_summary.strip() or '_No plan summary was produced._'}\n\n"
         f"_Opened by the ASEP agent team (run {run_id})._\n\n"
+        f"{evidence}"
         "## Definition of Done\n\n"
         "These boxes are the reviewer's to verify — the agent team cannot "
         "self-certify a human review.\n\n"
