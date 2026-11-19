@@ -19,6 +19,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@asep/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       better-auth:
         specifier: 1.4.21
         version: 1.4.21(@prisma/client@5.22.0)(better-sqlite3@12.11.1)(drizzle-orm@0.41.0(@prisma/client@5.22.0)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(kysely@0.29.2)(pg@8.22.0))(next@15.5.20(@babel/core@7.29.7)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.22.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@2.1.9(@types/node@22.20.0)(jsdom@25.0.1(supports-color@10.2.2))(lightningcss@1.32.0)(supports-color@10.2.2))

@@ -507,6 +507,156 @@
         }
       }
     },
+    "/v1/runs/{run_id}/roster": {
+      "patch": {
+        "summary": "Update Roster",
+        "operationId": "update_roster_v1_runs__run_id__roster_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RosterUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/deploy-decision": {
+      "post": {
+        "summary": "Decide Deployment",
+        "operationId": "decide_deployment_v1_runs__run_id__deploy_decision_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/triage": {
+      "patch": {
+        "summary": "Update Triage",
+        "operationId": "update_triage_v1_runs__run_id__triage_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{run_id}/decision": {
       "post": {
         "summary": "Decide Run",
@@ -2315,6 +2465,145 @@
         }
       }
     },
+    "/v1/preview-credentials": {
+      "get": {
+        "summary": "Get Preview Credential",
+        "operationId": "get_preview_credential_v1_preview_credentials_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewCredentialOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Put Preview Credential",
+        "operationId": "put_preview_credential_v1_preview_credentials_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewCredentialIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewCredentialOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Preview Credential",
+        "operationId": "delete_preview_credential_v1_preview_credentials_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "List Models",
+        "operationId": "list_models_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelEntry"
+                  },
+                  "type": "array",
+                  "title": "Response List Models V1 Models Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/model-policy": {
+      "get": {
+        "summary": "Get Model Policy",
+        "operationId": "get_model_policy_v1_model_policy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPolicyOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Put Model Policy",
+        "operationId": "put_model_policy_v1_model_policy_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelPolicyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPolicyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/integrations": {
       "get": {
         "summary": "List Integrations",
@@ -2459,6 +2748,23 @@
   },
   "components": {
     "schemas": {
+      "AgentRole": {
+        "type": "string",
+        "enum": [
+          "supervisor",
+          "product_manager",
+          "backend",
+          "frontend",
+          "devops",
+          "reviewer",
+          "qa",
+          "scrum_master",
+          "technical_writer",
+          "principal_engineer",
+          "release_engineer"
+        ],
+        "title": "AgentRole"
+      },
       "BlockedItemOut": {
         "properties": {
           "item_id": {
@@ -2557,6 +2863,15 @@
           "message"
         ],
         "title": "CommitOut"
+      },
+      "Complexity": {
+        "type": "string",
+        "enum": [
+          "quick",
+          "standard",
+          "complex"
+        ],
+        "title": "Complexity"
       },
       "ConnectionIn": {
         "properties": {
@@ -3248,6 +3563,162 @@
         ],
         "title": "MessageOut"
       },
+      "ModelEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "pattern": "^(anthropic|openai|gemini|openai_compatible)$",
+            "title": "Provider"
+          },
+          "context_size": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Context Size"
+          },
+          "supports_tools": {
+            "type": "boolean",
+            "title": "Supports Tools",
+            "default": true
+          },
+          "strength": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Strength"
+          },
+          "input_cost_per_million": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Input Cost Per Million"
+          },
+          "output_cost_per_million": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Output Cost Per Million"
+          },
+          "open_source": {
+            "type": "boolean",
+            "title": "Open Source",
+            "default": false
+          },
+          "evaluated": {
+            "type": "boolean",
+            "title": "Evaluated",
+            "default": false
+          },
+          "requires_api_key": {
+            "type": "boolean",
+            "title": "Requires Api Key",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "context_size",
+          "strength",
+          "input_cost_per_million",
+          "output_cost_per_million"
+        ],
+        "title": "ModelEntry"
+      },
+      "ModelPolicyIn": {
+        "properties": {
+          "level_pins": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Level Pins",
+            "default": {}
+          },
+          "allow_open_source_auto": {
+            "type": "boolean",
+            "title": "Allow Open Source Auto",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ModelPolicyIn"
+      },
+      "ModelPolicyOut": {
+        "properties": {
+          "level_pins": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Level Pins"
+          },
+          "allow_open_source_auto": {
+            "type": "boolean",
+            "title": "Allow Open Source Auto"
+          },
+          "open_source_models": {
+            "items": {
+              "$ref": "#/components/schemas/OpenSourceModelStatus"
+            },
+            "type": "array",
+            "title": "Open Source Models"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level_pins",
+          "allow_open_source_auto",
+          "open_source_models"
+        ],
+        "title": "ModelPolicyOut"
+      },
+      "OpenSourceModelStatus": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "eligible_for_auto": {
+            "type": "boolean",
+            "title": "Eligible For Auto"
+          },
+          "certified_strength": {
+            "type": "integer",
+            "title": "Certified Strength"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "eligible_for_auto",
+          "certified_strength",
+          "reason"
+        ],
+        "title": "OpenSourceModelStatus"
+      },
       "PlanEditIn": {
         "properties": {
           "tasks": {
@@ -3348,6 +3819,174 @@
         ],
         "title": "PlanTaskEdit",
         "description": "One task's edit at the approval gate: retitle, re-describe, or drop.\nAn omitted description leaves the existing one alone; an empty string\nclears it."
+      },
+      "PreviewCredentialIn": {
+        "properties": {
+          "kubeconfig": {
+            "type": "string",
+            "maxLength": 262144,
+            "minLength": 1,
+            "title": "Kubeconfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kubeconfig"
+        ],
+        "title": "PreviewCredentialIn"
+      },
+      "PreviewCredentialOut": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured"
+        ],
+        "title": "PreviewCredentialOut"
+      },
+      "PreviewDeployment": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "deployed",
+              "failed",
+              "deleted",
+              "simulated"
+            ],
+            "title": "Status"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "source_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Sha"
+          },
+          "smoke": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SmokeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "namespace",
+          "status",
+          "expires_at"
+        ],
+        "title": "PreviewDeployment"
+      },
+      "PreviewOptions": {
+        "properties": {
+          "chart_path": {
+            "type": "string",
+            "title": "Chart Path",
+            "default": "deploy/helm"
+          },
+          "values_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values File"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "ttl_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Ttl Hours",
+            "default": 24
+          },
+          "smoke_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Smoke Paths"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PreviewOptions"
       },
       "Priority": {
         "type": "string",
@@ -3562,6 +4201,20 @@
         ],
         "title": "RoadmapIn"
       },
+      "RosterUpdate": {
+        "properties": {
+          "model_overrides": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 24,
+            "title": "Model Overrides"
+          }
+        },
+        "type": "object",
+        "title": "RosterUpdate"
+      },
       "RunCreate": {
         "properties": {
           "request": {
@@ -3591,6 +4244,45 @@
               }
             ],
             "title": "Max Cost Usd"
+          },
+          "complexity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Complexity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_overrides": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 24,
+            "title": "Model Overrides"
+          },
+          "preview_requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Requested"
+          },
+          "preview_options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3670,6 +4362,37 @@
             ],
             "title": "Finished At"
           },
+          "complexity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Complexity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Reason"
+          },
+          "team_template": {
+            "type": "string",
+            "title": "Team Template",
+            "default": "standard"
+          },
+          "test_only": {
+            "type": "boolean",
+            "title": "Test Only",
+            "default": false
+          },
           "plan": {
             "anyOf": [
               {
@@ -3700,6 +4423,97 @@
           "total_output_tokens": {
             "type": "integer",
             "title": "Total Output Tokens"
+          },
+          "test_report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Report"
+          },
+          "team": {
+            "items": {
+              "$ref": "#/components/schemas/Seat"
+            },
+            "type": "array",
+            "title": "Team"
+          },
+          "model_overrides": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Model Overrides"
+          },
+          "design_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Design Note"
+          },
+          "stages_completed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stages Completed"
+          },
+          "preview_requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Requested"
+          },
+          "preview_options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview_deployment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewDeployment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deployment_status": {
+            "type": "string",
+            "title": "Deployment Status",
+            "default": "not_requested"
+          },
+          "deployment_source_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Source Sha"
           }
         },
         "type": "object",
@@ -3790,6 +4604,37 @@
               }
             ],
             "title": "Finished At"
+          },
+          "complexity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Complexity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Reason"
+          },
+          "team_template": {
+            "type": "string",
+            "title": "Team Template",
+            "default": "standard"
+          },
+          "test_only": {
+            "type": "boolean",
+            "title": "Test Only",
+            "default": false
           }
         },
         "type": "object",
@@ -3915,6 +4760,86 @@
         ],
         "title": "SearchHit"
       },
+      "Seat": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AgentRole"
+          },
+          "level": {
+            "$ref": "#/components/schemas/SeatLevel"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "role",
+          "level"
+        ],
+        "title": "Seat"
+      },
+      "SeatLevel": {
+        "type": "string",
+        "enum": [
+          "support",
+          "engineer",
+          "senior",
+          "principal"
+        ],
+        "title": "SeatLevel"
+      },
+      "SmokeResult": {
+        "properties": {
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "checks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "passed"
+        ],
+        "title": "SmokeResult"
+      },
       "TaskOut": {
         "properties": {
           "id": {
@@ -3970,6 +4895,22 @@
           "attempts": {
             "type": "integer",
             "title": "Attempts"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "default": "engineer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           }
         },
         "type": "object",
@@ -4046,6 +4987,18 @@
           "detail"
         ],
         "title": "TestResult"
+      },
+      "TriageUpdate": {
+        "properties": {
+          "complexity": {
+            "$ref": "#/components/schemas/Complexity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complexity"
+        ],
+        "title": "TriageUpdate"
       },
       "ValidationError": {
         "properties": {

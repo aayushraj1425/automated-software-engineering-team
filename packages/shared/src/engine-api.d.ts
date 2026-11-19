@@ -205,6 +205,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{run_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Roster */
+        patch: operations["update_roster_v1_runs__run_id__roster_patch"];
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/deploy-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Deployment */
+        post: operations["decide_deployment_v1_runs__run_id__deploy_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Triage */
+        patch: operations["update_triage_v1_runs__run_id__triage_patch"];
+        trace?: never;
+    };
     "/v1/runs/{run_id}/decision": {
         parameters: {
             query?: never;
@@ -838,6 +889,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/preview-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preview Credential */
+        get: operations["get_preview_credential_v1_preview_credentials_get"];
+        /** Put Preview Credential */
+        put: operations["put_preview_credential_v1_preview_credentials_put"];
+        post?: never;
+        /** Delete Preview Credential */
+        delete: operations["delete_preview_credential_v1_preview_credentials_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/model-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Policy */
+        get: operations["get_model_policy_v1_model_policy_get"];
+        /** Put Model Policy */
+        put: operations["put_model_policy_v1_model_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/integrations": {
         parameters: {
             query?: never;
@@ -900,6 +1005,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AgentRole
+         * @enum {string}
+         */
+        AgentRole: "supervisor" | "product_manager" | "backend" | "frontend" | "devops" | "reviewer" | "qa" | "scrum_master" | "technical_writer" | "principal_engineer" | "release_engineer";
         /** BlockedItemOut */
         BlockedItemOut: {
             /**
@@ -933,6 +1043,11 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * Complexity
+         * @enum {string}
+         */
+        Complexity: "quick" | "standard" | "complex";
         /** ConnectionIn */
         ConnectionIn: {
             /** Config */
@@ -1220,6 +1335,80 @@ export interface components {
              */
             created_at: string;
         };
+        /** ModelEntry */
+        ModelEntry: {
+            /** Id */
+            id: string;
+            /** Provider */
+            provider: string;
+            /** Context Size */
+            context_size: number;
+            /**
+             * Supports Tools
+             * @default true
+             */
+            supports_tools: boolean;
+            /** Strength */
+            strength: number;
+            /** Input Cost Per Million */
+            input_cost_per_million: number;
+            /** Output Cost Per Million */
+            output_cost_per_million: number;
+            /**
+             * Open Source
+             * @default false
+             */
+            open_source: boolean;
+            /**
+             * Evaluated
+             * @default false
+             */
+            evaluated: boolean;
+            /**
+             * Requires Api Key
+             * @default false
+             */
+            requires_api_key: boolean;
+        };
+        /** ModelPolicyIn */
+        ModelPolicyIn: {
+            /**
+             * Level Pins
+             * @default {}
+             */
+            level_pins: {
+                [key: string]: string;
+            };
+            /**
+             * Allow Open Source Auto
+             * @default false
+             */
+            allow_open_source_auto: boolean;
+        };
+        /** ModelPolicyOut */
+        ModelPolicyOut: {
+            /** Level Pins */
+            level_pins: {
+                [key: string]: string;
+            };
+            /** Allow Open Source Auto */
+            allow_open_source_auto: boolean;
+            /** Open Source Models */
+            open_source_models: components["schemas"]["OpenSourceModelStatus"][];
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** OpenSourceModelStatus */
+        OpenSourceModelStatus: {
+            /** Model Id */
+            model_id: string;
+            /** Eligible For Auto */
+            eligible_for_auto: boolean;
+            /** Certified Strength */
+            certified_strength: number;
+            /** Reason */
+            reason: string;
+        };
         /** PlanEditIn */
         PlanEditIn: {
             /** Tasks */
@@ -1259,6 +1448,64 @@ export interface components {
              * @default false
              */
             drop: boolean;
+        };
+        /** PreviewCredentialIn */
+        PreviewCredentialIn: {
+            /** Kubeconfig */
+            kubeconfig: string;
+        };
+        /** PreviewCredentialOut */
+        PreviewCredentialOut: {
+            /** Configured */
+            configured: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** PreviewDeployment */
+        PreviewDeployment: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Namespace */
+            namespace: string;
+            /** Url */
+            url?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "deployed" | "failed" | "deleted" | "simulated";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Source Sha */
+            source_sha?: string | null;
+            smoke?: components["schemas"]["SmokeResult"] | null;
+            /** Error */
+            error?: string | null;
+        };
+        /** PreviewOptions */
+        PreviewOptions: {
+            /**
+             * Chart Path
+             * @default deploy/helm
+             */
+            chart_path: string;
+            /** Values File */
+            values_file?: string | null;
+            /** Image */
+            image?: string | null;
+            /**
+             * Ttl Hours
+             * @default 24
+             */
+            ttl_hours: number;
+            /** Smoke Paths */
+            smoke_paths?: string[];
         };
         /**
          * Priority
@@ -1349,6 +1596,13 @@ export interface components {
             /** Goal */
             goal: string;
         };
+        /** RosterUpdate */
+        RosterUpdate: {
+            /** Model Overrides */
+            model_overrides?: {
+                [key: string]: string;
+            };
+        };
         /** RunCreate */
         RunCreate: {
             /** Request */
@@ -1357,6 +1611,14 @@ export interface components {
             repository_url: string;
             /** Max Cost Usd */
             max_cost_usd?: number | string | null;
+            complexity?: components["schemas"]["Complexity"] | null;
+            /** Model Overrides */
+            model_overrides?: {
+                [key: string]: string;
+            };
+            /** Preview Requested */
+            preview_requested?: boolean | null;
+            preview_options?: components["schemas"]["PreviewOptions"] | null;
         };
         /** RunDetailOut */
         RunDetailOut: {
@@ -1384,6 +1646,19 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+            complexity?: components["schemas"]["Complexity"] | null;
+            /** Triage Reason */
+            triage_reason?: string | null;
+            /**
+             * Team Template
+             * @default standard
+             */
+            team_template: string;
+            /**
+             * Test Only
+             * @default false
+             */
+            test_only: boolean;
             /** Plan */
             plan: {
                 [key: string]: unknown;
@@ -1396,6 +1671,31 @@ export interface components {
             total_input_tokens: number;
             /** Total Output Tokens */
             total_output_tokens: number;
+            /** Test Report */
+            test_report?: {
+                [key: string]: unknown;
+            } | null;
+            /** Team */
+            team?: components["schemas"]["Seat"][];
+            /** Model Overrides */
+            model_overrides?: {
+                [key: string]: string;
+            };
+            /** Design Note */
+            design_note?: string | null;
+            /** Stages Completed */
+            stages_completed?: string[];
+            /** Preview Requested */
+            preview_requested?: boolean | null;
+            preview_options?: components["schemas"]["PreviewOptions"] | null;
+            preview_deployment?: components["schemas"]["PreviewDeployment"] | null;
+            /**
+             * Deployment Status
+             * @default not_requested
+             */
+            deployment_status: string;
+            /** Deployment Source Sha */
+            deployment_source_sha?: string | null;
         };
         /** RunOut */
         RunOut: {
@@ -1423,6 +1723,19 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+            complexity?: components["schemas"]["Complexity"] | null;
+            /** Triage Reason */
+            triage_reason?: string | null;
+            /**
+             * Team Template
+             * @default standard
+             */
+            team_template: string;
+            /**
+             * Test Only
+             * @default false
+             */
+            test_only: boolean;
         };
         /** RunReportOut */
         RunReportOut: {
@@ -1465,6 +1778,36 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** Seat */
+        Seat: {
+            /** Key */
+            key: string;
+            role: components["schemas"]["AgentRole"];
+            level: components["schemas"]["SeatLevel"];
+            /** Model */
+            model?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
+         * SeatLevel
+         * @enum {string}
+         */
+        SeatLevel: "support" | "engineer" | "senior" | "principal";
+        /** SmokeResult */
+        SmokeResult: {
+            /** Passed */
+            passed: boolean;
+            /** Checks */
+            checks?: {
+                [key: string]: unknown;
+            }[];
+            /** Error */
+            error?: string | null;
+        };
         /** TaskOut */
         TaskOut: {
             /**
@@ -1488,6 +1831,13 @@ export interface components {
             result: string | null;
             /** Attempts */
             attempts: number;
+            /**
+             * Level
+             * @default engineer
+             */
+            level: string;
+            /** Model */
+            model?: string | null;
         };
         /** TerminalCommandIn */
         TerminalCommandIn: {
@@ -1511,6 +1861,10 @@ export interface components {
             dry_run: boolean;
             /** Detail */
             detail: string;
+        };
+        /** TriageUpdate */
+        TriageUpdate: {
+            complexity: components["schemas"]["Complexity"];
         };
         /** ValidationError */
         ValidationError: {
@@ -2005,6 +2359,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanEditOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_roster_v1_runs__run_id__roster_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RosterUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_deployment_v1_runs__run_id__deploy_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_triage_v1_runs__run_id__triage_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
@@ -3277,6 +3736,150 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preview_credential_v1_preview_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCredentialOut"];
+                };
+            };
+        };
+    };
+    put_preview_credential_v1_preview_credentials_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewCredentialIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCredentialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_preview_credential_v1_preview_credentials_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_models_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelEntry"][];
+                };
+            };
+        };
+    };
+    get_model_policy_v1_model_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelPolicyOut"];
+                };
+            };
+        };
+    };
+    put_model_policy_v1_model_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelPolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelPolicyOut"];
+                };
             };
             /** @description Validation Error */
             422: {
