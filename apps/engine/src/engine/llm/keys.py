@@ -19,7 +19,9 @@ from engine.security.crypto import DecryptionError, decrypt
 log = structlog.get_logger()
 
 # The providers a user may bring a key for (litellm model-id prefixes).
-ALLOWED_PROVIDERS = ("anthropic", "openai", "gemini")
+# openai_compatible covers Ollama, vLLM and LM Studio endpoints; its key (if any)
+# is only ever sent to the operator's configured base_url for that catalog entry.
+ALLOWED_PROVIDERS = ("anthropic", "openai", "gemini", "openai_compatible")
 
 provider_keys_var: ContextVar[dict[str, str] | None] = ContextVar("provider_keys", default=None)
 
