@@ -1,10 +1,13 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from engine.llm.catalog import ModelEntry, SeatLevel
 
 # Every embedding — real or fake — has exactly this many numbers; the
 # code_chunks column is vector(EMBEDDING_DIM). Changing it means re-indexing.
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 3072
 
 
 class Settings(BaseSettings):
@@ -44,6 +47,13 @@ class Settings(BaseSettings):
     engine_encryption_key: str = ""
     engine_cors_origins: str = "http://localhost:3000"
     log_level: str = "INFO"
+
+    # Provider API keys — read by background tasks that have no user context
+    # (e.g. repository indexing). Chat/agent calls use per-user keys from the
+    # database instead (keys.py). Empty = no server-level key for that provider.
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
 
     llm_fake: bool = False
     workspaces_dir: str = ".workspaces"
@@ -102,7 +112,27 @@ class Settings(BaseSettings):
     model_planner: str = "anthropic/claude-opus-4-8"
     model_coder: str = "anthropic/claude-sonnet-4-6"
     model_cheap: str = "anthropic/claude-haiku-4-5"
-    model_embedding: str = "gemini/text-embedding-004"  # must produce EMBEDDING_DIM numbers
+    model_embedding: str = "gemini/gemini-embedding-001"  # must produce EMBEDDING_DIM numbers
+    # Server-side key for openai_compatible endpoints that need one (a local
+    # Ollama needs none). Callers' own keys win, as for every provider.
+    model_openai_compatible_api_key: str = ""
+    # Signed evaluation results that let an open source model join auto
+    # selection (docs/architecture/agents/OPEN_SOURCE_MODELS.md).
+    model_evaluation_dir: str = ".model-evaluations"
+    model_evaluation_max_age_days: int = 30
+
+    # Empty retains the legacy tier mapping. JSON arrays/maps in .env.
+    model_catalog: list[ModelEntry] = []
+    model_level_pins: dict[SeatLevel, str] = {}
+
+    @model_validator(mode="after")
+    def validate_model_catalog(self):
+        ids = [entry.id for entry in self.model_catalog]
+        if len(ids) != len(set(ids)):
+            raise ValueError("MODEL_CATALOG contains duplicate model ids")
+        if any(model not in ids for model in self.model_level_pins.values()):
+            raise ValueError("MODEL_LEVEL_PINS must reference MODEL_CATALOG entries")
+        return self
 
 
 @lru_cache

@@ -16,8 +16,6 @@ from alembic import op
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
 
-from engine.config import EMBEDDING_DIM
-
 revision: str = "0004"
 down_revision: str | None = "0003"
 branch_labels: str | Sequence[str] | None = None
@@ -44,7 +42,9 @@ def upgrade() -> None:
         sa.Column("start_line", sa.Integer, nullable=False),
         sa.Column("end_line", sa.Integer, nullable=False),
         sa.Column("content", sa.Text, nullable=False),
-        sa.Column("embedding", Vector(EMBEDDING_DIM), nullable=False),
+        # Historical schema: migration 0025 widens this to 3072. Importing the
+        # current setting here breaks fresh installs at the 0009 HNSW index.
+        sa.Column("embedding", Vector(768), nullable=False),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),

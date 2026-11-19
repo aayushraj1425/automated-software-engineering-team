@@ -8,12 +8,20 @@ See docs/architecture/agents/AGENT_RUNTIME.md for the lifecycle diagrams.
 from enum import StrEnum
 
 
+class Complexity(StrEnum):
+    QUICK = "quick"
+    STANDARD = "standard"
+    COMPLEX = "complex"
+
+
 class RunStatus(StrEnum):
     QUEUED = "queued"
     PLANNING = "planning"
     AWAITING_APPROVAL = "awaiting_approval"
     EXECUTING = "executing"
     REVIEWING = "reviewing"
+    AWAITING_DEPLOY_APPROVAL = "awaiting_deploy_approval"
+    DEPLOYING = "deploying"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -38,6 +46,8 @@ class AgentRole(StrEnum):
     QA = "qa"
     SCRUM_MASTER = "scrum_master"
     TECHNICAL_WRITER = "technical_writer"
+    PRINCIPAL_ENGINEER = "principal_engineer"
+    RELEASE_ENGINEER = "release_engineer"
 
 
 # ── Planning Suite (docs/architecture/planning-knowledge/PLANNING_SUITE.md) ────────────────────

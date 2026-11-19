@@ -123,6 +123,30 @@ class AgentRun(Base, TimestampMixin):
     request: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default=RunStatus.QUEUED, index=True)
     plan: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    complexity: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    triage_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    team_template: Mapped[str] = mapped_column(
+        String(32), default="standard", server_default="standard"
+    )
+    test_only: Mapped[bool] = mapped_column(default=False, server_default="false")
+    test_report: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    team: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+    model_overrides: Mapped[dict[str, str]] = mapped_column(
+        JSONB, default=dict, server_default="{}"
+    )
+    design_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    stages_completed: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    preview_requested: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    preview_options: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    preview_deployment: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    deployment_status: Mapped[str] = mapped_column(
+        String(32), default="not_requested", server_default="not_requested"
+    )
+    deployment_approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    deployment_approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    deployment_approved_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     base_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
     branch_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -158,6 +182,8 @@ class AgentTask(Base, TimestampMixin):
     )
     sequence: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(32))
+    level: Mapped[str] = mapped_column(String(16), default="engineer", server_default="engineer")
+    model: Mapped[str | None] = mapped_column(String(256), nullable=True)
     title: Mapped[str] = mapped_column(String(256))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default=TaskStatus.PENDING, index=True)
@@ -168,6 +194,24 @@ class AgentTask(Base, TimestampMixin):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     run: Mapped[AgentRun] = relationship(back_populates="tasks")
+
+
+class OrganizationModelPolicy(Base, TimestampMixin):
+    __tablename__ = "organization_model_policies"
+
+    org_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    level_pins: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict, server_default="{}")
+    allow_open_source_auto: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+
+
+class PreviewCredential(Base, TimestampMixin):
+    __tablename__ = "preview_credentials"
+
+    org_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    encrypted_credentials: Mapped[str] = mapped_column(Text)
 
 
 class AgentEvent(Base):
@@ -220,15 +264,10 @@ class CodeChunk(Base):
         # hybrid retrieval (design note:
         # docs/architecture/repository-intelligence/HYBRID_RETRIEVAL.md).
         Index("ix_code_chunks_content_tsv", "content_tsv", postgresql_using="gin"),
-        # HNSW approximate-nearest-neighbor index keeps cosine-distance vector
-        # search fast as repositories grow
-        # (docs/architecture/repository-intelligence/INCREMENTAL_INDEXING.md).
-        Index(
-            "ix_code_chunks_embedding_hnsw",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
+        # No ANN index on `embedding`: gemini-embedding-001 produces 3072-dim
+        # vectors and pgvector caps both HNSW and IVFFlat at 2000 dims (see
+        # migration 0025). Cosine-distance search falls back to an exact scan.
+        # Switch the column to halfvec to restore an index (production TODO).
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

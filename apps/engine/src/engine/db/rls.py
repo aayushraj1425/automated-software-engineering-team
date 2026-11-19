@@ -76,6 +76,7 @@ CHILD_TABLES: dict[str, tuple[str, str]] = {
 # opens *explicitly shared* keys only — personal keys have org_id NULL and
 # stay behind the owner clause (PROVIDER_KEYS.md).
 ORG_SHARED_TABLES: frozenset[str] = frozenset({"repositories", "agent_runs", "provider_keys"})
+ORG_ONLY_TABLES = ("organization_model_policies", "preview_credentials")
 
 
 def _policy_predicate(table: str, owner_column: str) -> str:
@@ -106,6 +107,17 @@ def _child_predicate(parent: str, fk_column: str) -> str:
 def rls_statements() -> list[str]:
     """The DDL applying every policy. Idempotent: safe to run twice."""
     statements: list[str] = []
+    for table in ORG_ONLY_TABLES:
+        predicate = (
+            f"{_SERVICE_CONTEXT} OR org_id = NULLIF(current_setting('app.org_id', true), '')"
+        )
+        statements += [
+            f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+            f"DROP POLICY IF EXISTS {table}_org_rows ON {table}",
+            f"CREATE POLICY {table}_org_rows ON {table} FOR ALL "
+            f"USING ({predicate}) WITH CHECK ({predicate})",
+        ]
     for table, owner_column in USER_OWNED_TABLES.items():
         predicate = _policy_predicate(table, owner_column)
         statements += [
@@ -143,6 +155,12 @@ def rls_statements() -> list[str]:
 def rls_teardown_statements() -> list[str]:
     """The mirror image, for the migration's downgrade."""
     statements: list[str] = []
+    for table in ORG_ONLY_TABLES:
+        statements += [
+            f"DROP POLICY IF EXISTS {table}_org_rows ON {table}",
+            f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+            f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY",
+        ]
     for table in USER_OWNED_TABLES:
         statements += [
             f"DROP POLICY IF EXISTS {table}_owner_rows ON {table}",

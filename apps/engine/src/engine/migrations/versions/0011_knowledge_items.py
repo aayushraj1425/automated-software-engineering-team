@@ -18,8 +18,6 @@ from alembic import op
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
 
-from engine.config import EMBEDDING_DIM
-
 revision: str = "0011"
 down_revision: str | None = "0010"
 branch_labels: str | Sequence[str] | None = None
@@ -46,7 +44,8 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("created_by", sa.String(64), nullable=True),
-        sa.Column("embedding", Vector(EMBEDDING_DIM), nullable=False),
+        # Keep migration history independent of the runtime embedding setting.
+        sa.Column("embedding", Vector(768), nullable=False),
         sa.Column(
             "content_tsv",
             postgresql.TSVECTOR,
