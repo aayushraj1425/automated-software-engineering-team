@@ -1,0 +1,16 @@
+# The adapter injects `preview.*` (run id, namespace, release, expiry) last, so
+# a repository cannot override them. `image` is replaced when the run supplies one.
+image: nginxinc/nginx-unprivileged:1.27-alpine
+replicas: 1
+service:
+  port: 80
+ingress:
+  enabled: true
+  className: ""
+  # Use a hostname your preview ingress controller serves. Left empty, the
+  # Ingress is skipped and the adapter reports no URL.
+  host: ""
+  tls: false
+preview:
+  enabled: false
+  runId: ""

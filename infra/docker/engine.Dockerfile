@@ -27,6 +27,25 @@ RUN set -eux; \
 
 COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /usr/local/bin/uv
 
+# Preview releases run in the engine or worker process. Verify official binary
+# checksums; set KUBECTL_VERSION to a minor compatible with the target cluster.
+ARG HELM_VERSION=4.3.1
+ARG KUBECTL_VERSION=1.36.1
+RUN set -eux; \
+    curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz; \
+    curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" -o /tmp/helm.sha256; \
+    cd /tmp; \
+    sed 's@helm-v[^ ]*linux-amd64.tar.gz@helm.tar.gz@' helm.sha256 | sha256sum --check; \
+    tar -xzf helm.tar.gz linux-amd64/helm; \
+    install -m 0755 linux-amd64/helm /usr/local/bin/helm; \
+    curl -fsSL "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o kubectl; \
+    curl -fsSL "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" -o kubectl.sha256; \
+    printf '%s  kubectl\n' "$(cat kubectl.sha256)" | sha256sum --check; \
+    install -m 0755 kubectl /usr/local/bin/kubectl; \
+    rm -rf /tmp/helm.tar.gz /tmp/helm.sha256 /tmp/linux-amd64 /tmp/kubectl /tmp/kubectl.sha256; \
+    helm version --short; \
+    kubectl version --client
+
 WORKDIR /app
 
 # Dependencies first so code edits don't bust the layer cache.

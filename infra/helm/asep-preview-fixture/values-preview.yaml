@@ -1,0 +1,6 @@
+# Example values file for PreviewOptions.values_file.
+replicas: 1
+ingress:
+  enabled: true
+  host: preview.example.com
+  tls: true

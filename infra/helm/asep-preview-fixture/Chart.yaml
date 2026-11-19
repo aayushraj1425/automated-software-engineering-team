@@ -1,0 +1,10 @@
+apiVersion: v2
+name: asep-preview-fixture
+description: >-
+  Smallest chart the preview adapter accepts: one unprivileged web server that
+  answers /healthz, a Service, and an Ingress. Use it to try the adapter and as
+  the starting point for a repository's own deploy/helm chart.
+  Design note: docs/architecture/agents/PREVIEW_DEPLOY_ADAPTER.md.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
