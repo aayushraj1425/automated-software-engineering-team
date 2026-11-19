@@ -220,6 +220,8 @@ async def test_router_hands_litellm_the_callers_key(monkeypatch):
 
     monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
     monkeypatch.setattr(get_settings(), "llm_fake", False)
+    monkeypatch.setattr(get_settings(), "model_planner", "anthropic/test-planner")
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "synthetic-server-key")
 
     # Whatever model the planner tier maps to, bring a key for its provider.
     planner_provider = get_settings().model_planner.split("/", 1)[0]
@@ -232,5 +234,12 @@ async def test_router_hands_litellm_the_callers_key(monkeypatch):
     assert captured["api_key"] == "sk-mine-1234"
 
     captured.clear()
-    await model_router.complete("planner", [{"role": "user", "content": "hi"}])
-    assert captured["api_key"] is None  # no user key: litellm reads the .env
+    fallback = provider_keys_var.set({})
+    try:
+        await model_router.complete("planner", [{"role": "user", "content": "hi"}])
+        assert captured["api_key"] == "synthetic-server-key"
+        monkeypatch.setattr(get_settings(), "anthropic_api_key", "")
+        await model_router.complete("planner", [{"role": "user", "content": "hi"}])
+        assert captured["api_key"] is None
+    finally:
+        provider_keys_var.reset(fallback)

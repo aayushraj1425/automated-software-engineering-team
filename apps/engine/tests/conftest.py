@@ -7,6 +7,15 @@ import time
 # vars take priority over .env files.
 os.environ["LLM_FAKE"] = "1"
 os.environ["ENGINE_SERVICE_SECRET"] = "test-service-secret-0123456789abcdef"
+# Offline tests must never inherit a developer's real provider credentials.
+# Individual key-routing tests install explicit synthetic keys with monkeypatch.
+for _provider_key_name in (
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "MODEL_OPENAI_COMPATIBLE_API_KEY",
+):
+    os.environ[_provider_key_name] = ""
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://asep:asep@localhost:5433/asep_test")
 # The whole suite runs in two-role mode: user-pinned sessions connect as the
 # non-owner asep_api role (created in _ensure_test_database), so every
@@ -49,7 +58,9 @@ def make_service_token(
     org_role: str | None = None,
 ) -> str:
     now = int(time.time())
-    payload: dict[str, object] = {"sub": user_id, "iat": now, "exp": now + 60}
+    # Multi-stage integration tests reuse their headers while Git and worker jobs
+    # run. Keep fixture tokens valid for those tests; expiry tests mint their own.
+    payload: dict[str, object] = {"sub": user_id, "iat": now, "exp": now + 3600}
     if org_id is not None:
         payload["org"] = org_id
     if org_role is not None:

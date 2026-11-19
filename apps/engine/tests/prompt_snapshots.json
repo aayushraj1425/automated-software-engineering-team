@@ -11,6 +11,10 @@
     "sha256": "9c15f6b294c3ed99b7525e52270a1ffed5dcf7891959de1e44ef380a53d5f535",
     "lines": 32
   },
+  "principal_engineer.md": {
+    "sha256": "aa423a5199cdd95b3f22bf0d55fe96148138216fe1e180c0ff9265771982c382",
+    "lines": 4
+  },
   "product_manager.md": {
     "sha256": "def363f716dc81658c87ed739d4b9c8a869f40edc00422c0cea9575e12625972",
     "lines": 31
@@ -18,6 +22,10 @@
   "qa.md": {
     "sha256": "4a9dd642b9ac13e341e14d49d3e339754d249b7d301452ab14516a8a1a1cf63e",
     "lines": 27
+  },
+  "release_engineer.md": {
+    "sha256": "58185a586bea6412cdcf08d449db95d9be5447ed38cccf95e54fcfd51668093a",
+    "lines": 4
   },
   "reviewer.md": {
     "sha256": "e83ed71baaa0ad9b7cc6784da282e5b4f194ecc81a0fc9630ecbd118d9b1c911",
